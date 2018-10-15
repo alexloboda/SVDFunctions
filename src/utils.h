@@ -129,7 +129,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             }
         }
         unsigned long n_pvals = pvals.size();
-        if (i >= min_controls - 1) {
+        if (i >= min_controls - 1 && !pvals.empty()) {
             lm pvals_lm(n_pvals);
             std::sort(pvals.begin(), pvals.end());
             for (int j = 0; j < n_pvals; j++) {

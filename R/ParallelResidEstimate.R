@@ -13,7 +13,7 @@ ParallelResidEstimate <- function (gmatrix, svdReference, nSV)
     for (i in 1:ncol(resiudals)) {
         normRes <- norm(resiudals[, i], type = "2")
         normG <- norm(gmatrix[, i], type = "2")
-        norms <- append(norms, normRes / normG)
+        norms <- append(norms, normRes)
     }
     norms
 }
