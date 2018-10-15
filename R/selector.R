@@ -14,7 +14,7 @@ NULL
 #' @param case_counts Matrix with summary genotype counts from cases
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
-select_controls <- function(gmatrix, residuals, case_counts, 
+SelectControls <- function(gmatrix, residuals, case_counts, 
                             min = 500) {
   if (dim(gmatrix)[1] != dim(case_counts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
