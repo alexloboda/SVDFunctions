@@ -14,9 +14,10 @@ NULL
 #' @param nSV Number of singular vectors to be used for reconstruction of the 
 #' @param caseCounts Matrix with summary genotype counts from cases
 #' @param min Minimal size of a control set that is permitted for return
+#' @param binSize sliding window size for optimal lambda search
 #' @export
 SelectControls <- function(gmatrix, svdReference, caseCounts, 
-                            min = 500, nSV = 5) {
+                            min = 500, nSV = 5, binSize = 1) {
   residuals <- ParallelResidEstimate(gmatrix, svdReference, nSV)
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
@@ -24,8 +25,6 @@ SelectControls <- function(gmatrix, svdReference, caseCounts,
   gmatrix <- as.matrix(gmatrix)
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
-  out <- select_controls_cpp(gmatrix, residuals, caseCounts, 
-                      stats::qchisq(ppoints(100000), df = 1), min)
-  out$lambda <- setNames(out$lambda, as.character(min:(min + length(out$lambda) - 1)))
-  out
+  select_controls_cpp(gmatrix, residuals, caseCounts, 
+                      stats::qchisq(ppoints(100000), df = 1), min, binSize)
 }

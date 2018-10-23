@@ -76,15 +76,18 @@ struct matching_results {
     double optimal_lambda;
     vector<double> pvals;
     vector<double> lambdas;
+    vector<int> lambda_i;
 
-    matching_results(int opt_prefix, double opt_lmd, vector<double>&& p_values, vector<double>&& lmbds)
+    matching_results(int opt_prefix, double opt_lmd, vector<double>&& p_values, vector<double>&& lmbds,
+                     vector<int>&& lmbd_i)
             :optimal_prefix(opt_prefix), pvals(std::move(p_values)), lambdas(std::move(lmbds)),
-            optimal_lambda(opt_lmd) {}
+            optimal_lambda(opt_lmd), lambda_i(std::move(lmbd_i)) {}
 };
 
 matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<double>& residuals,
                                                   vector<vector<int>>& case_counts, std::function<double(double)>& qchisq,
-                                                  int min_controls = 500) {
+                                                  int min_controls = 500, int bin = 1) {
+    bin = std::max(bin, 1);
     std::vector<bool> snp_mask = check_user_counts(case_counts);
 
     sort_controls(gmatrix, residuals);
@@ -107,9 +110,10 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     double lambda = std::numeric_limits<double>::infinity();
     std::vector<double> optimal_pvals;
     std::vector<double> lambdas;
+    std::vector<int> lambda_i;
     int optimal_prefix = -1;
 
-    for (int i = 0; i < n; i++) {
+    for (int i = bin - 1; i < n; i += bin) {
         ++rank;
         std::vector<double> pvals;
         for (int j = 0; j < m; j++) {
@@ -138,6 +142,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             pvals_lm.solve();
             double cur_lambda = pvals_lm.get_lambda();
             lambdas.push_back(cur_lambda);
+            lambda_i.push_back(i + 1);
             if (cur_lambda < 1.3) {
                 if (cur_lambda < 1.05 || cur_lambda <= lambda) {
                     optimal_prefix = i;
@@ -148,7 +153,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
         }
     }
 
-    return matching_results(optimal_prefix, lambda, std::move(optimal_pvals), std::move(lambdas));
+    return matching_results(optimal_prefix, lambda, std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i));
 }
 
 #endif

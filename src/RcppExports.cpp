@@ -6,8 +6,8 @@
 using namespace Rcpp;
 
 // select_controls_cpp
-List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals, NumericMatrix& cc, NumericVector& chi2fn, NumericVector min);
-RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP residualsSEXP, SEXP ccSEXP, SEXP chi2fnSEXP, SEXP minSEXP) {
+List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals, NumericMatrix& cc, NumericVector& chi2fn, NumericVector min, IntegerVector bin_size);
+RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP residualsSEXP, SEXP ccSEXP, SEXP chi2fnSEXP, SEXP minSEXP, SEXP bin_sizeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -16,13 +16,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericMatrix& >::type cc(ccSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type chi2fn(chi2fnSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type min(minSEXP);
-    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, residuals, cc, chi2fn, min));
+    Rcpp::traits::input_parameter< IntegerVector >::type bin_size(bin_sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, residuals, cc, chi2fn, min, bin_size));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 5},
+    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 6},
     {NULL, NULL, 0}
 };
 

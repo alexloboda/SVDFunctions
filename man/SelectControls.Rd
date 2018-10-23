@@ -4,7 +4,8 @@
 \alias{SelectControls}
 \title{Selection of the optimal set of controls}
 \usage{
-SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5)
+SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5,
+  binSize = 1)
 }
 \arguments{
 \item{gmatrix}{Genotype matrix}
@@ -16,6 +17,8 @@ SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5)
 \item{min}{Minimal size of a control set that is permitted for return}
 
 \item{nSV}{Number of singular vectors to be used for reconstruction of the}
+
+\item{binSize}{sliding window size for optimal lambda search}
 }
 \description{
 Calls C++ routine to find optimal set of controls satisfying 
