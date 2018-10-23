@@ -44,10 +44,13 @@ List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
     NumericVector pvals(result.pvals.begin(), result.pvals.end());
     NumericVector optimal_lambda(1, result.optimal_lambda);
     IntegerVector names(result.lambda_i.begin(), result.lambda_i.end());
+    IntegerVector pvals_num(result.pvals_num.begin(), result.pvals_num.end());
     lambda.attr("names") = names;
+    pvals_num.attr("names") = names;
     ret["lambda"] = lambda;
     ret["controls"] = n_controls;
     ret["pvals"] = pvals;
     ret["optimal_lambda"] = optimal_lambda;
+    ret["snps"] = pvals_num;
     return ret;
 }
