@@ -4,16 +4,18 @@
 \alias{SelectControls}
 \title{Selection of the optimal set of controls}
 \usage{
-SelectControls(gmatrix, residuals, case_counts, min = 500)
+SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5)
 }
 \arguments{
 \item{gmatrix}{Genotype matrix}
 
-\item{residuals}{Vector of relative residual vector norms for all prospective controls}
+\item{svdReference}{Reference basis of the left singular vectors}
 
-\item{case_counts}{Matrix with summary genotype counts from cases}
+\item{caseCounts}{Matrix with summary genotype counts from cases}
 
 \item{min}{Minimal size of a control set that is permitted for return}
+
+\item{nSV}{Number of singular vectors to be used for reconstruction of the}
 }
 \description{
 Calls C++ routine to find optimal set of controls satisfying 

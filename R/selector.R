@@ -10,19 +10,21 @@ NULL
 #' Otherwise no results will be returned. Minimal size of control set 
 #' is \code{min} samples for privacy preservation reasons.
 #' @param gmatrix Genotype matrix
-#' @param residuals Vector of relative residual vector norms for all prospective controls
-#' @param case_counts Matrix with summary genotype counts from cases
+#' @param svdReference Reference basis of the left singular vectors
+#' @param nSV Number of singular vectors to be used for reconstruction of the 
+#' @param caseCounts Matrix with summary genotype counts from cases
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
-SelectControls <- function(gmatrix, residuals, case_counts, 
-                            min = 500) {
-  if (dim(gmatrix)[1] != dim(case_counts)[1] | length(residuals) != dim(gmatrix)[2]) {
+SelectControls <- function(gmatrix, svdReference, caseCounts, 
+                            min = 500, nSV = 5) {
+  residuals <- ParallelResidEstimate(gmatrix, svdReference, nSV)
+  if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
   }
   gmatrix <- as.matrix(gmatrix)
   residuals <- as.numeric(residuals)
-  case_counts <- as.matrix(case_counts)
-  out <- select_controls_cpp(gmatrix, residuals, case_counts, 
+  caseCounts <- as.matrix(caseCounts)
+  out <- select_controls_cpp(gmatrix, residuals, caseCounts, 
                       stats::qchisq(ppoints(100000), df = 1), min)
   out$lambda <- setNames(out$lambda, as.character(min:(min + length(out$lambda) - 1)))
   out
