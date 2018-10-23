@@ -19,12 +19,15 @@ NULL
 SelectControls <- function(gmatrix, svdReference, caseCounts, 
                             min = 500, nSV = 5, binSize = 1) {
   residuals <- ParallelResidEstimate(gmatrix, svdReference, nSV)
+  control_names <- names(residuals)[order(residuals)] 
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
   }
   gmatrix <- as.matrix(gmatrix)
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
-  select_controls_cpp(gmatrix, residuals, caseCounts, 
+  result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
                       stats::qchisq(ppoints(100000), df = 1), min, binSize)
+  result$selected_controls <- control_names[1:result$controls]
+  result
 }
