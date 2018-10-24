@@ -115,7 +115,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     std::vector<int> pvals_num;
     int optimal_prefix = -1;
 
-    for (int i = bin - 1; i < n; i += bin) {
+    for (int i = 0; i < n; i++) {
         ++rank;
         std::vector<double> pvals;
         for (int j = 0; j < m; j++) {
@@ -126,7 +126,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             std::vector<int>& cts = counts[j];
             ++cts[cur];
             lms[j].set(cur, cur, 0, cts[cur]);
-            if (i >= min_controls - 1) {
+            if (i >= min_controls - 1 && (i + 1) % bin == 0) {
                 if (!check_counts(cts[0], cts[1], cts[2])) {
                     continue;
                 }
@@ -135,7 +135,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             }
         }
         unsigned long n_pvals = pvals.size();
-        if (i >= min_controls - 1 && !pvals.empty()) {
+        if (i >= min_controls - 1 && !pvals.empty() && (i + 1) % bin == 0) {
             lm pvals_lm(n_pvals);
             std::sort(pvals.begin(), pvals.end());
             for (int j = 0; j < n_pvals; j++) {
