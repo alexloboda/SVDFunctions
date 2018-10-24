@@ -148,7 +148,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             pvals_num.push_back(pvals.size());
             if (cur_lambda < 1.3) {
                 if (cur_lambda < 1.05 || cur_lambda <= lambda) {
-                    optimal_prefix = i;
+                    optimal_prefix = i + 1;
                     lambda = cur_lambda;
                     optimal_pvals = pvals;
                 }
