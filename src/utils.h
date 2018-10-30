@@ -57,9 +57,7 @@ std::vector<bool> check_user_counts(vector<vector<int>>& case_counts) {
         int homref = case_counts[i][0];
         int het = case_counts[i][1];
         int hom = case_counts[i][2];
-        double overall = 2 * (homref + het + hom);
-        double tmp = (2 * homref + het) / overall;
-        mask.push_back(tmp > 0.05 && tmp < 0.95);
+        mask.push_back(check_counts(homref, het, hom));
     }
     return mask;
 }
