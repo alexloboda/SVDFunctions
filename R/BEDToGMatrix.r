@@ -7,29 +7,29 @@ ReplaceMissing<-function(x){
 }
 
 EstimateCountsGLM<-function(gmatrixToCount){
-	  counts <- mat.or.vec(nr=nrow(gmatrixToCount), nc=3)
-    for (i in 1:nrow(gmatrixToCount)){
-	    AlleleCounts<-table(gmatrixToCount[i,])
-      if("0" %in% names(AlleleCounts)){
-	      homref <- AlleleCounts["0"]
-      } else {
-		    homref <- 0
-	    }
-      if("1" %in% names(AlleleCounts)){
-		      het <- AlleleCounts["1"]
-	    } else {
-		      het <- 0
-	    }
-      if("2" %in% names(AlleleCounts)){
-		    homalt <- AlleleCounts["2"]
-	    } else {
-		    homalt <- 0
-	    }
-	    counts[i, 1] <- homref
-	    counts[i, 2] <- het
-	    counts[i, 3] <- homalt
-	  }
-    counts
+  counts <- mat.or.vec(nr=nrow(gmatrixToCount), nc=3)
+  for (i in 1:nrow(gmatrixToCount)){
+    AlleleCounts<-table(gmatrixToCount[i,])
+    if("0" %in% names(AlleleCounts)){
+      homref <- AlleleCounts["0"]
+    } else {
+	    homref <- 0
+    }
+    if("1" %in% names(AlleleCounts)){
+	    het <- AlleleCounts["1"]
+    } else {
+	    het <- 0
+    }
+     if("2" %in% names(AlleleCounts)){
+	    homalt <- AlleleCounts["2"]
+    } else {
+	    homalt <- 0
+    }
+    counts[i, 1] <- homref
+    counts[i, 2] <- het
+    counts[i, 3] <- homalt
+  }
+  counts
 }
 
 #' @export
