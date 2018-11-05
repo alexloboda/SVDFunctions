@@ -8,10 +8,12 @@ Maintainer: Who to complain to <yourfault@somewhere.net>
 Description: More about what it does (maybe more than one line)
 License: What license is it under?
 Encoding: UTF-8
+biocViews:
 Imports:
     magrittr,
     Rcpp,
-    BH
+    BH,
+    snpStats
 RoxygenNote: 6.1.0
 LinkingTo: Rcpp, 
            BH
