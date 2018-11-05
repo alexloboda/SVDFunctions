@@ -28,6 +28,10 @@ SelectControls <- function(gmatrix, svdReference, caseCounts,
   caseCounts <- as.matrix(caseCounts)
   result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
                       stats::qchisq(ppoints(100000), df = 1), min, binSize)
-  result$controls <- control_names[1:result$controls]
+  if (result$controls >= 1) {
+    result$controls <- control_names[1:result$controls]
+  } else {
+    result$controls <- c()
+  }
   result
 }

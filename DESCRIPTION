@@ -1,12 +1,15 @@
 Package: SVDFunctions
 Type: Package
-Title: What the package does (short line)
+Title: Set of functions for selecting matching genetic controls without sharing genotypes.
 Version: 1.0
 Date: 2018-09-06
-Author: Who wrote it
-Maintainer: Who to complain to <yourfault@somewhere.net>
-Description: More about what it does (maybe more than one line)
-License: What license is it under?
+Authors@R: c(person("Alexander", "Loboda", email="aloboda@broadinstitute.org", role=c("aut","cre")),
+            person("Mykyta", "Artomov", email="artomov@broadinstitute.org", role=c("aut")))
+Description: Package contains set of functions used for building SVD-based 
+    COntrol REpository (SCORE) - platform for secure matching of control 
+    subjects without genotype sharing for exome DNA sequencing studies. 
+    Platform is available at dnascore.net
+License: MIT
 Encoding: UTF-8
 biocViews:
 Imports:
