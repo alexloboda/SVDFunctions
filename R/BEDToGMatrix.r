@@ -34,6 +34,7 @@ EstimateCountsGLM <- function(gmatrixToCount){
 
 #' @export
 BED2GMatrix <- function(bfile, ref) {
+  ref <- normalizePath(ref)
   ref <- fread(ref, header = T)
   ref <- as.data.frame(ref)
   regions.storage <- read.table(paste(bfile, ".bim", sep=""))
