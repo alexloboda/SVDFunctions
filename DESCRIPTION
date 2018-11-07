@@ -12,7 +12,7 @@ Description: Package contains set of functions used for building SVD-based
 License: MIT
 Encoding: UTF-8
 biocViews:
-Depends:
+Imports:
     magrittr,
     Rcpp,
     BH,
