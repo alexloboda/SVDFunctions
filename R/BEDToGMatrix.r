@@ -49,13 +49,13 @@ BED2GMatrix <- function(bfile, ref) {
   regions.storage <- read.table(paste(bfile, ".bim", sep=""))
   regions <- regions.storage[,2] %>% unlist %>% as.character
   
-  outfilename <- tail(strsplit(bfile, split = "/")[[1]], n = 1)
+  outfilename <- bfile#tail(strsplit(bfile, split = "/")[[1]], n = 1)
   output <- paste(outfilename, "_gmatrix.txt", sep="")
   message(date()," Starting genotype matrix conversion...")
   
-  PlinkData <- read.plink(bed = paste(bfile, "bed", sep="."),
-                          bim = paste(bfile, "bim", sep="."),
-                          fam = paste(bfile, "fam", sep="."), 
+  PlinkData <- read.plink(bed = normalizePath(paste(bfile, "bed", sep=".")),
+                          bim = normalizePath(paste(bfile, "bim", sep=".")),
+                          fam = normalizePath(paste(bfile, "fam", sep=".")), 
                           select.snps = regions)
   
   gmatrix <- as(PlinkData$genotypes,'numeric') %>% t(.)
