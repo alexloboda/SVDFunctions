@@ -16,7 +16,8 @@ Imports:
     magrittr,
     Rcpp,
     BH,
-    snpStats
+    snpStats,
+    data.table
 RoxygenNote: 6.1.0
 SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues

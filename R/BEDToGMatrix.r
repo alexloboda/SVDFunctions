@@ -32,6 +32,15 @@ EstimateCountsGLM <- function(gmatrixToCount){
   counts
 }
 
+#' Create two files needed to run SCORE platform
+#'
+#' This function generates matrix of left singular 
+#' vectors and summary genotype counts. Binary PLINK files are used as an input.
+#' @param bfile  name of the PLINK files (i.e. if you have "example.bed", 
+#' "example.bim", "example.fam" files as PLINK binary data storage, 
+#' bfile="example")
+#' @param ref file with a list of DNA variant locations and corresponding 
+#' reference alleles. Could be downloaded from http://dnascore.net -> Tutorial
 #' @export
 BED2GMatrix <- function(bfile, ref) {
   ref <- normalizePath(ref)
