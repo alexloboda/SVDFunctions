@@ -41,22 +41,23 @@ EstimateCountsGLM <- function(gmatrixToCount){
 #' bfile="example")
 #' @param ref file with a list of DNA variant locations and corresponding 
 #' reference alleles. Could be downloaded from http://dnascore.net -> Tutorial
+#' @import magrittr
 #' @export
 BED2GMatrix <- function(bfile, ref) {
   ref <- normalizePath(ref)
-  ref <- fread(ref, header = T)
+  ref <- data.table::fread(ref, header = T)
   ref <- as.data.frame(ref)
-  regions.storage <- read.table(paste(bfile, ".bim", sep=""))
+  regions.storage <- read.table(paste(bfile, ".bim", sep = ""))
   regions <- regions.storage[,2] %>% unlist %>% as.character
   
-  outfilename <- bfile#tail(strsplit(bfile, split = "/")[[1]], n = 1)
+  outfilename <- bfile
   output <- paste(outfilename, "_gmatrix.txt", sep="")
   message(date()," Starting genotype matrix conversion...")
   
-  PlinkData <- read.plink(bed = normalizePath(paste(bfile, "bed", sep=".")),
-                          bim = normalizePath(paste(bfile, "bim", sep=".")),
-                          fam = normalizePath(paste(bfile, "fam", sep=".")), 
-                          select.snps = regions)
+  PlinkData <- snpStats::read.plink(bed = normalizePath(paste0(bfile, ".bed")),
+                                    bim = normalizePath(paste0(bfile, ".bim")),
+                                    fam = normalizePath(paste0(bfile, ".fam")), 
+                                    select.snps = regions)
   
   gmatrix <- as(PlinkData$genotypes,'numeric') %>% t(.)
   meta <- PlinkData$map
@@ -72,8 +73,8 @@ BED2GMatrix <- function(bfile, ref) {
   meta[mismatch,c(2,3)] <- meta[mismatch,c(3,2)]
   for(i in mismatch){
      geno.vector<-as.numeric(as.character(unlist(gmatrix[i,])))
-     geno.vector[which(gmatrix[i,]==0)] <- 2
-     geno.vector[which(gmatrix[i,]==2)] <- 0
+     geno.vector[which(gmatrix[i,] == 0)] <- 2
+     geno.vector[which(gmatrix[i,] == 2)] <- 0
      gmatrix[i,] <- geno.vector
   }
   gmatrix <- cbind(meta, gmatrix)
