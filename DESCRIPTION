@@ -18,5 +18,7 @@ Imports:
     BH,
     snpStats
 RoxygenNote: 6.1.0
+SystemRequirements: C++11
+BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
            BH
