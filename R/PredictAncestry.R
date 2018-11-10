@@ -10,10 +10,29 @@
 #' @param SV Number of singular vectors to use
 #' @param AncestryList Vector of ancestry names
 #' @export
-PredictAncestry <- function(SampleVector, ReferenceUList, SV, AncestryList){
-  residuals <- rep(0, length(AncestryList))
-  for (i in 1:length(AncestryList)){
-    residuals[i] <- ComputeResidual.Cross(SampleVector, ReferenceUList[[i]], SV)
+PredictAncestry<-function(gmatrix,ReferenceUList,SV,Ancestries){
+  if(class(ReferenceUList)!="list"){
+    stop("Collection of U-bases must be supplied as list object")
   }
-  return(AncestryList[which.min(residuals)])
+  if(length(which(is.na(gmatrix)==TRUE,arr.ind = TRUE))>0){
+    stop("Missing values in genotype matrix. Use ReplaceMissing() function to fix")
+  }
+  if(length(ReferenceUList)<2){
+    stop("More than 1 basis must be supplied")
+  }
+  if(length(ReferenceUList)!=length(Ancestries)){
+    stop("Different length of bases list and ancestries vector")
+  }
+  resid<-vector("list",length(ReferenceUList))
+  for(i in 1:length(ReferenceUList)){
+    resid[[i]]<-ParallelResidEstimate(gmatrix = gmatrix,svdReference = ReferenceUList[[i]],nSV = SV)
+  }
+  resid<-do.call(rbind,resid)
+  rownames(resid)<-Ancestries
+  svd.pred.anc<-c()
+  for(i in 1:ncol(resid)){
+    svd.pred.anc<-c(svd.pred.anc,Ancestries[which.min(resid[,i])])
+  }
+  names(svd.pred.anc)<-colnames(gmatrix)
+  return(svd.pred.anc)
 }
