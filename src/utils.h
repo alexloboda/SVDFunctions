@@ -116,6 +116,10 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     int optimal_prefix = -1;
 
     for (int i = 0; i < n; i++) {
+        if (i % 100 == 0) {
+            Rcpp::checkUserInterrupt();
+        }
+
         ++rank;
         std::vector<double> pvals;
         for (int j = 0; j < m; j++) {

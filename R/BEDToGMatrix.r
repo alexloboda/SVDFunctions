@@ -90,7 +90,7 @@ BED2GMatrix <- function(bfile, ref) {
   u <- svd(gmatrix,nu=min(c(10,abs(ncol(gmatrix)-1),abs(nrow(gmatrix)-1))))$u
   utils::write.table(u, paste(outfilename, "U.txt", sep="_"), row.names=F, 
               col.names = F, sep = "\t", quote=F)
-  write.table(case_counts, paste(outfilename, "_case_counts.txt", sep=""), 
+  utils::write.table(case_counts, paste(outfilename, "_case_counts.txt", sep=""), 
               sep="\t", quote = F, row.names = F)
   message(date(), " Success. Exiting...")
 }
