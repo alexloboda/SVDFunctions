@@ -4,15 +4,15 @@
 \alias{PredictAncestry}
 \title{SVD-based ancestry prediction}
 \usage{
-PredictAncestry(gmatrix, ReferenceUList, SV, Ancestries)
+PredictAncestry(gmatrix, ReferenceUList, SV, AncestryList)
 }
 \arguments{
+\item{gmatrix}{Vector of genotypes for a sample}
+
 \item{ReferenceUList}{List object containing matrices of the left singular
 vectors for every ancestry reference}
 
 \item{SV}{Number of singular vectors to use}
-
-\item{SampleVector}{Vector of genotypes for a sample}
 
 \item{AncestryList}{Vector of ancestry names}
 }

@@ -88,7 +88,7 @@ BED2GMatrix <- function(bfile, ref) {
   colnames(case_counts) <- c("VAR","REF","ALT","REFHOM","HET","ALTHOM")
   gmatrix <- ReplaceMissing(as.matrix(gmatrix[,-c(1,2,3)]))
   u <- svd(gmatrix,nu=min(c(10,abs(ncol(gmatrix)-1),abs(nrow(gmatrix)-1))))$u
-  write.table(u, paste(outfilename, "U.txt", sep="_"), row.names=F, 
+  utils::write.table(u, paste(outfilename, "U.txt", sep="_"), row.names=F, 
               col.names = F, sep = "\t", quote=F)
   write.table(case_counts, paste(outfilename, "_case_counts.txt", sep=""), 
               sep="\t", quote = F, row.names = F)

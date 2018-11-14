@@ -7,10 +7,10 @@
 ComputeResidual.preproc(ReferenceU, SV)
 }
 \arguments{
-\item{SampleVector}{Number of singular vectors to be used for reconstruction
-of the original vector}
+\item{ReferenceU}{Matrix of the left singular vectors of cases}
 
-\item{PreprocessedU}{Matrix of the left singular vectors of cases}
+\item{SV}{Number of singular vectors to be used for reconstruction
+of the original vector}
 }
 \description{
 Residual vector is estimated as \eqn{(I - UU^T)Z}, where part 
