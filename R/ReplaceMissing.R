@@ -3,13 +3,13 @@
 #' SVD does not tolerated missing values in a matrix. This function replaces 
 #' missing entries in genotype matrix with average genotype for each DNA 
 #' variant rounded to an integer.
-#' @param GenotypeMatrix Matrix of genotypes (class – Matrix)
+#' @param genotypeMatrix Matrix of genotypes (class – Matrix)
 #' @export
-ReplaceMissing <- function (GenotypeMatrix) 
+ReplaceMissing <- function (genotypeMatrix) 
 {
-    k <- which(is.na(GenotypeMatrix), arr.ind = T)
+    k <- which(is.na(genotypeMatrix), arr.ind = T)
     if (length(k) > 0) {
-        GenotypeMatrix[k] <- round(rowMeans(GenotypeMatrix, na.rm = T)[k[, 1]])
+        genotypeMatrix[k] <- round(rowMeans(genotypeMatrix, na.rm = T)[k[, 1]])
     }
-    return(GenotypeMatrix)
+    return(genotypeMatrix)
 }

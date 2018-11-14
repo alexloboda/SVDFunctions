@@ -4,24 +4,24 @@
 \alias{SelectControls}
 \title{Selection of the optimal set of controls}
 \usage{
-SelectControls(gmatrix, svdReference, caseCounts, min_lambda = 0.75,
-  softmin_lambda = 0.9, softmax_lambda = 1.05, max_lambda = 1.3,
-  min = 500, nSV = 5, binSize = 1)
+SelectControls(genotypeMatrix, SVDReference, caseCounts,
+  minLambda = 0.75, softMinLambda = 0.9, softMaxLambda = 1.05,
+  maxLambda = 1.3, min = 500, nSV = 5, binSize = 1)
 }
 \arguments{
-\item{gmatrix}{Genotype matrix}
+\item{genotypeMatrix}{Genotype matrix}
 
-\item{svdReference}{Reference basis of the left singular vectors}
+\item{SVDReference}{Reference basis of the left singular vectors}
 
 \item{caseCounts}{Matrix with summary genotype counts from cases}
 
-\item{min_lambda}{Minimum possible lambda}
+\item{minLambda}{Minimum possible lambda}
 
-\item{softmin_lambda}{Desirable minimum for lambda}
+\item{softMinLambda}{Desirable minimum for lambda}
 
-\item{softmax_lambda}{Desirable maximum for lambda}
+\item{softMaxLambda}{Desirable maximum for lambda}
 
-\item{max_lambda}{Maximum possible lambda}
+\item{maxLambda}{Maximum possible lambda}
 
 \item{min}{Minimal size of a control set that is permitted for return}
 

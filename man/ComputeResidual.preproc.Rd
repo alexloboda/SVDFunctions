@@ -4,10 +4,10 @@
 \alias{ComputeResidual.preproc}
 \title{Intermediate computation of the residual vectors}
 \usage{
-ComputeResidual.preproc(ReferenceU, SV)
+ComputeResidual.preproc(referenceU, SV)
 }
 \arguments{
-\item{ReferenceU}{Matrix of the left singular vectors of cases}
+\item{referenceU}{Matrix of the left singular vectors of cases}
 
 \item{SV}{Number of singular vectors to be used for reconstruction
 of the original vector}
@@ -15,6 +15,6 @@ of the original vector}
 \description{
 Residual vector is estimated as \eqn{(I - UU^T)Z}, where part 
 \eqn{I - UU^T} is the same for every 
-control sample. Thus, could be pre-computed only once for every case 
+control sample. Thus, could be precomputed only once for every case 
 basis supplied.
 }

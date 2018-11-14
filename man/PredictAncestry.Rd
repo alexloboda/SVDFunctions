@@ -4,17 +4,17 @@
 \alias{PredictAncestry}
 \title{SVD-based ancestry prediction}
 \usage{
-PredictAncestry(gmatrix, ReferenceUList, SV, AncestryList)
+PredictAncestry(genotypeMatrix, referenceUList, SV, ancestryList)
 }
 \arguments{
-\item{gmatrix}{Vector of genotypes for a sample}
+\item{genotypeMatrix}{Vector of genotypes for a sample}
 
-\item{ReferenceUList}{List object containing matrices of the left singular
+\item{referenceUList}{List object containing matrices of the left singular
 vectors for every ancestry reference}
 
 \item{SV}{Number of singular vectors to use}
 
-\item{AncestryList}{Vector of ancestry names}
+\item{ancestryList}{Vector of ancestry names}
 }
 \description{
 Requires several left singular vector bases from every ancestry to be detected. 

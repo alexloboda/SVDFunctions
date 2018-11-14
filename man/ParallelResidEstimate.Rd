@@ -4,12 +4,12 @@
 \alias{ParallelResidEstimate}
 \title{Estimation of residual vector norms for all controls}
 \usage{
-ParallelResidEstimate(gmatrix, svdReference, nSV)
+ParallelResidEstimate(genotypeMatrix, SVDReference, nSV)
 }
 \arguments{
-\item{gmatrix}{Genotype matrix}
+\item{genotypeMatrix}{Genotype matrix}
 
-\item{svdReference}{Reference basis of the left singular vectors}
+\item{SVDReference}{Reference basis of the left singular vectors}
 
 \item{nSV}{Number of singular vectors to be used for reconstruction of the 
 original vector}

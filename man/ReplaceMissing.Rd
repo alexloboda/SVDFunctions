@@ -4,10 +4,10 @@
 \alias{ReplaceMissing}
 \title{Replace of missing values in genotype matrix}
 \usage{
-ReplaceMissing(GenotypeMatrix)
+ReplaceMissing(genotypeMatrix)
 }
 \arguments{
-\item{GenotypeMatrix}{Matrix of genotypes (class – Matrix)}
+\item{genotypeMatrix}{Matrix of genotypes (class – Matrix)}
 }
 \description{
 SVD does not tolerated missing values in a matrix. This function replaces 
