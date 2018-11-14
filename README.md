@@ -1,5 +1,8 @@
 # SVDFunctions
 
+[![Build
+Status](https://travis-ci.org/alexloboda/SVDFunctions.svg?branch=master)](https://travis-ci.org/alexloboda/SVDFunctions)
+
 Installation
 ==============
 
