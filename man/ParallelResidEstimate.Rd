@@ -2,7 +2,7 @@
 % Please edit documentation in R/ParallelResidEstimate.R
 \name{ParallelResidEstimate}
 \alias{ParallelResidEstimate}
-\title{Estimation of relative residual vector norms for all controls}
+\title{Estimation of residual vector norms for all controls}
 \usage{
 ParallelResidEstimate(gmatrix, svdReference, nSV)
 }
@@ -15,5 +15,5 @@ ParallelResidEstimate(gmatrix, svdReference, nSV)
 original vector}
 }
 \description{
-Estimation of relative residual vector norms for all controls
+Estimation of residual vector norms for all controls
 }

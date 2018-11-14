@@ -9,7 +9,9 @@ using std::vector;
 
 // [[Rcpp::export]]
 List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
-                     NumericMatrix& cc, NumericVector& chi2fn, NumericVector min,
+                     NumericMatrix& cc, NumericVector& chi2fn,
+                     NumericVector min_lambda, NumericVector lb_lambda,
+                     NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min,
                      IntegerVector bin_size) {
     int n_c = gmatrix.ncol();
     int n_snps = gmatrix.nrow();
@@ -34,10 +36,11 @@ List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
             case_counts[i][j] = (int)std::lround(cc(i, j));
         }
     }
-    int min_controls = (int)std::lround(min[0]);
-    int bin = (int)std::lround(bin_size[0]);
+    int min_controls = min[0];
+    int bin = bin_size[0];
     std::function<double(double)> qchi = q.function();
-    auto result = select_controls_impl(gmatrix_c, resid, case_counts, qchi, min_controls, bin);
+    auto result = select_controls_impl(gmatrix_c, resid, case_counts, qchi, min_lambda[0], lb_lambda[0],
+            max_lambda[0], ub_lambda[0], min_controls, bin);
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());
     IntegerVector n_controls(1, result.optimal_prefix);

@@ -85,6 +85,8 @@ struct matching_results {
 
 matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<double>& residuals,
                                                   vector<vector<int>>& case_counts, std::function<double(double)>& qchisq,
+                                                  double min_lambda, double lb_lambda,
+                                                  double max_lambda, double ub_lambda,
                                                   int min_controls = 500, int bin = 1) {
     bin = std::max(bin, 1);
     std::vector<bool> snp_mask = check_user_counts(case_counts);
@@ -144,8 +146,10 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             lambdas.push_back(cur_lambda);
             lambda_i.push_back(i + 1);
             pvals_num.push_back(pvals.size());
-            if (cur_lambda < 1.3) {
-                if (cur_lambda < 1.05 || cur_lambda <= lambda) {
+            double lambda_dist = std::max(lambda - ub_lambda, lb_lambda - lambda);
+            double cur_lambda_dist = std::max(cur_lambda - ub_lambda, lb_lambda - cur_lambda);
+            if (cur_lambda < max_lambda && cur_lambda > min_lambda) {
+                if ((cur_lambda < ub_lambda && cur_lambda > lb_lambda) || cur_lambda_dist < lambda_dist) {
                     optimal_prefix = i + 1;
                     lambda = cur_lambda;
                     optimal_pvals = pvals;

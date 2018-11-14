@@ -1,4 +1,4 @@
-#' Estimation of relative residual vector norms for all controls
+#' Estimation of residual vector norms for all controls
 #' 
 #' @param gmatrix Genotype matrix
 #' @param svdReference Reference basis of the left singular vectors

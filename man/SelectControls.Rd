@@ -4,8 +4,9 @@
 \alias{SelectControls}
 \title{Selection of the optimal set of controls}
 \usage{
-SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5,
-  binSize = 1)
+SelectControls(gmatrix, svdReference, caseCounts, min_lambda = 0.75,
+  softmin_lambda = 0.9, softmax_lambda = 1.05, max_lambda = 1.3,
+  min = 500, nSV = 5, binSize = 1)
 }
 \arguments{
 \item{gmatrix}{Genotype matrix}
@@ -14,6 +15,14 @@ SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5,
 
 \item{caseCounts}{Matrix with summary genotype counts from cases}
 
+\item{min_lambda}{Minimum possible lambda}
+
+\item{softmin_lambda}{Desirable minimum for lambda}
+
+\item{softmax_lambda}{Desirable maximum for lambda}
+
+\item{max_lambda}{Maximum possible lambda}
+
 \item{min}{Minimal size of a control set that is permitted for return}
 
 \item{nSV}{Number of singular vectors to be used for reconstruction of the}
@@ -21,9 +30,11 @@ SelectControls(gmatrix, svdReference, caseCounts, min = 500, nSV = 5,
 \item{binSize}{sliding window size for optimal lambda search}
 }
 \description{
-Calls C++ routine to find optimal set of controls satisfying 
-\eqn{\lambda_GC<1.05} or if none exists – will select a set of controls with
- minimal \eqn{\lambda} GC satisfying \eqn{\lambda < 1.3}.
+Finds an optimal set of controls satisfying 
+\eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}
+or if none exists – will select a set of controls with
+ closest \eqn{\lambda_GC} to the range \eqn{[softmin_lambda; softmax_lambda]} 
+ satisfying \eqn{\lambda_GC < max_lambda} and \eqn{\lambda_GC > min_lambda}.
 Otherwise no results will be returned. Minimal size of control set 
 is \code{min} samples for privacy preservation reasons.
 }
