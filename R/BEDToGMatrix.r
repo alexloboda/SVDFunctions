@@ -47,7 +47,7 @@ BED2GMatrix <- function(bfile, ref) {
   ref <- normalizePath(ref)
   ref <- data.table::fread(ref, header = T)
   ref <- as.data.frame(ref)
-  regions.storage <- read.table(paste(bfile, ".bim", sep = ""))
+  regions.storage <- utils::read.table(paste(bfile, ".bim", sep = ""))
   regions <- regions.storage[,2] %>% unlist %>% as.character
   
   outfilename <- bfile
@@ -59,7 +59,7 @@ BED2GMatrix <- function(bfile, ref) {
                                     fam = normalizePath(paste0(bfile, ".fam")), 
                                     select.snps = regions)
   
-  gmatrix <- as(PlinkData$genotypes,'numeric') %>% t(.)
+  gmatrix <- methods::as(PlinkData$genotypes,'numeric') %>% t(.)
   meta <- PlinkData$map
   meta[,1] <- paste(paste("chr", meta[,1], sep=""), meta[,4], sep=":")
   
@@ -79,7 +79,7 @@ BED2GMatrix <- function(bfile, ref) {
   }
   gmatrix <- cbind(meta, gmatrix)
   
-  write.table(gmatrix, output, quote=F, sep="\t", row.names=F)
+  utils::write.table(gmatrix, output, quote=F, sep="\t", row.names=F)
   
   message(date(), " Generating Sharable Data")
   case_counts <- cbind(gmatrix[,c(1,2,3)],

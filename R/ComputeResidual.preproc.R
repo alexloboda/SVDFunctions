@@ -4,9 +4,9 @@
 #' \eqn{I - UU^T} is the same for every 
 #' control sample. Thus, could be pre-computed only once for every case 
 #' basis supplied. 
-#' @param SampleVector Number of singular vectors to be used for reconstruction
+#' @param SV Number of singular vectors to be used for reconstruction
 #' of the original vector
-#' @param PreprocessedU Matrix of the left singular vectors of cases
+#' @param ReferenceU Matrix of the left singular vectors of cases
 #' @export
 ComputeResidual.preproc <- function (ReferenceU, SV) 
 {
