@@ -48,6 +48,8 @@ BED2GMatrix <- function(bfile, ref) {
   ref <- data.table::fread(ref, header = T)
   ref <- as.data.frame(ref)
   regions.storage <- utils::read.table(paste(bfile, ".bim", sep = ""))
+  genomic_cord<-paste(paste("chr",regions.storage[,1],sep=""),regions.storage[,4],sep=":")
+  regions.storage<-regions.storage[which(genomic_cord %in% ref[,1]), ]
   regions <- regions.storage[,2] %>% unlist %>% as.character
   
   outfilename <- bfile
@@ -64,6 +66,7 @@ BED2GMatrix <- function(bfile, ref) {
   meta[,1] <- paste(paste("chr", meta[,1], sep=""), meta[,4], sep=":")
   
   ref_subset <- ref[ref[,1] %in% meta[,1], 2] %>% unlist %>% as.character
+  meta <- meta[meta[, 1] %in% ref[, 1],]
   if (any(meta[[5]] %>% as.character != ref_subset)){
     mismatch <- which(meta[,5] %>% unlist %>% as.character != ref_subset)
   }
@@ -78,7 +81,7 @@ BED2GMatrix <- function(bfile, ref) {
      gmatrix[i,] <- geno.vector
   }
   gmatrix <- cbind(meta, gmatrix)
-  
+  gmatrix <- gmatrix[gmatrix[, 2] == ref[ref[, 1] %in% gmatrix[, 1], 2],] 
   utils::write.table(gmatrix, output, quote=F, sep="\t", row.names=F)
   
   message(date(), " Generating Sharable Data")
