@@ -1,7 +1,7 @@
 Package: SVDFunctions
 Type: Package
 Title: Set of functions for selecting matching genetic controls without sharing genotypes.
-Version: 1.0001
+Version: 1.0002
 Authors@R: c(person("Alexander", "Loboda", email="aloboda@broadinstitute.org", role=c("aut","cre")),
             person("Mykyta", "Artomov", email="artomov@broadinstitute.org", role=c("aut")),
             person("Maxim", "Artyomov",role=c("aut")),
@@ -12,7 +12,7 @@ Description: Package contains set of functions used for building SVD-based
     Platform is available at dnascore.net
 License: MIT
 Encoding: UTF-8
-biocViews:
+biocViews: 
 Imports:
     magrittr,
     Rcpp,
@@ -25,3 +25,4 @@ SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
            BH
+Suggests: testthat
