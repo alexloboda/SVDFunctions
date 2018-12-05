@@ -41,9 +41,11 @@ EstimateCountsGLM <- function(gmatrixToCount){
 #' bfile="example")
 #' @param ref file with a list of DNA variant locations and corresponding
 #' reference alleles. Could be downloaded from http://dnascore.net -> Tutorial
+#' @param outputDir directory where results will be stored, if NULL results 
+#' will be placed in the same directory as bfile
 #' @import magrittr
 #' @export
-BED2GMatrix <- function(bfile, ref) {
+BED2GMatrix <- function(bfile, ref, outputDir = NULL) {
   ref <- normalizePath(ref)
   ref <- data.table::fread(ref, header = T)
   ref <- as.data.frame(ref)
@@ -52,7 +54,8 @@ BED2GMatrix <- function(bfile, ref) {
   regions.storage<-regions.storage[which(genomic_cord %in% ref[,1]), ]
   regions <- regions.storage[,2] %>% unlist %>% as.character
 
-  outfilename <- bfile
+  outputDirectory <- if(is.null(outputDir)) dirname(bfile) else outputDir
+  outfilename <- paste0(outputDirectory, "/", basename(bfile))
   output <- paste(outfilename, "_gmatrix.txt", sep="")
   message(date()," Starting genotype matrix conversion...")
 

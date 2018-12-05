@@ -4,17 +4,20 @@
 \alias{BED2GMatrix}
 \title{Create two files needed to run SCORE platform}
 \usage{
-BED2GMatrix(bfile, ref)
+BED2GMatrix(bfile, ref, outputDir = NULL)
 }
 \arguments{
-\item{bfile}{name of the PLINK files (i.e. if you have "example.bed", 
-"example.bim", "example.fam" files as PLINK binary data storage, 
+\item{bfile}{name of the PLINK files (i.e. if you have "example.bed",
+"example.bim", "example.fam" files as PLINK binary data storage,
 bfile="example")}
 
-\item{ref}{file with a list of DNA variant locations and corresponding 
+\item{ref}{file with a list of DNA variant locations and corresponding
 reference alleles. Could be downloaded from http://dnascore.net -> Tutorial}
+
+\item{outputDir}{directory where results will be stored, if NULL results 
+will be placed in the same directory as bfile}
 }
 \description{
-This function generates matrix of left singular 
+This function generates matrix of left singular
 vectors and summary genotype counts. Binary PLINK files are used as an input.
 }
