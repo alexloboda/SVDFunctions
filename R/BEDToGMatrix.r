@@ -64,9 +64,7 @@ BED2GMatrix <- function(bfile, ref) {
   gmatrix <- methods::as(PlinkData$genotypes,'numeric') %>% t(.)
   meta <- PlinkData$map
   meta[,1] <- paste(paste("chr", meta[,1], sep=""), meta[,4], sep=":")
-	#gmatrix <- cbind(meta[,c(1,5,6)],gmatrix)
-  ref_subset <- ref[ref[,1] %in% meta[,1], 2] %>% unlist %>% as.character
-  meta <- meta[meta[, 1] %in% ref[, 1],]
+	meta <- meta[meta[, 1] %in% ref[, 1],]
 	keep_snps_for_analysis <- c()
 	mismatch <- c()
 	for (i in 1:nrow(meta)){
