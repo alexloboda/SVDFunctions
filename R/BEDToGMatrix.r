@@ -50,7 +50,8 @@ BED2GMatrix <- function(bfile, ref, outputDir = NULL) {
   ref <- data.table::fread(ref, header = T)
   ref <- as.data.frame(ref)
   regions.storage <- data.table::fread(paste(bfile, ".bim", sep = ""))
-  genomic_cord<-paste(paste("chr",unlist(regions.storage[,1]),sep=""),unlist(regions.storage[,4]),sep=":")
+  genomic_cord <- paste(paste("chr", unlist(regions.storage[, 1]), sep=""),
+                        unlist(regions.storage[,4]), sep = ":")
   regions.storage<-regions.storage[which(genomic_cord %in% ref[,1]), ]
   regions <- regions.storage[,2] %>% unlist %>% as.character
 
@@ -71,10 +72,12 @@ BED2GMatrix <- function(bfile, ref, outputDir = NULL) {
 	keep_snps_for_analysis <- c()
 	mismatch <- c()
 	for (i in 1:nrow(meta)){
-		if (ref[which(ref[,1] == meta[i,1]),2] == meta[i,5] & ref[which(ref[,1] == meta[i,1]),3] == meta[i,6]){
+		if (ref[which(ref[,1] == meta[i,1]),2] == meta[i,5] &
+		    ref[which(ref[,1] == meta[i,1]),3] == meta[i,6]){
 			keep_snps_for_analysis <- c(keep_snps_for_analysis, i)
 		}
-		if (ref[which(ref[,1] == meta[i,1]),2] == meta[i,6] & ref[which(ref[,1] == meta[i,1]),3] == meta[i,5]){
+		if (ref[which(ref[,1] == meta[i,1]),2] == meta[i,6] &
+		    ref[which(ref[,1] == meta[i,1]),3] == meta[i,5]){
 			keep_snps_for_analysis <- c(keep_snps_for_analysis, i)
 			mismatch <- c(mismatch, i)
 		}
@@ -89,9 +92,8 @@ BED2GMatrix <- function(bfile, ref, outputDir = NULL) {
   gmatrix <- cbind(meta[keep_snps_for_analysis,c(1,5,6)], gmatrix[keep_snps_for_analysis,])
   message(date()," Validating genotype matrix...")
 	for (i in 1:nrow(gmatrix)){
-		if (ref[which(ref[,1] == gmatrix[i,1]),2] == gmatrix[i,2] & ref[which(ref[,1] == gmatrix[i,1]),3] == gmatrix[i,3]){
-			next
-		} else {
+		if (ref[which(ref[,1] == gmatrix[i,1]), 2] != gmatrix[i,2] |
+		    ref[which(ref[,1] == gmatrix[i,1]),3] != gmatrix[i, 3]){
 			message("REF/ALT mismatch at variant #", i)
 		}
 	}
