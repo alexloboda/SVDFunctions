@@ -84,8 +84,7 @@ BED2GMatrix <- function(bfile, ref) {
      gmatrix[i,] <- geno.vector
   }
   gmatrix <- cbind(meta[keep_snps_for_analysis,c(1,5,6)], gmatrix[keep_snps_for_analysis,])
-  utils::write.table(gmatrix, output, quote=F, sep="\t", row.names=F)
-	message(date()," Validating genotype matrix...")
+  message(date()," Validating genotype matrix...")
 	for (i in 1:nrow(gmatrix)){
 		if (ref[which(ref[,1] == gmatrix[i,1]),2] == gmatrix[i,2] & ref[which(ref[,1] == gmatrix[i,1]),3] == gmatrix[i,3]){
 			next
@@ -94,7 +93,11 @@ BED2GMatrix <- function(bfile, ref) {
 		}
 	}
 	message(date()," Done...")
-  message(date(), " Generating Sharable Data")
+	message(date()," Checking duplicates...")
+	gmatrix <- gmatrix[which(!duplicated(gmatrix[,1:3])),]
+	message(date()," Done...")
+	utils::write.table(gmatrix, output, quote=F, sep="\t", row.names=F)
+  message(date(), " Generating Sharable Data...")
   case_counts <- cbind(gmatrix[,c(1,2,3)],
                        EstimateCountsGLM(as.matrix(gmatrix[,-c(1, 2, 3)])))
 
