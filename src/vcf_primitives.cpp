@@ -1,4 +1,4 @@
-#include "vcf.h"
+#include "vcf_primitives.h"
 
 #include <string>
 #include <algorithm>

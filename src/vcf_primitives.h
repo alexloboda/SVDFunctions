@@ -32,7 +32,7 @@ namespace vcf {
         bool parse(std::string);
 
     public:
-        Chromosome(const std::string&);
+        explicit Chromosome(const std::string&);
         explicit operator std::string() const;
         int num() const;
 
@@ -67,6 +67,15 @@ namespace vcf {
 
         friend bool operator==(const Variant& variant, const Variant& other);
     };
+
+    class Range {
+        Chromosome chr;
+        int from;
+        int to;
+    public:
+        Range(Chromosome chr, int from, int to);
+        bool includes(const Position& p) const;
+    };
 }
 
 namespace std {
@@ -87,39 +96,6 @@ namespace std {
             return seed;
         }
     };
-}
-
-namespace vcf {
-    class Range {
-        Chromosome chr;
-        int from;
-        int to;
-    public:
-        Range(Chromosome chr, int from, int to);
-        bool includes(const Position& p) const;
-    };
-
-    class VCFFilter {
-        std::unordered_set<Variant> available_variants;
-        std::unordered_set<Variant> bad_variants;
-        std::unordered_set<std::string> available_samples;
-        std::vector<Range> ranges;
-    public:
-        VCFFilter();
-        bool apply(const Variant& v) const;
-    };
-
-    class VCFParser {
-        std::vector<std::string> fields;
-        std::vector<Variant> variants_found;
-        std::vector<std::string> samples_found;
-        std::vector<std::vector<int>> gmatrix;
-        std::unordered_map<std::string, int> fields_positions;
-
-    public:
-        explicit VCFParser(std::istream stream, VCFFilter& filter);
-};
-
 }
 
 #endif //SRC_VCF_H
