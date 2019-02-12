@@ -86,9 +86,9 @@ namespace vcf {
         AlleleType type;
     public:
         Allele(AlleleType type, int DP, int GQ);
-        int DP();
-        int GQ();
-        AlleleType alleleType();
+        int DP() const;
+        int GQ() const;
+        AlleleType alleleType() const;
     };
 }
 

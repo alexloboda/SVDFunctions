@@ -129,15 +129,15 @@ namespace vcf {
 
     Allele::Allele(AlleleType type, int DP, int GQ) :type(type), depth(DP), quality(GQ){}
 
-    int Allele::DP() {
+    int Allele::DP() const {
         return depth;
     }
 
-    int Allele::GQ() {
+    int Allele::GQ() const {
         return quality;
     }
 
-    AlleleType Allele::alleleType() {
+    AlleleType Allele::alleleType() const {
         return type;
     }
 }

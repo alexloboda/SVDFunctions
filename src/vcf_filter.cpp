@@ -42,5 +42,6 @@ namespace vcf {
     }
 
     bool VCFFilter::apply(const Allele& allele) const {
+        return allele.DP() > DP && allele.GQ() > GQ;
     }
 }
