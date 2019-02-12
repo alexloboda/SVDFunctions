@@ -25,8 +25,9 @@ namespace vcf {
     };
 
     class Chromosome {
-        const int chrX = 23;
-        const int chrY = 24;
+        static const int chrX = 23;
+        static const int chrY = 24;
+
         int chr;
 
         bool parse(std::string);
@@ -75,6 +76,19 @@ namespace vcf {
     public:
         Range(Chromosome chr, int from, int to);
         bool includes(const Position& p) const;
+    };
+
+    enum AlleleType {HOM, HET, ALT, MISSING};
+
+    class Allele {
+        int depth;
+        int quality;
+        AlleleType type;
+    public:
+        Allele(AlleleType type, int DP, int GQ);
+        int DP();
+        int GQ();
+        AlleleType alleleType();
     };
 }
 

@@ -7,7 +7,8 @@ namespace {
 }
 
 namespace vcf {
-    VCFFilter::VCFFilter() :variants_set(false), ranges_set(false) {}
+    VCFFilter::VCFFilter(int DP, int GQ)
+        :variants_set(false), ranges_set(false), DP(DP), GQ(GQ) {}
 
     void VCFFilter::set_available_variants(vector<Variant>& variants) {
         available_variants.clear();
@@ -31,12 +32,15 @@ namespace vcf {
     bool VCFFilter::apply(const Variant& v) const {
         return bad_variants.find(v) == bad_variants.end() &&
                 (!variants_set || available_variants.find(v) != available_variants.end()) &&
-                (!ranges_set || std::any_of(ranges.begin(), ranges.end(), [&v](Range& r){r.includes(v.position());}));
+                (!ranges_set || std::any_of(ranges.begin(), ranges.end(), [&v](const Range& r){
+                    return r.includes(v.position());
+                }));
     }
 
     bool VCFFilter::apply(const string& sample) const {
         return available_samples.find(sample) != available_samples.end();
     }
 
-
+    bool VCFFilter::apply(const Allele& allele) const {
+    }
 }

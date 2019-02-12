@@ -126,4 +126,18 @@ namespace vcf {
         }
         return p.position() >= from && p.position() < to;
     }
+
+    Allele::Allele(AlleleType type, int DP, int GQ) :type(type), depth(DP), quality(GQ){}
+
+    int Allele::DP() {
+        return depth;
+    }
+
+    int Allele::GQ() {
+        return quality;
+    }
+
+    AlleleType Allele::alleleType() {
+        return type;
+    }
 }
