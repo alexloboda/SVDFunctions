@@ -1,8 +1,6 @@
 #ifndef SRC_VCF_PARSER_H
 #define SRC_VCF_PARSER_H
 
-#include <optional>
-
 #include "vcf_primitives.h"
 #include "vcf_filter.h"
 #include "vcf_handlers.h"
