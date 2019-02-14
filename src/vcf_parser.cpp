@@ -52,10 +52,7 @@ namespace vcf {
         string ref = tokens[REF];
         vector<string> alts = split(tokens[ALT], ',');
         for (const string& alt: alts) {
-            Variant variant(position, ref, alt);
-            if (filter.apply(variant)) {
-                variants.emplace_back(position, ref, alt);
-            }
+            variants.emplace_back(position, ref, alt);
         }
         return variants;
     }
@@ -88,7 +85,7 @@ namespace vcf {
         }
     }
 
-    void VCFParser::parseGenotypes() {
+    void VCFParser::parse_genotypes() {
         string line;
         while (getline(input, line)) {
             ++line_num;

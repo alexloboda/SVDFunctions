@@ -28,7 +28,7 @@ namespace vcf {
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);
         void parseHeader();
-        void parseGenotypes();
+        void parse_genotypes();
         void registerHandler(std::unique_ptr<VariantsHandler>&& handler);
 
         std::vector<std::string> sample_names();

@@ -30,7 +30,7 @@ namespace vcf {
     }
 
     bool VCFFilter::apply(const string& sample) const {
-        return available_samples.find(sample) != available_samples.end();
+        return !variants_set || available_samples.find(sample) != available_samples.end();
     }
 
     bool VCFFilter::apply(const Allele& allele) const {
