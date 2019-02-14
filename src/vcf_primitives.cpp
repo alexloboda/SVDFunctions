@@ -39,7 +39,7 @@ namespace vcf {
         return seed;
     }
 
-    Variant::Variant(Position pos, string& ref, string& alt)
+    Variant::Variant(Position pos, const string& ref, const string& alt)
             : pos(pos), ref(ref), alt(alt) {}
 
     bool operator==(const Variant& var, const Variant& other) {
@@ -117,7 +117,7 @@ namespace vcf {
 
     ParserException::ParserException(std::string message) :msg(message) {}
 
-    std::string ParserException::get_message() {
+    std::string ParserException::get_message() const {
         return msg;
     }
 

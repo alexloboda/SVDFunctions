@@ -22,7 +22,7 @@ namespace vcf {
         explicit ParserException(std::string message);
         ParserException(std::string message, int line);
 
-        std::string get_message();
+        std::string get_message() const;
     };
 
     class Chromosome {
@@ -61,7 +61,7 @@ namespace vcf {
         std::string ref;
         std::string alt;
     public:
-        Variant(Position pos, std::string& ref, std::string& alt);
+        Variant(Position pos, const std::string& ref, const std::string& alt);
         explicit operator std::string() const;
         Position position() const;
         std::string reference() const;

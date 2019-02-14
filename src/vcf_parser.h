@@ -20,6 +20,8 @@ namespace vcf {
         std::istream& input;
         std::vector<std::string> samples;
 
+        int line_num;
+
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);
         void parseHeader();
