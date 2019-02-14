@@ -25,24 +25,6 @@ namespace {
         }
         return result;
     }
-
-    vector<Variant> parse_variants(vector<string> tokens) {
-        Chromosome chr(tokens[CHROM]);
-        int pos;
-        try {
-            pos = std::stoi(tokens[POS]);
-        } catch (...) {
-            throw ParserException("Can't read variant position");
-        }
-        Position position(chr, pos);
-        vector<Variant> variants;
-        string ref = tokens[REF];
-        vector<string> alts = split(tokens[ALT], ',');
-        for (const string& alt: alts) {
-            variants.emplace_back(position, ref, alt);
-        }
-        return variants;
-    }
 }
 
 namespace vcf {
@@ -55,6 +37,27 @@ namespace vcf {
 
     std::vector<std::string> VCFParser::sample_names() {
         return samples;
+    }
+
+    vector<Variant> VCFParser::parse_variants(const vector<string>& tokens) {
+        Chromosome chr(tokens[CHROM]);
+        int pos;
+        try {
+            pos = std::stoi(tokens[POS]);
+        } catch (...) {
+            throw ParserException("Can't read variant position");
+        }
+        Position position(chr, pos);
+        vector<Variant> variants;
+        string ref = tokens[REF];
+        vector<string> alts = split(tokens[ALT], ',');
+        for (const string& alt: alts) {
+            Variant variant(position, ref, alt);
+            if (filter.apply(variant)) {
+                variants.emplace_back(position, ref, alt);
+            }
+        }
+        return variants;
     }
 
     void VCFParser::parseHeader() {
@@ -75,7 +78,10 @@ namespace vcf {
                                                   "Found: " + token, line_num);
                         }
                     } else {
-                        samples.push_back(token);
+                        if (filter.apply(token)) {
+                            samples.push_back(token);
+                            filtered_samples.push_back(i);
+                        }
                     }
                 }
             }

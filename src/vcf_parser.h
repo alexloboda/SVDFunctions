@@ -19,8 +19,11 @@ namespace vcf {
         std::vector<std::unique_ptr<VariantsHandler>> handlers;
         std::istream& input;
         std::vector<std::string> samples;
+        std::vector<int> filtered_samples;
 
         int line_num;
+
+        std::vector<Variant> parse_variants(const std::vector<std::string>& tokens);
 
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);
