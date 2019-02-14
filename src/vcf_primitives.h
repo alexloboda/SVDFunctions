@@ -19,7 +19,8 @@ namespace vcf {
     class ParserException {
         std::string msg;
     public:
-        explicit ParserException(const std::string& message);
+        explicit ParserException(std::string message);
+        ParserException(std::string message, int line);
 
         std::string get_message();
     };
@@ -78,7 +79,7 @@ namespace vcf {
         bool includes(const Position& p) const;
     };
 
-    enum AlleleType {HOM, HET, ALT, MISSING};
+    enum AlleleType {HOMREF, HET, HOM, MISSING};
 
     class Allele {
         int depth;

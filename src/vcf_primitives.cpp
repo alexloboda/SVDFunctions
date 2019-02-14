@@ -63,19 +63,23 @@ namespace vcf {
     }
 
     bool Chromosome::parse(std::string str) {
-        transform(str.begin(), str.end(), str.begin(), ::tolower);
-        if (str.substr(0, 3) != "chr") {
-            return false;
+        if (!std::all_of(str.begin(), str.end(), ::isdigit)) {
+            transform(str.begin(), str.end(), str.begin(), ::tolower);
+            if (str.substr(0, 3) != "chr") {
+                return false;
+            }
+            str = str.substr(3, str.length());
         }
-        string ending = str.substr(3, str.length());
-        if (ending == "X") {
+
+        if (str == "X") {
             chr = chrX;
         }
-        if (ending == "Y") {
+        if (str == "Y") {
             chr = chrY;
         }
+
         try {
-            chr = stoi(ending);
+            chr = stoi(str);
             if (chr < 1 || chr > 22) {
                 return false;
             }
@@ -111,10 +115,14 @@ namespace vcf {
         return chr;
     }
 
-    ParserException::ParserException(const std::string& message) :msg(message) {}
+    ParserException::ParserException(std::string message) :msg(message) {}
 
     std::string ParserException::get_message() {
         return msg;
+    }
+
+    ParserException::ParserException(std::string message, int line) {
+        msg = "Error in line " + to_string(line) + ": " + message;
     }
 
     Range::Range(Chromosome chr, int from, int to)
