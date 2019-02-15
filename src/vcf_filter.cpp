@@ -16,17 +16,20 @@ namespace vcf {
         variants_set = true;
     }
 
-    void VCFFilter::add_bad_variants(vector<Variant>& variants) {
-        bad_variants.insert(variants.begin(), variants.end());
+    void VCFFilter::add_bad_variants(vector<Position>& positions) {
+        bad_variants.insert(positions.begin(), positions.end());
     }
 
     void VCFFilter::add_samples(vector<string> samples) {
         available_samples.insert(samples.begin(), samples.end());
     }
 
-    bool VCFFilter::apply(const Variant& v) const {
-        return bad_variants.find(v) == bad_variants.end() &&
-                (!variants_set || available_variants.find(v) != available_variants.end());
+    bool VCFFilter::apply(const vcf::Variant& v) const {
+        return (!variants_set || available_variants.find(v) != available_variants.end());
+    }
+
+    bool VCFFilter::apply(const Position& p) const {
+        return bad_variants.find(p) == bad_variants.end();
     }
 
     bool VCFFilter::apply(const string& sample) const {

@@ -1,5 +1,6 @@
 #include "vcf_parser.h"
 
+#include <algorithm>
 #include <sstream>
 #include <iostream>
 
@@ -9,6 +10,8 @@ namespace {
     using std::istream;
     using std::vector;
     using std::string;
+    using std::find;
+    using std::pair;
 
     vector<string> split(const string& line, char delim){
         vector<string> result;
@@ -25,6 +28,45 @@ namespace {
         }
         return result;
     }
+
+    Position parse_position(const vector<string>& tokens) {
+        Chromosome chr(tokens[CHROM]);
+        int pos;
+        try {
+            pos = std::stoi(tokens[POS]);
+        } catch (...) {
+            throw ParserException("Can't read variant position");
+        }
+        return {chr, pos};
+    }
+
+    class Format {
+        const string DP_FIELD = "DP";
+        const string GQ_FIELD = "GQ";
+
+        long depth_pos;
+        long qual_pos;
+    public:
+        Format(const string& format) {
+            vector<string> parts = split(format, ':');
+            auto dp_pos = find(parts.begin(), parts.end(), DP_FIELD);
+            auto gq_pos = find(parts.begin(), parts.end(), GQ_FIELD);
+            if (dp_pos == parts.end() || gq_pos == parts.end()) {
+                throw ParserException("No DP or GQ available for a variant");
+            }
+            depth_pos = dp_pos - parts.begin();
+            qual_pos = gq_pos - parts.begin();
+        }
+
+        pair<int, int> parse(const string& genotype) {
+            vector<string> parts = split(genotype, ':');
+            try {
+                return std::make_pair(stoi(parts[depth_pos]), stoi(parts[qual_pos]));
+            } catch (...) {
+                throw ParserException("Missing DP or GQ value");
+            }
+        }
+    };
 }
 
 namespace vcf {
@@ -39,15 +81,7 @@ namespace vcf {
         return samples;
     }
 
-    vector<Variant> VCFParser::parse_variants(const vector<string>& tokens) {
-        Chromosome chr(tokens[CHROM]);
-        int pos;
-        try {
-            pos = std::stoi(tokens[POS]);
-        } catch (...) {
-            throw ParserException("Can't read variant position");
-        }
-        Position position(chr, pos);
+    vector<Variant> VCFParser::parse_variants(const vector<string>& tokens, const Position& position) {
         vector<Variant> variants;
         string ref = tokens[REF];
         vector<string> alts = split(tokens[ALT], ',');
@@ -94,7 +128,12 @@ namespace vcf {
                 continue;
             }
             try {
-                vector<Variant> variants = parse_variants(tokens);
+                Position position = parse_position(tokens);
+                if (!filter.apply(position)) {
+                    continue;
+                }
+                vector<Variant> variants = parse_variants(tokens, position);
+                Format format(tokens[FORMAT]);
             } catch (const ParserException& e) {
                 ParserException exception(e.get_message(), line_num);
                 std::cerr << e.get_message() << std::endl;

@@ -7,12 +7,12 @@
 
 namespace vcf {
     enum Field {
-        CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO
+        CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT
     };
 
     class VCFParser {
         static const char DELIM = '\t';
-        const std::vector<std::string> FIELDS = {"CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO"};
+        const std::vector<std::string> FIELDS = {"CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"};
 
         const VCFFilter& filter;
 
@@ -23,7 +23,7 @@ namespace vcf {
 
         int line_num;
 
-        std::vector<Variant> parse_variants(const std::vector<std::string>& tokens);
+        std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
 
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);
