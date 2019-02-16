@@ -21,6 +21,7 @@ namespace vcf {
         void add_samples(std::vector<std::string> samples);
         bool apply(const Position& v) const;
         bool apply(const Variant& v) const;
+        bool apply(int dp, int gq) const;
         bool apply(const std::string& sample) const;
         bool apply(const Allele& allele) const;
     };

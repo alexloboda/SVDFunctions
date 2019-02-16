@@ -12,6 +12,7 @@ namespace {
     using std::string;
     using std::find;
     using std::pair;
+    using std::stoi;
 
     vector<string> split(const string& line, char delim){
         vector<string> result;
@@ -33,7 +34,7 @@ namespace {
         Chromosome chr(tokens[CHROM]);
         int pos;
         try {
-            pos = std::stoi(tokens[POS]);
+            pos = stoi(tokens[POS]);
         } catch (...) {
             throw ParserException("Can't read variant position");
         }
@@ -43,25 +44,40 @@ namespace {
     class Format {
         const string DP_FIELD = "DP";
         const string GQ_FIELD = "GQ";
+        const string GT_FIELD = "GT" ;
+
+        const string DELIM_1 = "|";
+        const string DELIM_2 = "/";
 
         long depth_pos;
         long qual_pos;
+        long genotype_pos;
+
+        void find_pos(const vector<string>& tokens, const string& field, long& pos) {
+            auto position = find(tokens.begin(), tokens.end(), field);
+            if (position == tokens.end()) {
+                throw ParserException("No DP, GQ or GT available for a variant");
+            }
+            pos = position - tokens.begin();
+        }
     public:
         Format(const string& format) {
             vector<string> parts = split(format, ':');
-            auto dp_pos = find(parts.begin(), parts.end(), DP_FIELD);
-            auto gq_pos = find(parts.begin(), parts.end(), GQ_FIELD);
-            if (dp_pos == parts.end() || gq_pos == parts.end()) {
-                throw ParserException("No DP or GQ available for a variant");
-            }
-            depth_pos = dp_pos - parts.begin();
-            qual_pos = gq_pos - parts.begin();
+            find_pos(parts, DP_FIELD, depth_pos);
+            find_pos(parts, GQ_FIELD, qual_pos);
+            find_pos(parts, GT_FIELD, genotype_pos);
         }
 
-        pair<int, int> parse(const string& genotype) {
+        Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
             vector<string> parts = split(genotype, ':');
             try {
-                return std::make_pair(stoi(parts[depth_pos]), stoi(parts[qual_pos]));
+                int dp = stoi(parts[depth_pos]);
+                int gq = stoi(parts[qual_pos]);
+                if (filter.apply(dp, gq)) {
+                    return {MISSING, dp, gq};
+                }
+                string gt = parts[genotype_pos];
+
             } catch (...) {
                 throw ParserException("Missing DP or GQ value");
             }
@@ -134,6 +150,18 @@ namespace vcf {
                 }
                 vector<Variant> variants = parse_variants(tokens, position);
                 Format format(tokens[FORMAT]);
+                for (int i = 0; i < variants.size(); i++) {
+                    Variant& variant = variants[i];
+                    if (filter.apply(variant)) {
+                        vector<Allele> alleles;
+                        for (int sample : filtered_samples) {
+                            alleles.push_back(format.parse(tokens[sample], i));
+                        }
+                        for (auto& handler: handlers) {
+                            handler->processVariant(variant, alleles);
+                        }
+                    }
+                }
             } catch (const ParserException& e) {
                 ParserException exception(e.get_message(), line_num);
                 std::cerr << e.get_message() << std::endl;
