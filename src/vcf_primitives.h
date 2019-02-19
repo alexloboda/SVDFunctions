@@ -80,6 +80,17 @@ namespace vcf {
     };
 
     enum AlleleType {HOMREF, HET, HOM, MISSING};
+
+    class Allele {
+        int depth;
+        int quality;
+        AlleleType type;
+    public:
+        Allele(AlleleType type, int DP, int GQ);
+        int DP() const;
+        int GQ() const;
+        AlleleType alleleType() const;
+    };
 }
 
 namespace std {

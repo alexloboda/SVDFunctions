@@ -93,17 +93,17 @@ namespace {
             find_pos(parts, GT_FIELD, genotype_pos);
         }
 
-        AlleleType parse(const string& genotype, int allele, const VCFFilter& filter) {
+        Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
             vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
                 if (gt == ".") {
-                    return MISSING;
+                    return {MISSING, 0, 0};
                 }
                 int dp = stoi(parts[depth_pos]);
                 int gq = stoi(parts[qual_pos]);
                 if (filter.apply(dp, gq)) {
-                    return MISSING;
+                    return {MISSING, dp, gq};
                 }
                 std::istringstream iss(gt);
                 int first_allele, second_allele;
@@ -112,7 +112,7 @@ namespace {
                 if (iss.fail() || (ch != DELIM_1 && ch != DELIM_2)) {
                     throw ParserException("Wrong GT format");
                 }
-                return type(first_allele, second_allele, allele);
+                return {type(first_allele, second_allele, allele), dp, gq};
             } catch (...) {
                 throw ParserException("Wrong GT format");
             }
@@ -189,7 +189,7 @@ namespace vcf {
                 for (int i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
                     if (filter.apply(variant)) {
-                        vector<AlleleType > alleles;
+                        vector<Allele> alleles;
                         for (int sample : filtered_samples) {
                             alleles.push_back(format.parse(tokens[sample], i, filter));
                         }
@@ -200,8 +200,12 @@ namespace vcf {
                 }
             } catch (const ParserException& e) {
                 ParserException exception(e.get_message(), line_num);
-                std::cerr << e.get_message() << std::endl;
+                handle_error(e);
             }
         }
+    }
+
+    void VCFParser::handle_error(const ParserException& e) {
+        std::cerr << e.get_message() << std::endl;
     }
 }

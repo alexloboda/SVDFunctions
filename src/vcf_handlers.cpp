@@ -14,7 +14,7 @@ namespace vcf {
         call_rate_matrix.resize(ranges.size(), val);
     }
 
-    void CallRateHandler::processVariant(Variant variant, std::vector<AlleleType> alleles) {
+    void CallRateHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
         for (int r = 0; r < ranges.size(); r++) {
             const Range& range = ranges[r];
             if (range.includes(variant.position())) {
@@ -27,10 +27,10 @@ namespace vcf {
         }
     }
 
-    void GenotypeMatrixHandler::processVariant(Variant variant, std::vector<AlleleType> alleles) {
-        vector<int> row;
-        for (const AlleleType& allele: alleles) {
-            row.push_back((int)allele);
+    void GenotypeMatrixHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+        vector<Allele> row;
+        for (const Allele& allele: alleles) {
+            row.push_back(allele);
         }
         gmatrix.push_back(row);
         variants.push_back(variant);

@@ -11,7 +11,7 @@ namespace vcf {
 
     public:
         VariantsHandler(const std::vector<std::string>& samples);
-        virtual void processVariant(Variant variant, std::vector<AlleleType > alleles) = 0;
+        virtual void processVariant(Variant variant, std::vector<Allele > alleles) = 0;
     };
 
     class CallRateHandler: public VariantsHandler {
@@ -19,15 +19,15 @@ namespace vcf {
         std::vector<std::vector<int>> call_rate_matrix;
     public:
         CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges);
-        void processVariant(Variant variant, std::vector<AlleleType> alleles) override;
+        void processVariant(Variant variant, std::vector<Allele> alleles) override;
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
-        std::vector<std::vector<int>> gmatrix;
+        std::vector<std::vector<Allele>> gmatrix;
         std::vector<Variant> variants;
     public:
         using VariantsHandler::VariantsHandler;
-        void processVariant(Variant variant, std::vector<AlleleType> alleles);
+        void processVariant(Variant variant, std::vector<Allele> alleles) override;
     };
 }
 
