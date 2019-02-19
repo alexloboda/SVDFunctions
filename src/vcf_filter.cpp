@@ -36,10 +36,6 @@ namespace vcf {
         return !variants_set || available_samples.find(sample) != available_samples.end();
     }
 
-    bool VCFFilter::apply(const Allele& allele) const {
-        return allele.DP() > DP && allele.GQ() > GQ;
-    }
-
     bool VCFFilter::apply(int dp, int gq) const {
         return dp > DP && gq > GQ;
     }

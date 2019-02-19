@@ -93,17 +93,17 @@ namespace {
             find_pos(parts, GT_FIELD, genotype_pos);
         }
 
-        Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
+        AlleleType parse(const string& genotype, int allele, const VCFFilter& filter) {
             vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
                 if (gt == ".") {
-                    return {MISSING, 0, 0};
+                    return MISSING;
                 }
                 int dp = stoi(parts[depth_pos]);
                 int gq = stoi(parts[qual_pos]);
                 if (filter.apply(dp, gq)) {
-                    return {MISSING, dp, gq};
+                    return MISSING;
                 }
                 std::istringstream iss(gt);
                 int first_allele, second_allele;
@@ -112,7 +112,7 @@ namespace {
                 if (iss.fail() || (ch != DELIM_1 && ch != DELIM_2)) {
                     throw ParserException("Wrong GT format");
                 }
-                return {type(first_allele, second_allele, allele), dp, gq};
+                return type(first_allele, second_allele, allele);
             } catch (...) {
                 throw ParserException("Wrong GT format");
             }
@@ -189,7 +189,7 @@ namespace vcf {
                 for (int i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
                     if (filter.apply(variant)) {
-                        vector<Allele> alleles;
+                        vector<AlleleType > alleles;
                         for (int sample : filtered_samples) {
                             alleles.push_back(format.parse(tokens[sample], i, filter));
                         }
