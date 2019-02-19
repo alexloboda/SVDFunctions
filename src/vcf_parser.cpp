@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+#include <sstream>
 
 namespace {
     using namespace vcf;
@@ -17,9 +18,9 @@ namespace {
     vector<string> split(const string& line, char delim){
         vector<string> result;
         string curr;
-        for (int i = 0; i < line.length(); i++) {
-            if (line[i] != delim) {
-                curr += line[i];
+        for (char ch : line) {
+            if (ch != delim) {
+                curr += ch;
             } else {
                 if (curr.length() != 0) {
                     result.push_back(curr);
@@ -27,6 +28,11 @@ namespace {
                 }
             }
         }
+
+        if (curr.length() != 0) {
+            result.push_back(curr);
+        }
+
         return result;
     }
 
@@ -46,8 +52,8 @@ namespace {
         const string GQ_FIELD = "GQ";
         const string GT_FIELD = "GT" ;
 
-        const string DELIM_1 = "|";
-        const string DELIM_2 = "/";
+        const char DELIM_1 = '|';
+        const char DELIM_2 = '/';
 
         long depth_pos;
         long qual_pos;
@@ -60,6 +66,25 @@ namespace {
             }
             pos = position - tokens.begin();
         }
+
+        AlleleType type(int first, int second, int allele) {
+            if (first > second) {
+                std::swap(first, second);
+            }
+            if (first == second) {
+                if (first == 0) {
+                    return HOMREF;
+                } else if (first == allele) {
+                    return HOM;
+                }
+            } else {
+                if (first == 0 && second == allele) {
+                    return HET;
+                }
+            }
+            return MISSING;
+        }
+
     public:
         Format(const string& format) {
             vector<string> parts = split(format, ':');
@@ -71,15 +96,25 @@ namespace {
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
             vector<string> parts = split(genotype, ':');
             try {
+                string gt = parts[genotype_pos];
+                if (gt == ".") {
+                    return {MISSING, 0, 0};
+                }
                 int dp = stoi(parts[depth_pos]);
                 int gq = stoi(parts[qual_pos]);
                 if (filter.apply(dp, gq)) {
                     return {MISSING, dp, gq};
                 }
-                string gt = parts[genotype_pos];
-
+                std::istringstream iss(gt);
+                int first_allele, second_allele;
+                char ch;
+                iss >> first_allele >> ch >> second_allele;
+                if (iss.fail() || (ch != DELIM_1 && ch != DELIM_2)) {
+                    throw ParserException("Wrong GT format");
+                }
+                return {type(first_allele, second_allele, allele), dp, gq};
             } catch (...) {
-                throw ParserException("Missing DP or GQ value");
+                throw ParserException("Wrong GT format");
             }
         }
     };
@@ -107,7 +142,7 @@ namespace vcf {
         return variants;
     }
 
-    void VCFParser::parseHeader() {
+    void VCFParser::parse_header() {
         string line;
         while (getline(input, line)) {
             ++line_num;
@@ -131,6 +166,7 @@ namespace vcf {
                         }
                     }
                 }
+                return;
             }
         }
     }
@@ -140,7 +176,7 @@ namespace vcf {
         while (getline(input, line)) {
             ++line_num;
             vector<string> tokens = split(line, DELIM);
-            if (tokens[QUAL] != "PASS") {
+            if (tokens[FILTER] != "PASS") {
                 continue;
             }
             try {
@@ -155,7 +191,7 @@ namespace vcf {
                     if (filter.apply(variant)) {
                         vector<Allele> alleles;
                         for (int sample : filtered_samples) {
-                            alleles.push_back(format.parse(tokens[sample], i));
+                            alleles.push_back(format.parse(tokens[sample], i, filter));
                         }
                         for (auto& handler: handlers) {
                             handler->processVariant(variant, alleles);
