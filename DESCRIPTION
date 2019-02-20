@@ -20,7 +20,7 @@ Imports:
     snpStats,
     data.table,
     methods
-RoxygenNote: 6.1.0
+RoxygenNote: 6.1.1
 SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 

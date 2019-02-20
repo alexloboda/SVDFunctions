@@ -8,6 +8,7 @@
 
 namespace vcf {
     class VariantsHandler {
+    protected:
         const std::vector<std::string>& samples;
 
     public:
@@ -16,6 +17,7 @@ namespace vcf {
     };
 
     class CallRateHandler: public VariantsHandler {
+    protected:
         const std::vector<Range>& ranges;
         std::vector<std::vector<int>> call_rate_matrix;
     public:
@@ -24,6 +26,7 @@ namespace vcf {
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
+    protected:
         std::vector<std::vector<AlleleType>> gmatrix;
         std::vector<Variant> variants;
     public:

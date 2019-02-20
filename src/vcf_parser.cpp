@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
-#include <sstream>
 
 namespace {
     using namespace vcf;
@@ -51,20 +50,24 @@ namespace {
         const string DP_FIELD = "DP";
         const string GQ_FIELD = "GQ";
         const string GT_FIELD = "GT" ;
+        const string AD_FIELD = "AD";
 
         const char DELIM_1 = '|';
         const char DELIM_2 = '/';
+        const char COMMA = ',';
 
         long depth_pos;
         long qual_pos;
         long genotype_pos;
+        long ad_pos;
 
         void find_pos(const vector<string>& tokens, const string& field, long& pos) {
             auto position = find(tokens.begin(), tokens.end(), field);
             if (position == tokens.end()) {
-                throw ParserException("No DP, GQ or GT available for a variant");
+                pos = -1;
+            } else {
+                pos = position - tokens.begin();
             }
-            pos = position - tokens.begin();
         }
 
         AlleleType type(int first, int second, int allele) {
@@ -91,6 +94,10 @@ namespace {
             find_pos(parts, DP_FIELD, depth_pos);
             find_pos(parts, GQ_FIELD, qual_pos);
             find_pos(parts, GT_FIELD, genotype_pos);
+            if (depth_pos == -1 || qual_pos == -1 || genotype_pos == -1) {
+                throw ParserException("No DP, GQ or GT available for a variant");
+            }
+            find_pos(parts, AD_FIELD, ad_pos);
         }
 
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
@@ -99,6 +106,18 @@ namespace {
                 string gt = parts[genotype_pos];
                 if (gt == ".") {
                     return {MISSING, 0, 0};
+                }
+                if (ad_pos != -1) {
+                    std::istringstream adstream(parts[ad_pos]);
+                    int ref, alt;
+                    char ch;
+                    adstream >> ref >> ch >> alt;
+                    if (!adstream.fail()) {
+                        double ratio = ref / (double)(ref + alt);
+                        if (ratio < 0.3 || ratio > 0.7) {
+                            return {MISSING, 0, 0};
+                        }
+                    }
                 }
                 int dp = stoi(parts[depth_pos]);
                 int gq = stoi(parts[qual_pos]);
@@ -122,7 +141,7 @@ namespace {
 
 namespace vcf {
 
-    void VCFParser::registerHandler(VariantsHandler& handler) {
+    void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler) {
         handlers.push_back(handler);
     }
 
@@ -194,7 +213,7 @@ namespace vcf {
                             alleles.push_back(format.parse(tokens[sample], i, filter));
                         }
                         for (auto& handler: handlers) {
-                            handler.processVariant(variant, alleles);
+                            handler->processVariant(variant, alleles);
                         }
                     }
                 }
