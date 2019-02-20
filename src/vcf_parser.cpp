@@ -54,7 +54,6 @@ namespace {
 
         const char DELIM_1 = '|';
         const char DELIM_2 = '/';
-        const char COMMA = ',';
 
         long depth_pos;
         long qual_pos;
@@ -93,11 +92,11 @@ namespace {
             vector<string> parts = split(format, ':');
             find_pos(parts, DP_FIELD, depth_pos);
             find_pos(parts, GQ_FIELD, qual_pos);
-            find_pos(parts, GT_FIELD, genotype_pos);
-            if (depth_pos == -1 || qual_pos == -1 || genotype_pos == -1) {
-                throw ParserException("No DP, GQ or GT available for a variant");
-            }
             find_pos(parts, AD_FIELD, ad_pos);
+            find_pos(parts, GT_FIELD, genotype_pos);
+            if (genotype_pos == -1) {
+                throw ParserException("No GT field available for a variant");
+            }
         }
 
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
@@ -119,8 +118,8 @@ namespace {
                         }
                     }
                 }
-                int dp = stoi(parts[depth_pos]);
-                int gq = stoi(parts[qual_pos]);
+                int dp = depth_pos == -1 ? 0 : stoi(parts[depth_pos]);
+                int gq = qual_pos == -1 ? 0 : stoi(parts[qual_pos]);
                 if (filter.apply(dp, gq)) {
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }

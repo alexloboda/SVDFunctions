@@ -41,7 +41,6 @@ namespace {
     };
 }
 
-//' @export
 // [[Rcpp::export]]
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& available_positions,
