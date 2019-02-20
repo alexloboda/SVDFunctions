@@ -7,6 +7,8 @@ namespace {
 namespace vcf {
     VariantsHandler::VariantsHandler(const std::vector<std::string>& samples) :samples(samples){}
 
+    void VariantsHandler::processVariant(Variant variant, std::vector<Allele> alleles) {}
+
     CallRateHandler::CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges)
         :VariantsHandler(samples), ranges(ranges) {
         auto val = vector<int>();
@@ -28,11 +30,27 @@ namespace vcf {
     }
 
     void GenotypeMatrixHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
-        vector<Allele> row;
+        vector<AlleleType> row;
         for (const Allele& allele: alleles) {
-            row.push_back(allele);
+            row.push_back(allele.alleleType());
         }
         gmatrix.push_back(row);
         variants.push_back(variant);
+    }
+
+    BinaryFileHandler::BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
+                                         std::string metadata_file) :VariantsHandler(samples),
+                                         binary(main_filename, std::ios::binary), meta(metadata_file) {
+        for (const std::string& sample: samples) {
+            meta << sample << DELIM;
+        }
+        meta << "\n";
+    }
+
+    void BinaryFileHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+        meta << (std::string)variant << "\n";
+        for (const Allele& allele: alleles) {
+
+        }
     }
 }

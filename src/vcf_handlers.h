@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <fstream>
 #include "vcf_primitives.h"
 
 namespace vcf {
@@ -11,7 +12,7 @@ namespace vcf {
 
     public:
         VariantsHandler(const std::vector<std::string>& samples);
-        virtual void processVariant(Variant variant, std::vector<Allele > alleles) = 0;
+        virtual void processVariant(Variant variant, std::vector<Allele> alleles);
     };
 
     class CallRateHandler: public VariantsHandler {
@@ -23,10 +24,21 @@ namespace vcf {
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
-        std::vector<std::vector<Allele>> gmatrix;
+        std::vector<std::vector<AlleleType>> gmatrix;
         std::vector<Variant> variants;
     public:
         using VariantsHandler::VariantsHandler;
+        void processVariant(Variant variant, std::vector<Allele> alleles) override;
+    };
+
+    class BinaryFileHandler: public VariantsHandler {
+        const std::string DELIM = "\t";
+
+        std::ofstream binary;
+        std::ofstream meta;
+    public:
+        BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
+                std::string metadata_file);
         void processVariant(Variant variant, std::vector<Allele> alleles) override;
     };
 }

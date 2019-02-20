@@ -103,7 +103,7 @@ namespace {
                 int dp = stoi(parts[depth_pos]);
                 int gq = stoi(parts[qual_pos]);
                 if (filter.apply(dp, gq)) {
-                    return {MISSING, dp, gq};
+                    return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
                 std::istringstream iss(gt);
                 int first_allele, second_allele;
@@ -112,7 +112,7 @@ namespace {
                 if (iss.fail() || (ch != DELIM_1 && ch != DELIM_2)) {
                     throw ParserException("Wrong GT format");
                 }
-                return {type(first_allele, second_allele, allele), dp, gq};
+                return {type(first_allele, second_allele, allele), (unsigned)dp, (unsigned)gq};
             } catch (...) {
                 throw ParserException("Wrong GT format");
             }
@@ -122,8 +122,8 @@ namespace {
 
 namespace vcf {
 
-    void VCFParser::registerHandler(std::unique_ptr<VariantsHandler>&& handler) {
-        handlers.push_back(std::move(handler));
+    void VCFParser::registerHandler(VariantsHandler& handler) {
+        handlers.push_back(handler);
     }
 
     VCFParser::VCFParser(std::istream& input, const VCFFilter& filter) :input(input), filter(filter), line_num(0) {}
@@ -194,7 +194,7 @@ namespace vcf {
                             alleles.push_back(format.parse(tokens[sample], i, filter));
                         }
                         for (auto& handler: handlers) {
-                            handler->processVariant(variant, alleles);
+                            handler.processVariant(variant, alleles);
                         }
                     }
                 }

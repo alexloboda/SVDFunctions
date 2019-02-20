@@ -135,17 +135,28 @@ namespace vcf {
         return p.position() >= from && p.position() < to;
     }
 
-    Allele::Allele(AlleleType type, int DP, int GQ) :type(type), depth(DP), quality(GQ){}
+    Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :type(type), depth(DP), quality(GQ){}
 
-    int Allele::DP() const {
+    unsigned Allele::DP() const {
         return depth;
     }
 
-    int Allele::GQ() const {
+    unsigned Allele::GQ() const {
         return quality;
     }
 
     AlleleType Allele::alleleType() const {
         return type;
+    }
+
+    std::ostream& operator<<(std::ostream& out, const AlleleBinary& allele) {
+        out.write(reinterpret_cast<const char*>(&allele), sizeof(AlleleBinary));
+    }
+
+    AlleleBinary AlleleBinary::fromAllele(const Allele& allele) {
+        AlleleBinary binary{};
+        binary.DP = (uint16_t)allele.DP();
+        binary.GQ = (uint16_t)allele.GQ();
+        binary.allele = allele.alleleType();
     }
 }

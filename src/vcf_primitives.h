@@ -82,14 +82,23 @@ namespace vcf {
     enum AlleleType {HOMREF, HET, HOM, MISSING};
 
     class Allele {
-        int depth;
-        int quality;
+        unsigned depth;
+        unsigned quality;
         AlleleType type;
     public:
-        Allele(AlleleType type, int DP, int GQ);
-        int DP() const;
-        int GQ() const;
+        Allele(AlleleType type, unsigned DP, unsigned GQ);
+
+        unsigned DP() const;
+        unsigned GQ() const;
         AlleleType alleleType() const;
+    };
+
+    struct AlleleBinary {
+        uint16_t DP;
+        uint16_t GQ;
+        uint8_t allele;
+        friend std::ostream& operator<<(std::ostream& os, const AlleleBinary& dt);
+        static AlleleBinary fromAllele(const Allele& allele);
     };
 }
 
