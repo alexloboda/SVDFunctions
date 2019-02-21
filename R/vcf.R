@@ -33,6 +33,13 @@ scanVCF <- function(filename, DP = 10L, GQ = 20L, samples = NULL,
   stopifnot(!is.na(DP[0]))
   stopifnot(!is.na(GQ[0]))
   
+  fixChar <- function(x) if(is.null(x)) character(0) else x
+  samples <- fixChar(samples)
+  bannedPositions <- fixChar(bannedPositions)
+  variants <- fixChar(variants)
+  regions <- fixChar(regions)
+  binaryPathPrefix <- fixChar(binaryPathPrefix)
+  
   stopifnot(length(filename) > 0)
   
   res <- parse_vcf(filename, samples, bannedPositions, variants, DP, GQ, 

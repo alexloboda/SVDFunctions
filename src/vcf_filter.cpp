@@ -21,6 +21,7 @@ namespace vcf {
     }
 
     void VCFFilter::add_samples(vector<string> samples) {
+        samples_set = true;
         available_samples.insert(samples.begin(), samples.end());
     }
 
@@ -33,7 +34,7 @@ namespace vcf {
     }
 
     bool VCFFilter::apply(const string& sample) const {
-        return !variants_set || available_samples.find(sample) != available_samples.end();
+        return !samples_set || available_samples.find(sample) != available_samples.end();
     }
 
     bool VCFFilter::apply(int dp, int gq) const {

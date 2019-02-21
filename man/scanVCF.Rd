@@ -4,10 +4,10 @@
 \alias{scanVCF}
 \title{Scan VCF files}
 \usage{
-scanVCF(filename, DP = 10L, GQ = 20L, samples = NULL,
-  bannedPositions = NULL, variants = NULL,
-  returnGenotypeMatrix = TRUE, regions = NULL,
-  binaryPathPrefix = NULL)
+scanVCF(filename, DP = 10L, GQ = 20L, samples = character(0),
+  bannedPositions = character(0), variants = character(0),
+  returnGenotypeMatrix = TRUE, regions = character(0),
+  binaryPathPrefix = character(0))
 }
 \arguments{
 \item{filename}{the name of file to read, can be plain text VCF file as well
@@ -29,7 +29,7 @@ must be eliminated from consideration.}
 
 \item{returnGenotypeMatrix}{logical: if TRUE genotype matrix will be returned}
 
-\item{regions}{the set of regions in format "chr#:# - chr#:#". For each
+\item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}
 
 \item{binaryPathPrefix}{the path prefix for binary file prefix_bin and 

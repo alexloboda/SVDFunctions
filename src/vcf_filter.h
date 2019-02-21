@@ -14,6 +14,7 @@ namespace vcf {
         std::unordered_set<std::string> available_samples;
 
         bool variants_set;
+        bool samples_set;
     public:
         VCFFilter(int DP, int GQ);
         void set_available_variants(std::vector<Variant>& variants);
@@ -23,7 +24,6 @@ namespace vcf {
         bool apply(const Variant& v) const;
         bool apply(int dp, int gq) const;
         bool apply(const std::string& sample) const;
-        bool apply(const Allele& allele) const;
     };
 
 }
