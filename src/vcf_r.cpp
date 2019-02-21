@@ -36,7 +36,7 @@ namespace {
                 }
             }
             std::vector<const char *> row_names;
-            transform(variants.begin(), variants.end(), row_names, [](Variant& v){return ((string)v).c_str();});
+            transform(variants.begin(), variants.end(), row_names.begin(), [](Variant& v){return ((string)v).c_str();});
             rownames(res) = CharacterVector(row_names.begin(), row_names.end());
             return res;
         }
@@ -92,6 +92,7 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
     transform(regions.begin(), regions.end(), ranges.begin(), [](const char* str){
         return vcf::Range::parseRange(string(str));
     });
+    return ranges;
 }
 
 // [[Rcpp::export]]
