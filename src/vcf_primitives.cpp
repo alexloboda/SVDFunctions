@@ -174,6 +174,9 @@ namespace vcf {
         int endpos = 0;
         try {
             iss >> chr >> start >> end;
+            if (iss.fail()) {
+                throw ParserException("Malformed range: " + s);
+            }
             startpos = stoi(start);
             endpos = stoi(end);
         } catch(...) {

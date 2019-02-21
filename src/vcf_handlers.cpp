@@ -1,4 +1,5 @@
 #include "vcf_handlers.h"
+#include <iostream>
 
 namespace {
     using std::vector;
