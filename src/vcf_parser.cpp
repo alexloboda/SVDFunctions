@@ -229,7 +229,7 @@ namespace vcf {
                     if (filter.apply(variant)) {
                         vector<Allele> alleles;
                         for (int sample : filtered_samples) {
-                            alleles.push_back(format.parse(tokens[sample], i, filter));
+                            alleles.push_back(format.parse(tokens[sample], i + 1, filter));
                         }
                         for (auto& handler: handlers) {
                             handler->processVariant(variant, alleles);

@@ -32,7 +32,7 @@ namespace {
                     if (val == vcf::MISSING) {
                         val = NA_INTEGER;
                     }
-                    res[i * samples.size() + j] = val;
+                    res[j * gmatrix.size() + i] = val;
                 }
             }
             vector<string> row_names;
@@ -52,7 +52,7 @@ namespace {
             NumericMatrix result(ranges.size(), samples.size());
             for (int i = 0; i < ranges.size(); i++) {
                 for (int j = 0; j < samples.size(); j++) {
-                    result[i * samples.size() + j] = (double)call_rate_matrix[i][j] / variants;
+                    result[j * ranges.size() + i] = (double)call_rate_matrix[i][j] / variants;
                 }
             }
             return result;
