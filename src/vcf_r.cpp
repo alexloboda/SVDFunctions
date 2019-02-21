@@ -35,6 +35,9 @@ namespace {
                     res[i * samples.size() + j] = val;
                 }
             }
+            std::vector<const char *> row_names;
+            transform(variants.begin(), variants.end(), row_names, [](Variant& v){return ((string)v).c_str();});
+            rownames(res) = CharacterVector(row_names.begin(), row_names.end());
             return res;
         }
     };
