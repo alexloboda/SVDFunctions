@@ -82,10 +82,17 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     parser.parse_header();
     auto ss = parser.sample_names();
     shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
+    shared_ptr<BinaryFileHandler> binary_handler;
 
     if (ret_gmatrix[0]) {
         gmatrix_handler.reset(new RGenotypeMatrixHandler(ss));
         parser.register_handler(gmatrix_handler);
+    }
+
+    if (binary_prefix.length() > 0) {
+        string prefix = string(binary_prefix[0]);
+        binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
+        parser.register_handler(binary_handler);
     }
 
     parser.parse_genotypes();
