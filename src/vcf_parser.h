@@ -24,7 +24,7 @@ namespace vcf {
         int line_num;
 
         std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
-        void handle_error(const ParserException& e);
+        virtual void handle_error(const ParserException& e);
 
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);

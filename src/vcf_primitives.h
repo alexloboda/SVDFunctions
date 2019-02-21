@@ -51,6 +51,8 @@ namespace vcf {
         Chromosome chromosome() const;
         int position() const;
 
+        static Position parse_position(const std::string& str);
+
         friend bool operator==(const Position& pos, const Position& other);
         friend size_t hash_value(const Position& pos);
     };
@@ -66,6 +68,8 @@ namespace vcf {
         Position position() const;
         std::string reference() const;
         std::string alternative() const;
+
+        static std::vector<Variant> parseVariants(const std::string& s);
 
         friend bool operator==(const Variant& variant, const Variant& other);
     };

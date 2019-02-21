@@ -8,6 +8,7 @@ namespace {
     using std::to_string;
     using std::transform;
     using std::invalid_argument;
+    using std::vector;
 }
 
 namespace vcf {
@@ -39,6 +40,19 @@ namespace vcf {
         return seed;
     }
 
+    Position Position::parse_position(const std::string& str) {
+        long pos = std::find(str.begin(), str.end(), ':') - str.begin();
+        if (pos >= str.length() - 1 || pos == 0) {
+            throw ParserException("Position must be in format chr#:# but " + str + " given");
+        }
+        Chromosome chr(str.substr(0, pos - 1));
+        try {
+            return {chr, std::stoi(str.substr(pos + 1, str.length() - pos - 1))};
+        } catch (...) {
+            throw ParserException("Position must be in format chr#:# but " + str + " given");
+        }
+    }
+
     Variant::Variant(Position pos, const string& ref, const string& alt)
             : pos(pos), ref(ref), alt(alt) {}
 
@@ -60,6 +74,24 @@ namespace vcf {
 
     std::string Variant::alternative() const {
         return alt;
+    }
+
+    vector<Variant> Variant::parseVariants(const std::string& s) {
+        std::istringstream iss(s);
+        vector<Variant> ret;
+        if (s.empty()) {
+            return ret;
+        }
+        string token;
+        iss >> token;
+        Position pos = Position::parse_position(token);
+        string ref;
+        iss >> ref;
+        string alt;
+        while(std::getline(iss, alt, ',')) {
+            ret.emplace_back(pos, ref, alt);
+        }
+        return ret;
     }
 
     bool Chromosome::parse(std::string str) {
