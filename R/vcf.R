@@ -22,7 +22,7 @@
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested.
 #' @export
-scanVCF <- function(filename, DP = 10L, GQ = 20L, samples = NULL, 
+scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL, 
                     bannedPositions = NULL, variants = NULL, 
                     returnGenotypeMatrix = TRUE, regions = NULL,
                     binaryPathPrefix = NULL) {
@@ -33,6 +33,8 @@ scanVCF <- function(filename, DP = 10L, GQ = 20L, samples = NULL,
   stopifnot(!is.na(DP[0]))
   stopifnot(!is.na(GQ[0]))
   
+  stopifnot(file.exists(vcf))
+  
   fixChar <- function(x) if(is.null(x)) character(0) else x
   samples <- fixChar(samples)
   bannedPositions <- fixChar(bannedPositions)
@@ -40,13 +42,11 @@ scanVCF <- function(filename, DP = 10L, GQ = 20L, samples = NULL,
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
   
-  stopifnot(length(filename) > 0)
-  
-  res <- parse_vcf(filename, samples, bannedPositions, variants, DP, GQ, 
+  res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                    regions, returnGenotypeMatrix, binaryPathPrefix);
   
-  if (!is.null(res$gmatrix)) {
-      colnames(res$gmatrix) <- res$samples
+  if (!is.null(res$genotype)) {
+      colnames(res$genotype) <- res$samples
   }
   if (!is.null(res$callrate)) {
       colnames(res$callrate) <- res$samples

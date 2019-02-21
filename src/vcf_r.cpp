@@ -35,8 +35,10 @@ namespace {
                     res[i * samples.size() + j] = val;
                 }
             }
-            std::vector<const char *> row_names;
-            transform(variants.begin(), variants.end(), row_names.begin(), [](Variant& v){return ((string)v).c_str();});
+            vector<string> row_names;
+            for_each(variants.begin(), variants.end(), [&row_names](Variant& v){
+                row_names.push_back((string)v);
+            });
             rownames(res) = CharacterVector(row_names.begin(), row_names.end());
             return res;
         }
@@ -64,14 +66,14 @@ VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_posi
 
     if (samples.length() > 0) {
         vector<string> ss;
-        transform(samples.begin(), samples.end(), ss.begin(), [](const char *s) { return string(s); });
+        for_each(samples.begin(), samples.end(), [&ss](const char *s) { ss.push_back(string(s)); });
         filter.add_samples(ss);
     }
 
     if (bad_positions.length() > 0) {
         vector<Position> bads;
-        transform(bad_positions.begin(), bad_positions.end(), bads.begin(), [](const char *s) {
-            return Position::parse_position(string(s));
+        for_each(bad_positions.begin(), bad_positions.end(), [&bads](const char *s) {
+            bads.push_back(Position::parse_position(string(s)));
         });
         filter.add_bad_variants(bads);
     }
@@ -89,8 +91,8 @@ VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_posi
 
 vector<vcf::Range> parse_regions(const CharacterVector& regions){
     vector<vcf::Range> ranges;
-    transform(regions.begin(), regions.end(), ranges.begin(), [](const char* str){
-        return vcf::Range::parseRange(string(str));
+    for_each(regions.begin(), regions.end(), [&ranges](const char* str){
+        ranges.push_back(vcf::Range::parseRange(string(str)));
     });
     return ranges;
 }
@@ -128,9 +130,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 
     parser.parse_genotypes();
     List ret;
-    vector<const char*> samples_cstr;
-    transform(ss.begin(), ss.end(), samples_cstr.begin(), [](string& s){return s.c_str();});
-    ret["samples"] = CharacterVector(samples_cstr.begin(), samples_cstr.end());
+    ret["samples"] = CharacterVector(ss.begin(), ss.end());
     if (ret_gmatrix[0]){
         ret["genotype"] = gmatrix_handler->result();
     }

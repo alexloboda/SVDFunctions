@@ -55,6 +55,8 @@ namespace {
         const char DELIM_1 = '|';
         const char DELIM_2 = '/';
 
+        const char MISSING_GT = '.';
+
         long depth_pos;
         long qual_pos;
         long genotype_pos;
@@ -99,11 +101,36 @@ namespace {
             }
         }
 
+        AlleleType parse_gt(const string gt, int allele){
+            if (find(gt.begin(), gt.end(), MISSING_GT) != gt.end()) {
+                return MISSING;
+            }
+            int first_allele, second_allele;
+            std::istringstream iss(gt);
+            iss >> first_allele;
+            if (iss.eof()) {
+                if (first_allele == 0) {
+                    return HOMREF;
+                }
+                return first_allele == allele ? HOM : MISSING;
+            }
+            char ch;
+            iss >> ch;
+            if (ch != DELIM_1 && ch != DELIM_2) {
+                throw ParserException("Wrong GT format");
+            }
+            iss >> second_allele;
+            if (iss.fail()) {
+                throw ParserException("Wrong GT format");
+            }
+            return type(first_allele, second_allele, allele);
+        }
+
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
             vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
-                if (gt == ".") {
+                if (gt == "." || gt == "./.") {
                     return {MISSING, 0, 0};
                 }
                 if (ad_pos != -1) {
@@ -123,14 +150,7 @@ namespace {
                 if (filter.apply(dp, gq)) {
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
-                std::istringstream iss(gt);
-                int first_allele, second_allele;
-                char ch;
-                iss >> first_allele >> ch >> second_allele;
-                if (iss.fail() || (ch != DELIM_1 && ch != DELIM_2)) {
-                    throw ParserException("Wrong GT format");
-                }
-                return {type(first_allele, second_allele, allele), (unsigned)dp, (unsigned)gq};
+                return {parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
             } catch (...) {
                 throw ParserException("Wrong GT format");
             }
@@ -218,7 +238,7 @@ namespace vcf {
                 }
             } catch (const ParserException& e) {
                 ParserException exception(e.get_message(), line_num);
-                handle_error(e);
+                handle_error(exception);
             }
         }
     }

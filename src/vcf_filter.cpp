@@ -8,7 +8,7 @@ namespace {
 
 namespace vcf {
     VCFFilter::VCFFilter(int DP, int GQ)
-        :variants_set(false), DP(DP), GQ(GQ) {}
+        :variants_set(false), samples_set(false), DP(DP), GQ(GQ) {}
 
     void VCFFilter::set_available_variants(vector<Variant>& variants) {
         available_variants.clear();

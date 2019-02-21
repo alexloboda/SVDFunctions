@@ -199,6 +199,7 @@ namespace vcf {
 
     std::ostream& operator<<(std::ostream& out, const AlleleBinary& allele) {
         out.write(reinterpret_cast<const char*>(&allele), sizeof(AlleleBinary));
+        return out;
     }
 
     AlleleBinary AlleleBinary::fromAllele(const Allele& allele) {
@@ -206,5 +207,6 @@ namespace vcf {
         binary.DP = (uint16_t)allele.DP();
         binary.GQ = (uint16_t)allele.GQ();
         binary.allele = allele.alleleType();
+        return binary;
     }
 }
