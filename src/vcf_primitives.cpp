@@ -167,6 +167,22 @@ namespace vcf {
         return p.position() >= from && p.position() < to;
     }
 
+    Range Range::parseRange(const std::string& s) {
+        std::istringstream iss(s);
+        string chr, start, end;
+        int startpos = 0;
+        int endpos = 0;
+        try {
+            iss >> chr >> start >> end;
+            startpos = stoi(start);
+            endpos = stoi(end);
+        } catch(...) {
+            throw ParserException("Malformed range: " + s);
+        }
+        Chromosome chromosome = Chromosome(chr);
+        return {chromosome, startpos, endpos};
+    }
+
     Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :type(type), depth(DP), quality(GQ){}
 
     unsigned Allele::DP() const {

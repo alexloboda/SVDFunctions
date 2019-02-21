@@ -10,13 +10,14 @@ namespace vcf {
     void VariantsHandler::processVariant(Variant variant, std::vector<Allele> alleles) {}
 
     CallRateHandler::CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges)
-        :VariantsHandler(samples), ranges(ranges) {
+        :VariantsHandler(samples), ranges(ranges), variants(0) {
         auto val = vector<int>();
         val.resize(samples.size());
         call_rate_matrix.resize(ranges.size(), val);
     }
 
     void CallRateHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+        variants++;
         for (int r = 0; r < ranges.size(); r++) {
             const Range& range = ranges[r];
             if (range.includes(variant.position())) {

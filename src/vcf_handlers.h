@@ -19,6 +19,7 @@ namespace vcf {
     class CallRateHandler: public VariantsHandler {
     protected:
         const std::vector<Range>& ranges;
+        int variants;
         std::vector<std::vector<int>> call_rate_matrix;
     public:
         CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges);

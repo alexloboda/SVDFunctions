@@ -81,6 +81,8 @@ namespace vcf {
     public:
         Range(Chromosome chr, int from, int to);
         bool includes(const Position& p) const;
+
+        static Range parseRange(const std::string& s);
     };
 
     enum AlleleType {HOMREF, HET, HOM, MISSING};

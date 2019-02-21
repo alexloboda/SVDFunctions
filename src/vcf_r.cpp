@@ -23,7 +23,8 @@ namespace {
     class RGenotypeMatrixHandler: public GenotypeMatrixHandler {
     public:
         using GenotypeMatrixHandler::GenotypeMatrixHandler;
-        List result() {
+
+        IntegerMatrix result() {
             IntegerMatrix res(gmatrix.size(), samples.size());
             for (int i = 0; i < gmatrix.size(); i++) {
                 for (int j = 0; j < samples.size(); j++) {
@@ -34,9 +35,22 @@ namespace {
                     res[i * samples.size() + j] = val;
                 }
             }
-            List ret;
-            ret["gmatrix"] = res;
-            return ret;
+            return res;
+        }
+    };
+
+    class RCallRateHandler: public CallRateHandler {
+    public:
+        using CallRateHandler::CallRateHandler;
+
+        NumericMatrix result() {
+            NumericMatrix result(ranges.size(), samples.size());
+            for (int i = 0; i < ranges.size(); i++) {
+                for (int j = 0; j < samples.size(); j++) {
+                    result[i * samples.size() + j] = (double)call_rate_matrix[i][j] / variants;
+                }
+            }
+            return result;
         }
     };
 }
@@ -70,10 +84,17 @@ VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_posi
     return filter;
 }
 
+vector<vcf::Range> parse_regions(const CharacterVector& regions){
+    vector<vcf::Range> ranges;
+    transform(regions.begin(), regions.end(), ranges.begin(), [](const char* str){
+        return vcf::Range::parseRange(string(str));
+    });
+}
+
 // [[Rcpp::export]]
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& allowed_variants,
-               const IntegerVector& DP, const IntegerVector& GQ,
+               const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions,
                const LogicalVector& ret_gmatrix, const CharacterVector& binary_prefix) {
     const char* name = filename[0];
     unique_ptr<std::istream> in(new zstr::ifstream(name));
@@ -83,10 +104,16 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     auto ss = parser.sample_names();
     shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
     shared_ptr<BinaryFileHandler> binary_handler;
+    shared_ptr<RCallRateHandler> callrate_handler;
 
     if (ret_gmatrix[0]) {
         gmatrix_handler.reset(new RGenotypeMatrixHandler(ss));
         parser.register_handler(gmatrix_handler);
+    }
+
+    if (regions.length() > 0) {
+        callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
+        parser.register_handler(callrate_handler);
     }
 
     if (binary_prefix.length() > 0) {
@@ -97,8 +124,14 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 
     parser.parse_genotypes();
     List ret;
+    vector<const char*> samples_cstr;
+    transform(ss.begin(), ss.end(), samples_cstr.begin(), [](string& s){return s.c_str();});
+    ret["samples"] = CharacterVector(samples_cstr.begin(), samples_cstr.end());
     if (ret_gmatrix[0]){
         ret["genotype"] = gmatrix_handler->result();
+    }
+    if (regions.length() > 0) {
+        ret["callrate"] = callrate_handler->result();
     }
     return ret;
 }
