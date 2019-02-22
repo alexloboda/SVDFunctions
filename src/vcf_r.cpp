@@ -52,7 +52,7 @@ namespace {
             NumericMatrix result(ranges.size(), samples.size());
             for (int i = 0; i < ranges.size(); i++) {
                 for (int j = 0; j < samples.size(); j++) {
-                    result[j * ranges.size() + i] = (double)call_rate_matrix[i][j] / variants;
+                    result[j * ranges.size() + i] = (double)call_rate_matrix[i][j] / n_variants[i];
                 }
             }
             return result;

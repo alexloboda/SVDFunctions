@@ -20,7 +20,7 @@ namespace vcf {
         bad_variants.insert(positions.begin(), positions.end());
     }
 
-    void VCFFilter::add_samples(vector<string> samples) {
+    void VCFFilter::add_samples(vector<string>& samples) {
         samples_set = true;
         available_samples.insert(samples.begin(), samples.end());
     }

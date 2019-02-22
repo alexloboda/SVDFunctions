@@ -19,7 +19,7 @@ namespace vcf {
         VCFFilter(int DP, int GQ);
         void set_available_variants(std::vector<Variant>& variants);
         void add_bad_variants(std::vector<Position>& positions);
-        void add_samples(std::vector<std::string> samples);
+        void add_samples(std::vector<std::string>& samples);
         bool apply(const Position& v) const;
         bool apply(const Variant& v) const;
         bool apply(int dp, int gq) const;

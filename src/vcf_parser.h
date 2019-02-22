@@ -14,7 +14,7 @@ namespace vcf {
         static const char DELIM = '\t';
         const std::vector<std::string> FIELDS = {"CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"};
 
-        const VCFFilter& filter;
+        const VCFFilter filter;
 
         std::vector<std::shared_ptr<VariantsHandler>> handlers;
         std::istream& input;
