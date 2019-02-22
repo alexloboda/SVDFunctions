@@ -53,7 +53,7 @@ namespace vcf {
     void BinaryFileHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
         meta << (std::string)variant << "\n";
         for (const Allele& allele: alleles) {
-
+            binary << AlleleBinary::fromAllele(allele);
         }
     }
 }
