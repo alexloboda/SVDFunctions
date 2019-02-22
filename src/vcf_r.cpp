@@ -102,40 +102,44 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& allowed_variants,
                const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions,
                const LogicalVector& ret_gmatrix, const CharacterVector& binary_prefix) {
-    const char* name = filename[0];
-    unique_ptr<std::istream> in(new zstr::ifstream(name));
-
-    Parser parser(*in, filter(samples, bad_positions, allowed_variants, DP[0], GQ[0]));
-    parser.parse_header();
-    auto ss = parser.sample_names();
-    shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
-    shared_ptr<BinaryFileHandler> binary_handler;
-    shared_ptr<RCallRateHandler> callrate_handler;
-
-    if (ret_gmatrix[0]) {
-        gmatrix_handler.reset(new RGenotypeMatrixHandler(ss));
-        parser.register_handler(gmatrix_handler);
-    }
-
-    if (regions.length() > 0) {
-        callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
-        parser.register_handler(callrate_handler);
-    }
-
-    if (binary_prefix.length() > 0) {
-        string prefix = string(binary_prefix[0]);
-        binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
-        parser.register_handler(binary_handler);
-    }
-
-    parser.parse_genotypes();
     List ret;
-    ret["samples"] = CharacterVector(ss.begin(), ss.end());
-    if (ret_gmatrix[0]){
-        ret["genotype"] = gmatrix_handler->result();
-    }
-    if (regions.length() > 0) {
-        ret["callrate"] = callrate_handler->result();
+    try {
+        const char *name = filename[0];
+        unique_ptr<std::istream> in(new zstr::ifstream(name));
+
+        Parser parser(*in, filter(samples, bad_positions, allowed_variants, DP[0], GQ[0]));
+        parser.parse_header();
+        auto ss = parser.sample_names();
+        shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
+        shared_ptr<BinaryFileHandler> binary_handler;
+        shared_ptr<RCallRateHandler> callrate_handler;
+
+        if (ret_gmatrix[0]) {
+            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss));
+            parser.register_handler(gmatrix_handler);
+        }
+
+        if (regions.length() > 0) {
+            callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
+            parser.register_handler(callrate_handler);
+        }
+
+        if (binary_prefix.length() > 0) {
+            string prefix = string(binary_prefix[0]);
+            binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
+            parser.register_handler(binary_handler);
+        }
+
+        parser.parse_genotypes();
+        ret["samples"] = CharacterVector(ss.begin(), ss.end());
+        if (ret_gmatrix[0]) {
+            ret["genotype"] = gmatrix_handler->result();
+        }
+        if (regions.length() > 0) {
+            ret["callrate"] = callrate_handler->result();
+        }
+    } catch (ParserException& e) {
+        ::Rf_error(e.get_message().c_str());
     }
     return ret;
 }

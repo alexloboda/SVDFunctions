@@ -1,0 +1,4 @@
+PKG_LIBS = -lz
+
+CXX_STD = CXX11
+PKG_CXXFLAGS = -g -O0

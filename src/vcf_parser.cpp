@@ -147,7 +147,7 @@ namespace {
                 }
                 int dp = depth_pos == -1 ? 0 : stoi(parts[depth_pos]);
                 int gq = qual_pos == -1 ? 0 : stoi(parts[qual_pos]);
-                if (filter.apply(dp, gq)) {
+                if (!filter.apply(dp, gq)) {
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
                 return {parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};

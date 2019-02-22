@@ -38,6 +38,6 @@ namespace vcf {
     }
 
     bool VCFFilter::apply(int dp, int gq) const {
-        return dp > DP && gq > GQ;
+        return dp >= DP && gq >= GQ;
     }
 }

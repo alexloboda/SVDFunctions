@@ -45,9 +45,9 @@ namespace vcf {
         if (pos >= str.length() - 1 || pos == 0) {
             throw ParserException("Position must be in format chr#:# but " + str + " given");
         }
-        Chromosome chr(str.substr(0, pos - 1));
+        Chromosome chr(str.substr(0, pos));
         try {
-            return {chr, std::stoi(str.substr(pos + 1, str.length() - pos - 1))};
+            return {chr, std::stoi(str.substr(pos + 1, str.length() - pos))};
         } catch (...) {
             throw ParserException("Position must be in format chr#:# but " + str + " given");
         }
@@ -88,7 +88,7 @@ namespace vcf {
         string ref;
         iss >> ref;
         string alt;
-        while(std::getline(iss, alt, ',')) {
+        while(std::getline(iss >> std::ws, alt, ',')) {
             ret.emplace_back(pos, ref, alt);
         }
         return ret;
