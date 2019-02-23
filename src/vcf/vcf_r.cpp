@@ -3,8 +3,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 #include <fstream>
-#include "zstr/zstr.hpp"
-#include "zstr/strict_fstream.hpp"
+#include "../zstr/zstr.hpp"
+#include "../zstr/strict_fstream.hpp"
 
 namespace {
     using namespace Rcpp;
@@ -66,7 +66,7 @@ VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_posi
 
     if (samples.length() > 0) {
         vector<string> ss;
-        for_each(samples.begin(), samples.end(), [&ss](const char *s) { ss.push_back(string(s)); });
+        for_each(samples.begin(), samples.end(), [&ss](const char *s) { ss.emplace_back(s); });
         filter.add_samples(ss);
     }
 
