@@ -3,8 +3,8 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 #include <fstream>
-#include "../zstr/zstr.hpp"
-#include "../zstr/strict_fstream.hpp"
+#include "zstr/zstr.hpp"
+#include "zstr/strict_fstream.hpp"
 
 namespace {
     using namespace Rcpp;
