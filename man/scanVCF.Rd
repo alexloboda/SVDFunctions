@@ -10,6 +10,9 @@ scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   binaryPathPrefix = NULL)
 }
 \arguments{
+\item{vcf}{the name of file to read, can be plain text VCF file as well
+as compressed with gzip or zlib headers.}
+
 \item{DP}{integer: minimum required read depth for position to be considered,
 otherwise assumed as missing.}
 
@@ -31,9 +34,6 @@ region call rate will be calculated and corresponding matrix will be returned.}
 
 \item{binaryPathPrefix}{the path prefix for binary file prefix_bin and 
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
-
-\item{filename}{the name of file to read, can be plain text VCF file as well
-as compressed with gzip or zlib headers.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

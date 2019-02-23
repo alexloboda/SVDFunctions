@@ -3,7 +3,7 @@
 #' Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
 #' with applied filters. Also can generate binary and metadata files for
 #' faster access to genotype data.
-#' @param filename the name of file to read, can be plain text VCF file as well
+#' @param vcf the name of file to read, can be plain text VCF file as well
 #' as compressed with gzip or zlib headers.
 #' @param DP integer: minimum required read depth for position to be considered,
 #' otherwise assumed as missing.
