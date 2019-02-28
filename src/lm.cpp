@@ -3,7 +3,7 @@
 #include <cmath>
 #include <boost/math/special_functions/beta.hpp>
 
-#include "lm.h"
+#include "include/lm.h"
 
 double pval_t(double t, double df) {
     if (df > 50) {

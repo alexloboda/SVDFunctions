@@ -1,4 +1,4 @@
-#include "vcf_parser.h"
+#include "include/vcf_parser.h"
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>

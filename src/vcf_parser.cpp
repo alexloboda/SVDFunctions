@@ -1,4 +1,4 @@
-#include "vcf_parser.h"
+#include "include/vcf_parser.h"
 
 #include <algorithm>
 #include <sstream>

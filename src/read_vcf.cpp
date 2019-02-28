@@ -3,7 +3,7 @@
 #include <unordered_set>
 #include <string>
 
-#include "vcf_primitives.h"
+#include "include/vcf_primitives.h"
 
 namespace {
     using Rcpp::CharacterVector;

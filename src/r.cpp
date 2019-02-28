@@ -1,8 +1,8 @@
 #include <Rcpp.h>
 #include <vector>
 
-#include "qchisq.h"
-#include "utils.h"
+#include "include/qchisq.h"
+#include "include/utils.h"
 
 using namespace Rcpp;
 using std::vector;

@@ -1,5 +1,5 @@
 #include <algorithm>
-#include "vcf_filter.h"
+#include "include/vcf_filter.h"
 
 namespace {
     using std::vector;

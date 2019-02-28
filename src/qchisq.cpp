@@ -1,4 +1,4 @@
-#include "qchisq.h"
+#include "include/qchisq.h"
 #include <fstream>
 #include <cmath>
 
