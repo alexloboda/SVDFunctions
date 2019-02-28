@@ -9,3 +9,7 @@ parse_vcf <- function(filename, samples, bad_positions, allowed_variants, DP, GQ
     .Call('_SVDFunctions_parse_vcf', PACKAGE = 'SVDFunctions', filename, samples, bad_positions, allowed_variants, DP, GQ, regions, ret_gmatrix, binary_prefix)
 }
 
+parse_binary_file <- function(variants, samples, binary_file, metafile, requiredDP, requiredGQ) {
+    .Call('_SVDFunctions_parse_binary_file', PACKAGE = 'SVDFunctions', variants, samples, binary_file, metafile, requiredDP, requiredGQ)
+}
+

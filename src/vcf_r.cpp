@@ -3,8 +3,10 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 #include <fstream>
-#include "zstr/zstr.hpp"
-#include "zstr/strict_fstream.hpp"
+
+#include "include/vcf_binary.h"
+#include "include/zstr/zstr.hpp"
+#include "include/zstr/strict_fstream.hpp"
 
 namespace {
     using namespace Rcpp;
@@ -142,4 +144,71 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         ::Rf_error(e.get_message().c_str());
     }
     return ret;
+}
+
+// [[Rcpp::export]]
+List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples,
+        const CharacterVector& binary_file, const CharacterVector& metafile,
+        IntegerVector& requiredDP, IntegerVector requiredGQ) {
+    try {
+        int DP = requiredDP[0];
+        int GQ = requiredGQ[0];
+
+        MemoryMappedScanner scanner((string) binary_file[0]);
+        ifstream fin(metafile[0]);
+        string line;
+        getline(fin, line);
+        istringstream iss(line);
+        unordered_map<string, int> sample_positions;
+        unordered_map<Variant, int> variant_positions;
+        string sample;
+        int n = 0;
+        for (; iss >> sample; n++) {
+            sample_positions.insert({sample, n});
+        }
+        vector<int> positions;
+        for (const char *s: samples) {
+            positions.push_back(sample_positions[string(s)]);
+        }
+
+        int i = 0;
+        while (getline(fin, line)) {
+            auto vars = Variant::parseVariants(line);
+            for (Variant v: vars) {
+                variant_positions.insert({v, i++});
+            }
+        }
+
+        List ret;
+        vector<int> homrefs, hets, homs;
+        for (const char *var: variants) {
+            int homref = 0, het = 0, hom = 0;
+            int pos = variant_positions.at(Variant::parseVariants(string(var))[0]);
+            for (int sample_position: positions) {
+                Allele allele = BinaryAllele::toAllele(scanner.scan(pos * n + sample_position));
+                if (allele.DP() >= DP && allele.GQ() >= GQ) {
+                    switch (allele.alleleType()) {
+                        case HOM:
+                            ++hom;
+                            break;
+                        case HET:
+                            ++het;
+                            break;
+                        case HOMREF:
+                            ++homref;
+                    }
+                }
+            }
+            homrefs.push_back(homref);
+            hets.push_back(het);
+            homs.push_back(hom);
+        }
+        ret["variant"] = variants;
+        ret["HOM_REF"] = NumericVector(homrefs.begin(), homrefs.end());
+        ret["HET"] = NumericVector(hets.begin(), hets.end());
+        ret["HOM"] = NumericVector(homs.begin(), homs.end());
+        return ret;
+    } catch (ParserException& e) {
+        ::Rf_error(e.get_message().c_str());
+    }
 }

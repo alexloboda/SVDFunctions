@@ -99,12 +99,14 @@ namespace vcf {
         AlleleType alleleType() const;
     };
 
-    struct AlleleBinary {
+    struct BinaryAllele {
         uint16_t DP;
         uint16_t GQ;
         uint8_t allele;
-        friend std::ostream& operator<<(std::ostream& os, const AlleleBinary& dt);
-        static AlleleBinary fromAllele(const Allele& allele);
+        friend std::ostream& operator<<(std::ostream& os, const BinaryAllele& dt);
+        friend std::istream& operator>>(std::istream& in, BinaryAllele& obj);
+        static BinaryAllele fromAllele(const Allele& allele);
+        static Allele toAllele(const BinaryAllele& allele);
     };
 }
 

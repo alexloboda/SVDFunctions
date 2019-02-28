@@ -54,3 +54,11 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   }
   res
 }
+
+#' @export
+scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20) {
+  stopifnot(file.exists(binaryFile))
+  stopifnot(file.exists(metafile))
+  res <- parse_binary_file(variants, samples, binaryFile, metafile, DP, GQ);
+  as.data.frame(res)
+}

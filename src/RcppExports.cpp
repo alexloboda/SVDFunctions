@@ -44,10 +44,27 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// parse_binary_file
+List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& binary_file, const CharacterVector& metafile, IntegerVector& requiredDP, IntegerVector requiredGQ);
+RcppExport SEXP _SVDFunctions_parse_binary_file(SEXP variantsSEXP, SEXP samplesSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type samples(samplesSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type binary_file(binary_fileSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type metafile(metafileSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type requiredDP(requiredDPSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type requiredGQ(requiredGQSEXP);
+    rcpp_result_gen = Rcpp::wrap(parse_binary_file(variants, samples, binary_file, metafile, requiredDP, requiredGQ));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 9},
+    {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 6},
     {NULL, NULL, 0}
 };
 

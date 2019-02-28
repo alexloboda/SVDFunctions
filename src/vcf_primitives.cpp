@@ -200,16 +200,26 @@ namespace vcf {
         return type;
     }
 
-    std::ostream& operator<<(std::ostream& out, const AlleleBinary& allele) {
-        out.write(reinterpret_cast<const char*>(&allele), sizeof(AlleleBinary));
+    std::ostream& operator<<(std::ostream& out, const BinaryAllele& allele) {
+        out.write(reinterpret_cast<const char*>(&allele), sizeof(BinaryAllele));
         return out;
     }
 
-    AlleleBinary AlleleBinary::fromAllele(const Allele& allele) {
-        AlleleBinary binary{};
+    BinaryAllele BinaryAllele::fromAllele(const Allele& allele) {
+        BinaryAllele binary{};
         binary.DP = (uint16_t)allele.DP();
         binary.GQ = (uint16_t)allele.GQ();
         binary.allele = allele.alleleType();
         return binary;
+    }
+
+    std::istream& operator>>(std::istream& in, BinaryAllele& obj) {
+        in.read((char*)&obj, sizeof(BinaryAllele));
+        return in;
+    }
+
+    Allele BinaryAllele::toAllele(const BinaryAllele& allele) {
+        auto type = (AlleleType)allele.allele;
+        return {type, allele.DP, allele.GQ};
     }
 }
