@@ -95,19 +95,18 @@ namespace vcf {
     }
 
     bool Chromosome::parse(std::string str) {
-        if (!std::all_of(str.begin(), str.end(), ::isdigit)) {
-            transform(str.begin(), str.end(), str.begin(), ::tolower);
-            if (str.substr(0, 3) != "chr") {
-                return false;
-            }
+        transform(str.begin(), str.end(), str.begin(), ::tolower);
+        if (str.substr(0, 3) == "chr") {
             str = str.substr(3, str.length());
         }
 
-        if (str == "X") {
+        if (str == "x") {
             chr = chrX;
+            return true;
         }
-        if (str == "Y") {
+        if (str == "y") {
             chr = chrY;
+            return true;
         }
 
         try {
