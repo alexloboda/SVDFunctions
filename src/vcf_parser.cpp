@@ -101,9 +101,12 @@ namespace {
             }
         }
 
-        AlleleType parse_gt(const string gt, int allele){
+        AlleleType parse_gt(const string& gt, int allele){
             if (find(gt.begin(), gt.end(), MISSING_GT) != gt.end()) {
                 return MISSING;
+            }
+            if (allele == 0) {
+                return HOM;
             }
             int first_allele, second_allele;
             std::istringstream iss(gt);
@@ -224,6 +227,18 @@ namespace vcf {
                 }
                 vector<Variant> variants = parse_variants(tokens, position);
                 Format format(tokens[FORMAT]);
+
+                int missing = 0;
+                unsigned long total = tokens.size() - FIELDS.size();
+                for (unsigned long i = FIELDS.size(); i < tokens.size(); i++) {
+                    if (format.parse(tokens[i], 0, filter).alleleType() == MISSING) {
+                        ++missing;
+                    }
+                }
+                if (missing > 0.1 * total) {
+                    continue;
+                }
+
                 for (int i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
                     if (filter.apply(variant)) {
