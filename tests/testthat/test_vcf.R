@@ -18,11 +18,11 @@ test_that("parsing gives reasonable genotype matrix", {
 test_that("callrates are calculated correctly", {
   file <- system.file("extdata", "CEU.exon.2010_09.genotypes.vcf.gz",
                       package = "SVDFunctions")
-  regions <- c("chr1 1108138 3545212")
+  regions <- c("chr1 1108138 36000000")
   samples <- c("NA07051", "NA12045", "NA12400")
   vcf <- scanVCF(file, DP = 20, GQ = 0, regions = regions, 
                samples = samples)
-  expectedCallrate <- matrix(c(1.0, 1.0, 1.0 / 8.0), nrow = length(regions), 
+  expectedCallrate <- matrix(c(1.0, 1.0, 3.0 / 14.0), nrow = length(regions), 
                             dimnames = list(regions, samples))
   expect_equal(vcf$callrate, expectedCallrate, tolerance = 1e-8)
 })

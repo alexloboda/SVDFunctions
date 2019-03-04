@@ -231,6 +231,11 @@ namespace vcf {
                         for (int sample : filtered_samples) {
                             alleles.push_back(format.parse(tokens[sample], i + 1, filter));
                         }
+                        // MAC > 0
+                        auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
+                        if (!std::any_of(alleles.begin(), alleles.end(), f)){
+                            continue;
+                        }
                         for (auto& handler: handlers) {
                             handler->processVariant(variant, alleles);
                         }
