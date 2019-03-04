@@ -55,6 +55,18 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   res
 }
 
+#' Scan binary variant file
+#' 
+#' Scan binary file produced by \code{\link{scanVCF}} and collect required 
+#' per variant allele counts statistics after applying quality control filters.
+#' @inheritParams scanVCF
+#' @param binaryFile the name of binary file
+#' @param metafile the name of metadata file
+#' @param samples the set of samples to be analyzed
+#' @return data.frame with four columns: variant(position, reference allele, 
+#' alternative allele); number of samples with 
+#' both reference, one reference and alternative allele indicated in first column,
+#' and both alternative respectively.
 #' @export
 scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20) {
   stopifnot(file.exists(binaryFile))
