@@ -55,8 +55,6 @@ namespace {
         const char DELIM_1 = '|';
         const char DELIM_2 = '/';
 
-        const char MISSING_GT = '.';
-
         long depth_pos;
         long qual_pos;
         long genotype_pos;
@@ -102,9 +100,6 @@ namespace {
         }
 
         AlleleType parse_gt(const string& gt, int allele){
-            if (find(gt.begin(), gt.end(), MISSING_GT) != gt.end()) {
-                return MISSING;
-            }
             if (allele == 0) {
                 return HOM;
             }
@@ -133,27 +128,30 @@ namespace {
             vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
-                if (gt == "." || gt == "./.") {
+                if (gt == "." || gt == "./." || gt == ".|.") {
                     return {MISSING, 0, 0};
-                }
-                if (ad_pos != -1) {
-                    std::istringstream adstream(parts[ad_pos]);
-                    int ref, alt;
-                    char ch;
-                    adstream >> ref >> ch >> alt;
-                    if (!adstream.fail()) {
-                        double ratio = ref / (double)(ref + alt);
-                        if (ratio < 0.3 || ratio > 0.7) {
-                            return {MISSING, 0, 0};
-                        }
-                    }
                 }
                 int dp = depth_pos == -1 ? 0 : stoi(parts[depth_pos]);
                 int gq = qual_pos == -1 ? 0 : stoi(parts[qual_pos]);
                 if (!filter.apply(dp, gq)) {
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
-                return {parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
+                Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
+                if (ret.alleleType() == HET) {
+                    if (ad_pos != -1) {
+                        std::istringstream adstream(parts[ad_pos]);
+                        int ref, alt;
+                        char ch;
+                        adstream >> ref >> ch >> alt;
+                        if (!adstream.fail()) {
+                            double ratio = ref / (double) (ref + alt);
+                            if (ratio < 0.3 || ratio > 0.7) {
+                                return {MISSING, 0, 0};
+                            }
+                        }
+                    }
+                }
+                return ret;
             } catch (...) {
                 throw ParserException("Wrong GT format");
             }
