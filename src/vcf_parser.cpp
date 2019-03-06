@@ -1,4 +1,5 @@
 #include "include/vcf_parser.h"
+#include <gperftools/profiler.h>
 
 #include <algorithm>
 #include <sstream>
@@ -211,8 +212,13 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
+        ProfilerStart("a.prof");
         string line;
         while (getline(input, line)) {
+            if (line_num == 1000) {
+                ProfilerStop();
+                std::exit(1);
+            }
             ++line_num;
             vector<string> tokens = split(line, DELIM);
             if (tokens[FILTER] != "PASS") {
