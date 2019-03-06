@@ -16,8 +16,14 @@ namespace {
     using std::stoi;
 
     vector<string> split(const string& line, char delim){
-        auto tokens = std::count(line.begin(), line.end(), delim);
-        vector<string> result(tokens + 1);
+        int tokens = 0;
+        for (char ch: line) {
+            if (ch == delim) {
+                ++tokens;
+            }
+        }
+
+        vector<string> result(tokens + 1, "");
         int last = 0;
         int token = 0;
         for (int i = 0; i < line.length(); i++) {
@@ -29,7 +35,7 @@ namespace {
         }
 
         if (last != line.length()) {
-            result[token++] = std::move(line.substr(last, line.length() - last));
+            result[token] = std::move(line.substr(last, line.length() - last));
         }
 
         return result;
@@ -115,11 +121,11 @@ namespace {
             char ch;
             iss >> ch;
             if (ch != DELIM_1 && ch != DELIM_2) {
-                throw ParserException("Wrong GT format");
+                throw ParserException("Wrong GT format: " + gt);
             }
             iss >> second_allele;
             if (iss.fail()) {
-                throw ParserException("Wrong GT format");
+                throw ParserException("Wrong GT format: " + gt);
             }
             return type(first_allele, second_allele, allele);
         }
@@ -153,7 +159,7 @@ namespace {
                 }
                 return ret;
             } catch (...) {
-                throw ParserException("Wrong GT format");
+                throw ParserException("Wrong GT format: " + genotype);
             }
         }
     };
@@ -183,6 +189,7 @@ namespace vcf {
 
     void VCFParser::parse_header() {
         string line;
+        ProfilerStart("a.prof");
         while (getline(input, line)) {
             ++line_num;
             if (line.substr(0, 2) == "##") {
@@ -190,9 +197,9 @@ namespace vcf {
             }
             if (line.substr(0, 1) == "#") {
                 line = line.substr(1);
-                std::istringstream iss(line);
-                string token;
-                for (int i = 0; iss >> token; i++) {
+                auto tokens = split(line, DELIM);
+                for (int i = 0; i < tokens.size(); i++) {
+                    const string& token = tokens[i];
                     if (i < FIELDS.size()) {
                         if (token != FIELDS[i]) {
                             throw ParserException("Wrong header line: expected column " + FIELDS[i] +
@@ -211,10 +218,9 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
-        ProfilerStart("a.prof");
         string line;
         while (getline(input, line)) {
-            if (line_num ==  5000) {
+            if (line_num ==  10000) {
                 ProfilerStop();
                 std::exit(1);
             }
@@ -247,7 +253,7 @@ namespace vcf {
                     if (filter.apply(variant)) {
                         vector<Allele> alleles;
                         for (int sample : filtered_samples) {
-                            alleles.push_back(format.parse(tokens[sample], i + 1, filter));
+                            alleles.push_back(format.parse(tokens.at(sample), i + 1, filter));
                         }
                         // MAC > 0
                         auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
