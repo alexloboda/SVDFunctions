@@ -216,6 +216,7 @@ namespace vcf {
         while (getline(input, line)) {
             if (line_num == 1000) {
                 ProfilerStop();
+                std::exit(1);
             }
             ++line_num;
             vector<string> tokens = split(line, DELIM);
