@@ -17,20 +17,19 @@ namespace {
 
     vector<string> split(const string& line, char delim){
         vector<string> result;
-        string curr;
-        for (char ch : line) {
-            if (ch != delim) {
-                curr += ch;
-            } else {
-                if (curr.length() != 0) {
-                    result.push_back(curr);
-                    curr = "";
+        int last = 0;
+        for (int i = 0; i < line.length(); i++) {
+            char ch = line[i];
+            if (ch == delim) {
+                if (last != i) {
+                    result.push_back(std::move(line.substr(last, i - last)));
                 }
+                last = i + 1;
             }
         }
 
-        if (curr.length() != 0) {
-            result.push_back(curr);
+        if (last != line.length()) {
+            result.push_back(std::move(line.substr(last, line.length() - last)));
         }
 
         return result;
@@ -217,7 +216,6 @@ namespace vcf {
         while (getline(input, line)) {
             if (line_num == 1000) {
                 ProfilerStop();
-                std::exit(1);
             }
             ++line_num;
             vector<string> tokens = split(line, DELIM);
