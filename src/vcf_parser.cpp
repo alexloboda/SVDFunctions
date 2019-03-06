@@ -15,8 +15,8 @@ namespace {
     using std::pair;
     using std::stoi;
 
-    vector<string> split(const string& line, char delim){
-        vector<string> result;
+    vector<string> split(const string& line, char delim, long size_hint = 0){
+        vector<string> result(size_hint);
         int last = 0;
         for (int i = 0; i < line.length(); i++) {
             char ch = line[i];
@@ -60,6 +60,8 @@ namespace {
         long genotype_pos;
         long ad_pos;
 
+        long tokens;
+
         void find_pos(const vector<string>& tokens, const string& field, long& pos) {
             auto position = find(tokens.begin(), tokens.end(), field);
             if (position == tokens.end()) {
@@ -90,6 +92,7 @@ namespace {
     public:
         Format(const string& format) {
             vector<string> parts = split(format, ':');
+            tokens = parts.size();
             find_pos(parts, DP_FIELD, depth_pos);
             find_pos(parts, GQ_FIELD, qual_pos);
             find_pos(parts, AD_FIELD, ad_pos);
@@ -125,7 +128,7 @@ namespace {
         }
 
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
-            vector<string> parts = split(genotype, ':');
+            vector<string> parts = split(genotype, ':', tokens);
             try {
                 string gt = parts[genotype_pos];
                 if (gt == "." || gt == "./." || gt == ".|.") {
