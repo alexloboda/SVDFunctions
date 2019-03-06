@@ -15,21 +15,21 @@ namespace {
     using std::pair;
     using std::stoi;
 
-    vector<string> split(const string& line, char delim, long size_hint = 0){
-        vector<string> result(size_hint);
+    vector<string> split(const string& line, char delim){
+        auto tokens = std::count(line.begin(), line.end(), delim);
+        vector<string> result(tokens + 1);
         int last = 0;
+        int token = 0;
         for (int i = 0; i < line.length(); i++) {
             char ch = line[i];
             if (ch == delim) {
-                if (last != i) {
-                    result.push_back(std::move(line.substr(last, i - last)));
-                }
+                result[token++] = std::move(line.substr(last, i - last));
                 last = i + 1;
             }
         }
 
         if (last != line.length()) {
-            result.push_back(std::move(line.substr(last, line.length() - last)));
+            result[token++] = std::move(line.substr(last, line.length() - last));
         }
 
         return result;
@@ -59,8 +59,6 @@ namespace {
         long qual_pos;
         long genotype_pos;
         long ad_pos;
-
-        long tokens;
 
         void find_pos(const vector<string>& tokens, const string& field, long& pos) {
             auto position = find(tokens.begin(), tokens.end(), field);
@@ -92,7 +90,6 @@ namespace {
     public:
         Format(const string& format) {
             vector<string> parts = split(format, ':');
-            tokens = parts.size();
             find_pos(parts, DP_FIELD, depth_pos);
             find_pos(parts, GQ_FIELD, qual_pos);
             find_pos(parts, AD_FIELD, ad_pos);
@@ -128,7 +125,7 @@ namespace {
         }
 
         Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
-            vector<string> parts = split(genotype, ':', tokens);
+            vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
                 if (gt == "." || gt == "./." || gt == ".|.") {
@@ -193,9 +190,9 @@ namespace vcf {
             }
             if (line.substr(0, 1) == "#") {
                 line = line.substr(1);
-                vector<string> tokens = split(line, DELIM);
-                for (int i = 0; i < tokens.size(); i++) {
-                    const string& token = tokens[i];
+                std::istringstream iss(line);
+                string token;
+                for (int i = 0; iss >> token; i++) {
                     if (i < FIELDS.size()) {
                         if (token != FIELDS[i]) {
                             throw ParserException("Wrong header line: expected column " + FIELDS[i] +
@@ -217,7 +214,7 @@ namespace vcf {
         ProfilerStart("a.prof");
         string line;
         while (getline(input, line)) {
-            if (line_num == 1000) {
+            if (line_num ==  5000) {
                 ProfilerStop();
                 std::exit(1);
             }
