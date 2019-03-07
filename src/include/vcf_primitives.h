@@ -81,6 +81,8 @@ namespace vcf {
     public:
         Range(Chromosome chr, int from, int to);
         bool includes(const Position& p) const;
+        bool operator<(const Range& other) const;
+        bool operator<(const Position& pos) const;
 
         static Range parseRange(const std::string& s);
     };

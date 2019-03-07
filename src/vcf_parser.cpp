@@ -15,27 +15,33 @@ namespace {
     using std::pair;
     using std::stoi;
 
-    vector<string> split(const string& line, char delim){
-        int tokens = 0;
+    vector<std::string> split(const string& line, char delim, int max_num_tokens = 0){
+        unsigned long tokens = 1;
         for (char ch: line) {
             if (ch == delim) {
                 ++tokens;
+                if (tokens == max_num_tokens) {
+                    break;
+                }
             }
         }
 
-        vector<string> result(tokens + 1, "");
-        int last = 0;
-        int token = 0;
+        vector<string> result;
+        result.reserve(tokens);
+        unsigned long last = 0;
         for (int i = 0; i < line.length(); i++) {
             char ch = line[i];
             if (ch == delim) {
-                result[token++] = std::move(line.substr(last, i - last));
+                result.push_back(std::move(line.substr(last, i - last)));
                 last = i + 1;
+                if (result.size() == max_num_tokens) {
+                    return result;
+                }
             }
         }
 
         if (last != line.length()) {
-            result[token] = std::move(line.substr(last, line.length() - last));
+            result.push_back(std::move(line.substr(last, line.length() - last)));
         }
 
         return result;
@@ -182,7 +188,10 @@ namespace vcf {
         string ref = tokens[REF];
         vector<string> alts = split(tokens[ALT], ',');
         for (const string& alt: alts) {
-            variants.emplace_back(position, ref, alt);
+            Variant variant(position, ref, alt);
+            if (filter.apply(variant)) {
+                variants.emplace_back(position, ref, alt);
+            }
         }
         return variants;
     }
@@ -217,15 +226,19 @@ namespace vcf {
         }
     }
 
+    bool VCFParser::is_of_interest(const Position& pos) {
+        bool interesting = false;
+        for (const auto& handler: handlers) {
+            interesting |= handler->isOfInterest(pos);
+        }
+        return interesting;
+    }
+
     void VCFParser::parse_genotypes() {
         string line;
         while (getline(input, line)) {
-            if (line_num ==  10000) {
-                ProfilerStop();
-                std::exit(1);
-            }
             ++line_num;
-            vector<string> tokens = split(line, DELIM);
+            vector<string> tokens = split(line, DELIM, FIELDS.size());
             if (tokens[FILTER] != "PASS") {
                 continue;
             }
@@ -234,7 +247,17 @@ namespace vcf {
                 if (!filter.apply(position)) {
                     continue;
                 }
+
+                if (!is_of_interest(position)) {
+                    continue;
+                }
+
                 vector<Variant> variants = parse_variants(tokens, position);
+                if (variants.empty()) {
+                    continue;
+                }
+                tokens = split(line, DELIM);
+
                 Format format(tokens[FORMAT]);
 
                 int missing = 0;
@@ -270,9 +293,11 @@ namespace vcf {
                 handle_error(exception);
             }
         }
+        ProfilerStop();
     }
 
     void VCFParser::handle_error(const ParserException& e) {
         std::cerr << e.get_message() << std::endl;
     }
+
 }
