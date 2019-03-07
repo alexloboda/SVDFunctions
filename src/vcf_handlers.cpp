@@ -15,8 +15,8 @@ namespace vcf {
         return false;
     }
 
-    CallRateHandler::CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges)
-        :VariantsHandler(samples), ranges(ranges) {
+    CallRateHandler::CallRateHandler(const std::vector<std::string>& _samples, const std::vector<Range>& _ranges)
+        :VariantsHandler(_samples), ranges(_ranges) {
         auto val = vector<int>();
         val.resize(samples.size());
         call_rate_matrix.resize(ranges.size(), val);

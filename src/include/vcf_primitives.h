@@ -35,6 +35,10 @@ namespace vcf {
 
     public:
         explicit Chromosome(const std::string&);
+        Chromosome(const Chromosome& other) = default;
+        Chromosome(Chromosome&& other) = default;
+        Chromosome& operator=(const Chromosome& other) = default;
+        Chromosome& operator=(Chromosome&& other) noexcept = default;
         explicit operator std::string() const;
         int num() const;
 
@@ -80,6 +84,10 @@ namespace vcf {
         int to;
     public:
         Range(Chromosome chr, int from, int to);
+        Range(const Range& other) = default;
+        Range(Range&& other) = default;
+        Range& operator=(const Range& other) noexcept = default;
+        Range& operator=(Range&& other) noexcept = default;
         bool includes(const Position& p) const;
         bool operator<(const Range& other) const;
         bool operator<(const Position& pos) const;

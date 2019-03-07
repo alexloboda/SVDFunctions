@@ -12,14 +12,14 @@ namespace vcf {
         const std::vector<std::string> samples;
 
     public:
-        VariantsHandler(const std::vector<std::string>& samples);
+        explicit VariantsHandler(const std::vector<std::string>& samples);
         virtual void processVariant(Variant variant, std::vector<Allele> alleles);
         virtual bool isOfInterest(const Position& position);
     };
 
     class CallRateHandler: public VariantsHandler {
     protected:
-        const std::vector<Range> ranges;
+        std::vector<Range> ranges;
         std::vector<int> n_variants;
         std::vector<std::vector<int>> call_rate_matrix;
     public:

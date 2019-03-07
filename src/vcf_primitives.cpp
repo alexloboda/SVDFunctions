@@ -186,11 +186,11 @@ namespace vcf {
     }
 
     bool Range::operator<(const Range& other) const {
-        return chr.num() < other.chr.num() || (chr.num() == other.chr.num() && to < other.to);
+        return chr.num() < other.chr.num() || (chr == other.chr && to < other.to);
     }
 
     bool Range::operator<(const Position& pos) const {
-        return chr.num() < pos.chromosome().num() || (chr.num() == pos.chromosome().num() && to < pos.position());
+        return chr.num() < pos.chromosome().num() || (chr == pos.chromosome() && to < pos.position());
     }
 
     Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :type(type), depth(DP), quality(GQ){}
