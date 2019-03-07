@@ -1,5 +1,4 @@
 #include "include/vcf_parser.h"
-#include <gperftools/profiler.h>
 
 #include <algorithm>
 #include <sstream>
@@ -198,7 +197,6 @@ namespace vcf {
 
     void VCFParser::parse_header() {
         string line;
-        ProfilerStart("a.prof");
         while (getline(input, line)) {
             ++line_num;
             if (line.substr(0, 2) == "##") {
@@ -293,11 +291,9 @@ namespace vcf {
                 handle_error(exception);
             }
         }
-        ProfilerStop();
     }
 
     void VCFParser::handle_error(const ParserException& e) {
         std::cerr << e.get_message() << std::endl;
     }
-
 }
