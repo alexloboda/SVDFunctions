@@ -8,16 +8,10 @@ namespace {
 
 namespace vcf {
     VCFFilter::VCFFilter(int DP, int GQ)
-        :variants_set(false), samples_set(false), DP(DP), GQ(GQ) {}
-
-    void VCFFilter::set_available_variants(vector<Variant>& variants) {
-        available_variants.clear();
-        available_variants.insert(variants.begin(), variants.end());
-        variants_set = true;
-    }
+        :samples_set(false), DP(DP), GQ(GQ) {}
 
     void VCFFilter::add_bad_variants(vector<Position>& positions) {
-        bad_variants.insert(positions.begin(), positions.end());
+        bad_positions.insert(positions.begin(), positions.end());
     }
 
     void VCFFilter::add_samples(vector<string>& samples) {
@@ -25,12 +19,8 @@ namespace vcf {
         available_samples.insert(samples.begin(), samples.end());
     }
 
-    bool VCFFilter::apply(const vcf::Variant& v) const {
-        return (!variants_set || available_variants.find(v) != available_variants.end());
-    }
-
     bool VCFFilter::apply(const Position& p) const {
-        return bad_variants.find(p) == bad_variants.end();
+        return bad_positions.find(p) == bad_positions.end();
     }
 
     bool VCFFilter::apply(const string& sample) const {

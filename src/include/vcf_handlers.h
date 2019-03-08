@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <unordered_set>
 #include "vcf_primitives.h"
 
 namespace vcf {
@@ -14,7 +15,7 @@ namespace vcf {
     public:
         explicit VariantsHandler(const std::vector<std::string>& samples);
         virtual void processVariant(Variant variant, std::vector<Allele> alleles);
-        virtual bool isOfInterest(const Position& position);
+        virtual bool isOfInterest(const Variant& position);
     };
 
     class CallRateHandler: public VariantsHandler {
@@ -25,17 +26,18 @@ namespace vcf {
     public:
         CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges);
         void processVariant(Variant variant, std::vector<Allele> alleles) override;
-        bool isOfInterest(const Position& position) override;
+        bool isOfInterest(const Variant& position) override;
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
     protected:
         std::vector<std::vector<AlleleType>> gmatrix;
         std::vector<Variant> variants;
+        std::unordered_set<Variant> available_variants;
     public:
-        using VariantsHandler::VariantsHandler;
+        GenotypeMatrixHandler(const std::vector<std::string>& samples, const std::vector<Variant>& variants);
         void processVariant(Variant variant, std::vector<Allele> alleles) override;
-        bool isOfInterest(const Position& position) override;
+        bool isOfInterest(const Variant& position) override;
     };
 
     class BinaryFileHandler: public VariantsHandler {
@@ -47,7 +49,7 @@ namespace vcf {
         BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
                 std::string metadata_file);
         void processVariant(Variant variant, std::vector<Allele> alleles) override;
-        bool isOfInterest(const Position& position) override;
+        bool isOfInterest(const Variant& position) override;
     };
 }
 

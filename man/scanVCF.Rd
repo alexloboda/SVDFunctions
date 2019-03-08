@@ -5,8 +5,7 @@
 \title{Scan VCF files}
 \usage{
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
-  bannedPositions = NULL, variants = NULL,
-  returnGenotypeMatrix = TRUE, regions = NULL,
+  bannedPositions = NULL, variants = NULL, regions = NULL,
   binaryPathPrefix = NULL)
 }
 \arguments{
@@ -25,9 +24,8 @@ considered, otherwise assumed as missing.}
 must be eliminated from consideration.}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
-
-\item{returnGenotypeMatrix}{logical: if TRUE genotype matrix will be returned}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
+corrspoding genotype matrix will be returned}
 
 \item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}

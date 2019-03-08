@@ -63,7 +63,7 @@ namespace {
 }
 
 VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_positions,
-        const CharacterVector& variants, int DP, int GQ) {
+        int DP, int GQ) {
     VCFFilter filter(DP, GQ);
 
     if (samples.length() > 0) {
@@ -80,14 +80,6 @@ VCFFilter filter(const CharacterVector& samples, const CharacterVector& bad_posi
         filter.add_bad_variants(bads);
     }
 
-    if (variants.length() > 0) {
-        vector<Variant> vs;
-        for_each(variants.begin(), variants.end(), [&vs](const char *s) {
-            vector<Variant> variants = Variant::parseVariants(string(s));
-            vs.insert(vs.end(), variants.begin(), variants.end());
-        });
-        filter.set_available_variants(vs);
-    }
     return filter;
 }
 
@@ -101,23 +93,28 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
 
 // [[Rcpp::export]]
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
-               const CharacterVector& bad_positions, const CharacterVector& allowed_variants,
+               const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions,
-               const LogicalVector& ret_gmatrix, const CharacterVector& binary_prefix) {
+               const CharacterVector& binary_prefix) {
     List ret;
     try {
         const char *name = filename[0];
         unique_ptr<std::istream> in(new zstr::ifstream(name));
 
-        Parser parser(*in, filter(samples, bad_positions, allowed_variants, DP[0], GQ[0]));
+        Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]));
         parser.parse_header();
         auto ss = parser.sample_names();
         shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
 
-        if (ret_gmatrix[0]) {
-            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss));
+        if (variants.length() > 0) {
+            vector<Variant> vs;
+            for_each(variants.begin(), variants.end(), [&vs](const char *s) {
+                vector<Variant> variants = Variant::parseVariants(string(s));
+                vs.insert(vs.end(), variants.begin(), variants.end());
+            });
+            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs));
             parser.register_handler(gmatrix_handler);
         }
 
@@ -134,7 +131,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 
         parser.parse_genotypes();
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
-        if (ret_gmatrix[0]) {
+        if (variants.length() > 0) {
             ret["genotype"] = gmatrix_handler->result();
         }
         if (regions.length() > 0) {
@@ -196,6 +193,9 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
                             break;
                         case HOMREF:
                             ++homref;
+                            break;
+                        default:
+                            break;
                     }
                 }
             }

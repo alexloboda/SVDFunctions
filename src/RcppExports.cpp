@@ -26,21 +26,20 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_vcf
-List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& allowed_variants, const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions, const LogicalVector& ret_gmatrix, const CharacterVector& binary_prefix);
-RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP allowed_variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP regionsSEXP, SEXP ret_gmatrixSEXP, SEXP binary_prefixSEXP) {
+List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions, const CharacterVector& binary_prefix);
+RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const CharacterVector& >::type filename(filenameSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type samples(samplesSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type bad_positions(bad_positionsSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type allowed_variants(allowed_variantsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type DP(DPSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type GQ(GQSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type regions(regionsSEXP);
-    Rcpp::traits::input_parameter< const LogicalVector& >::type ret_gmatrix(ret_gmatrixSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type binary_prefix(binary_prefixSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, allowed_variants, DP, GQ, regions, ret_gmatrix, binary_prefix));
+    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, regions, binary_prefix));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -63,7 +62,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
-    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 9},
+    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 8},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 6},
     {NULL, NULL, 0}
 };

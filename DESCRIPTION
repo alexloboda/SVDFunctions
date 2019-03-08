@@ -19,7 +19,8 @@ Imports:
     BH,
     snpStats,
     data.table,
-    methods
+    methods,
+    seqminer
 RoxygenNote: 6.1.1
 SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues

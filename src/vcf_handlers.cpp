@@ -11,7 +11,7 @@ namespace vcf {
 
     void VariantsHandler::processVariant(Variant variant, std::vector<Allele> alleles) {}
 
-    bool VariantsHandler::isOfInterest(const Position& position) {
+    bool VariantsHandler::isOfInterest(const Variant& variant) {
         return false;
     }
 
@@ -38,7 +38,8 @@ namespace vcf {
         }
     }
 
-    bool CallRateHandler::isOfInterest(const Position& position) {
+    bool CallRateHandler::isOfInterest(const Variant& variant) {
+        const Position& position = variant.position();
         auto it = std::lower_bound(ranges.begin(), ranges.end(), position);
         if (it == ranges.end()) {
             return false;
@@ -47,6 +48,9 @@ namespace vcf {
     }
 
     void GenotypeMatrixHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+        if (!isOfInterest(variant)) {
+            return;
+        }
         vector<AlleleType> row;
         for (const Allele& allele: alleles) {
             row.push_back(allele.alleleType());
@@ -55,8 +59,13 @@ namespace vcf {
         variants.push_back(variant);
     }
 
-    bool GenotypeMatrixHandler::isOfInterest(const Position& position) {
-        return true;
+    bool GenotypeMatrixHandler::isOfInterest(const Variant& variant) {
+        return available_variants.find(variant) != available_variants.end();
+    }
+
+    GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs)
+        : VariantsHandler(ss) {
+        available_variants.insert(vs.begin(), vs.end());
     }
 
     BinaryFileHandler::BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
@@ -75,7 +84,7 @@ namespace vcf {
         }
     }
 
-    bool BinaryFileHandler::isOfInterest(const Position& position) {
+    bool BinaryFileHandler::isOfInterest(const Variant& variant) {
         return true;
     }
 }

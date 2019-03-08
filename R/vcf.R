@@ -1,3 +1,30 @@
+transformToTabixRegions <- function(x, pattern, outputPattern){
+  captures <- regexpr(pattern, x, perl = TRUE)
+  if (captures == -1) {
+    stop(paste0("Region ", x, " is not correctly formatted"))
+  }
+  starts <- attr(captures, "capture.start")
+  stops <- starts + attr(captures, "capture.length") - 1
+  substrings <- sapply(mapply(c, starts, stops, SIMPLIFY = FALSE), 
+    function(y) {
+      substr(x, y[1], y[2])
+    })
+  paste0(substrings[outputPattern[1]], ":", substrings[outputPattern[2]], "-",
+         substrings[outputPattern[3]])
+}
+
+createVCFFromTabixIndex <- function(vcf, variants, regions) {
+  regionsPattern <- "^[\\s]*chr([\\d+XY]) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
+  crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
+  callRatePositions <- sapply(regions, crt)
+  variantsPattern <- "^[\\s]*chr([\\d+XY])[\\s]*:[\\s]*([\\d]+)[\\s]"
+  vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
+  variantsPosiitons <- sapply(variants, vart)
+  rs <- setNames(c(callRatePositions, variantsPosiitons), NULL)
+  t <- tempfile("SVDFunctions", fileext = "vcf")
+  write(tabix.read(vcf, rs), file = t)
+}
+
 #' Scan VCF files 
 #' 
 #' Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
@@ -13,8 +40,8 @@
 #' @param bannedPositions the set of positions in format "chr#:#" that 
 #' must be eliminated from consideration. 
 #' @param variants the set of variants in format "chr#:# REF ALT"
-#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". 
-#' @param returnGenotypeMatrix logical: if TRUE genotype matrix will be returned
+#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
+#' corrspoding genotype matrix will be returned
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
@@ -24,8 +51,7 @@
 #' @export
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL, 
                     bannedPositions = NULL, variants = NULL, 
-                    returnGenotypeMatrix = TRUE, regions = NULL,
-                    binaryPathPrefix = NULL) {
+                    regions = NULL, binaryPathPrefix = NULL) {
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
@@ -35,6 +61,11 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   stopifnot(file.exists(vcf))
   
+  tbi <- cat(vcf, ".tbi")
+  if (is.null(binaryPathPrefix) && file.exists(cat(vcf, ".tbi"))) {
+    vcf <- createVCFFromTabixIndex(vcf, tbi, variants, regions)
+  }
+  
   fixChar <- function(x) if(is.null(x)) character(0) else x
   samples <- fixChar(samples)
   bannedPositions <- fixChar(bannedPositions)
@@ -43,7 +74,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   binaryPathPrefix <- fixChar(binaryPathPrefix)
   
   res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                   regions, returnGenotypeMatrix, binaryPathPrefix);
+                   regions, binaryPathPrefix);
   
   if (!is.null(res$genotype)) {
       colnames(res$genotype) <- res$samples

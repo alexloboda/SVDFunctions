@@ -15,7 +15,8 @@ scanBinaryFile(binaryFile, metafile, samples, variants, DP = 10,
 \item{samples}{the set of samples to be analyzed}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
+corrspoding genotype matrix will be returned}
 
 \item{DP}{integer: minimum required read depth for position to be considered,
 otherwise assumed as missing.}

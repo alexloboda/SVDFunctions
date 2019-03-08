@@ -188,7 +188,7 @@ namespace vcf {
         vector<string> alts = split(tokens[ALT], ',');
         for (const string& alt: alts) {
             Variant variant(position, ref, alt);
-            if (filter.apply(variant)) {
+            if (is_of_interest(variant)) {
                 variants.emplace_back(position, ref, alt);
             }
         }
@@ -224,10 +224,10 @@ namespace vcf {
         }
     }
 
-    bool VCFParser::is_of_interest(const Position& pos) {
+    bool VCFParser::is_of_interest(const Variant& var) {
         bool interesting = false;
         for (const auto& handler: handlers) {
-            interesting |= handler->isOfInterest(pos);
+            interesting |= handler->isOfInterest(var);
         }
         return interesting;
     }
@@ -246,11 +246,8 @@ namespace vcf {
                     continue;
                 }
 
-                if (!is_of_interest(position)) {
-                    continue;
-                }
-
                 vector<Variant> variants = parse_variants(tokens, position);
+
                 if (variants.empty()) {
                     continue;
                 }
@@ -271,19 +268,17 @@ namespace vcf {
 
                 for (int i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
-                    if (filter.apply(variant)) {
-                        vector<Allele> alleles;
-                        for (int sample : filtered_samples) {
-                            alleles.push_back(format.parse(tokens.at(sample), i + 1, filter));
-                        }
-                        // MAC > 0
-                        auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
-                        if (!std::any_of(alleles.begin(), alleles.end(), f)){
-                            continue;
-                        }
-                        for (auto& handler: handlers) {
-                            handler->processVariant(variant, alleles);
-                        }
+                    vector<Allele> alleles;
+                    for (int sample : filtered_samples) {
+                        alleles.push_back(format.parse(tokens.at(sample), i + 1, filter));
+                    }
+                    // MAC > 0
+                    auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
+                    if (!std::any_of(alleles.begin(), alleles.end(), f)){
+                        continue;
+                    }
+                    for (auto& handler: handlers) {
+                        handler->processVariant(variant, alleles);
                     }
                 }
             } catch (const ParserException& e) {

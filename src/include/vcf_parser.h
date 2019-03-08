@@ -25,7 +25,7 @@ namespace vcf {
 
         std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
         virtual void handle_error(const ParserException& e);
-        bool is_of_interest(const Position& pos);
+        bool is_of_interest(const Variant& var);
 
     public:
         VCFParser(std::istream& input, const VCFFilter& filter);
