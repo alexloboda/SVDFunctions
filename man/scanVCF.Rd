@@ -39,6 +39,6 @@ requested.
 }
 \description{
 Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
-with applied filters. Also can generate binary and metadata files for
-faster access to genotype data.
+with applied filters. In addition, the method can generate binary and 
+metadata files for faster access to genotype data.
 }

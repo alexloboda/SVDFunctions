@@ -222,6 +222,7 @@ namespace vcf {
                 return;
             }
         }
+        throw ParserException("No VCF header found in given file");
     }
 
     bool VCFParser::is_of_interest(const Variant& var) {

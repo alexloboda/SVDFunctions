@@ -14,22 +14,31 @@ transformToTabixRegions <- function(x, pattern, outputPattern){
 }
 
 createVCFFromTabixIndex <- function(vcf, variants, regions) {
-  regionsPattern <- "^[\\s]*chr([\\d+XY]) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
-  crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
-  callRatePositions <- sapply(regions, crt)
-  variantsPattern <- "^[\\s]*chr([\\d+XY])[\\s]*:[\\s]*([\\d]+)[\\s]"
-  vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
-  variantsPosiitons <- sapply(variants, vart)
-  rs <- setNames(c(callRatePositions, variantsPosiitons), NULL)
-  t <- tempfile("SVDFunctions", fileext = "vcf")
-  write(tabix.read(vcf, rs), file = t)
+  variantsPositions <- NULL
+  callRatePosition <- NULL
+  if (!is.null(regions)) {
+    regionsPattern <- "^[\\s]*chr([\\d+XY]) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
+    crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
+    callRatePositions <- sapply(regions, crt)
+  }
+  if (!is.null(variants)) {
+    variantsPattern <- "^[\\s]*chr([\\d+XY])[\\s]*:[\\s]*([\\d]+)[\\s]"
+    vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
+    variantsPosiitons <- sapply(variants, vart)
+  }
+  rs <- setNames(c(unlist(callRatePositions), unlist(variantsPositions)), NULL)
+  t <- tempfile("SVDFunctions", fileext = ".vcf")
+  header <- seqminer::tabix.read.header(vcf)
+  genotypes <- seqminer::tabix.read(vcf, rs)
+  write(c(unlist(header), unlist(genotypes)), file = t)
+  t
 }
 
 #' Scan VCF files 
 #' 
 #' Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
-#' with applied filters. Also can generate binary and metadata files for
-#' faster access to genotype data.
+#' with applied filters. In addition, the method can generate binary and 
+#' metadata files for faster access to genotype data.
 #' @param vcf the name of file to read, can be plain text VCF file as well
 #' as compressed with gzip or zlib headers.
 #' @param DP integer: minimum required read depth for position to be considered,
@@ -49,7 +58,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested.
 #' @export
-scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL, 
+scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
                     regions = NULL, binaryPathPrefix = NULL) {
   stopifnot(length(DP) > 0)
@@ -61,9 +70,11 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   stopifnot(file.exists(vcf))
   
-  tbi <- cat(vcf, ".tbi")
-  if (is.null(binaryPathPrefix) && file.exists(cat(vcf, ".tbi"))) {
-    vcf <- createVCFFromTabixIndex(vcf, tbi, variants, regions)
+  tbi <- paste0(vcf, ".tbi")
+  if (is.null(binaryPathPrefix) && file.exists(tbi)) {
+    vcf <- createVCFFromTabixIndex(vcf, variants, regions)
+  } else {
+    tbi <- NULL
   }
   
   fixChar <- function(x) if(is.null(x)) character(0) else x
@@ -73,8 +84,17 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
   
-  res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                   regions, binaryPathPrefix);
+  tryCatch(
+    res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
+                   regions, binaryPathPrefix),
+    error = function(c) {
+      if (!is.null(tbi)) {
+        suffix <- paste0("Note: since .tbi is provided a temp file containing ",
+                "only necessary regions has been created(", vcf, "). See ",
+                "the temp file for more information about the error.\n")
+      }
+      stop(paste0(conditionMessage(c), "\n", suffix))
+  })
   
   if (!is.null(res$genotype)) {
       colnames(res$genotype) <- res$samples
