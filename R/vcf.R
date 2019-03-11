@@ -16,21 +16,25 @@ transformToTabixRegions <- function(x, pattern, outputPattern){
 createVCFFromTabixIndex <- function(vcf, variants, regions) {
   variantsPositions <- NULL
   callRatePosition <- NULL
+  header <- seqminer::tabix.read.header(vcf)
+  t <- tempfile("SVDFunctions", fileext = ".vcf")
+  write(header$header, file = t)
   if (!is.null(regions)) {
     regionsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
     crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
     callRatePositions <- sapply(regions, crt)
+    for (region in callRatePositions) {
+      write(seqminer::tabix.read(vcf, region), file = t, append = TRUE)
+    }
   }
   if (!is.null(variants)) {
     variantsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y)[\\s]*:[\\s]*([\\d]+)[\\s]"
     vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
-    variantsPosiitons <- sapply(variants, vart)
+    variantsPosititons <- sapply(variants, vart)
+    for (var in variantsPositions) {
+      write(seqminer::tabix.read(vcf, var), file = t, append = TRUE)
+    }
   }
-  rs <- setNames(c(unlist(callRatePositions), unlist(variantsPositions)), NULL)
-  t <- tempfile("SVDFunctions", fileext = ".vcf")
-  header <- seqminer::tabix.read.header(vcf)
-  genotypes <- seqminer::tabix.read(vcf, rs)
-  write(c(unlist(header), unlist(genotypes)), file = t)
   t
 }
 
