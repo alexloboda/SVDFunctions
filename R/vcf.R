@@ -17,12 +17,12 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
   variantsPositions <- NULL
   callRatePosition <- NULL
   if (!is.null(regions)) {
-    regionsPattern <- "^[\\s]*chr([\\d+XY]) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
+    regionsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
     crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
     callRatePositions <- sapply(regions, crt)
   }
   if (!is.null(variants)) {
-    variantsPattern <- "^[\\s]*chr([\\d+XY])[\\s]*:[\\s]*([\\d]+)[\\s]"
+    variantsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y)[\\s]*:[\\s]*([\\d]+)[\\s]"
     vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
     variantsPosiitons <- sapply(variants, vart)
   }
