@@ -51,6 +51,17 @@ namespace vcf {
         if (!isOfInterest(variant)) {
             return;
         }
+        double missing_rate = std::count_if(alleles.begin(), alleles.end(), [](const Allele& x){
+            return x.alleleType() == MISSING;
+        }) / (double)alleles.size();
+        if (missing_rate > MISSING_RATE_THRESHOLD) {
+            return;
+        }
+        // MAC > 0
+        auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
+        if (!std::any_of(alleles.begin(), alleles.end(), f)){
+            return;
+        }
         vector<AlleleType> row;
         for (const Allele& allele: alleles) {
             row.push_back(allele.alleleType());

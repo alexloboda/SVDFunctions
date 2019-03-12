@@ -256,27 +256,11 @@ namespace vcf {
 
                 Format format(tokens[FORMAT]);
 
-                int missing = 0;
-                unsigned long total = tokens.size() - FIELDS.size();
-                for (unsigned long i = FIELDS.size(); i < tokens.size(); i++) {
-                    if (format.parse(tokens[i], 0, filter).alleleType() == MISSING) {
-                        ++missing;
-                    }
-                }
-                if (missing > 0.1 * total) {
-                    continue;
-                }
-
                 for (int i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
                     vector<Allele> alleles;
                     for (int sample : filtered_samples) {
                         alleles.push_back(format.parse(tokens.at(sample), i + 1, filter));
-                    }
-                    // MAC > 0
-                    auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
-                    if (!std::any_of(alleles.begin(), alleles.end(), f)){
-                        continue;
                     }
                     for (auto& handler: handlers) {
                         handler->processVariant(variant, alleles);

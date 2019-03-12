@@ -30,6 +30,7 @@ namespace vcf {
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
+        const double MISSING_RATE_THRESHOLD = 0.1;
     protected:
         std::vector<std::vector<AlleleType>> gmatrix;
         std::vector<Variant> variants;
