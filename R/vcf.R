@@ -17,7 +17,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
   variantsPositions <- NULL
   callRatePosition <- NULL
   header <- seqminer::tabix.read.header(vcf)
-  t <- tempfile("SVDFunctions", fileext = ".vcf")
+  t <- tempfile("regions", fileext = ".vcf.gz")
   con <- gzfile(t, "w")
   write(header$header, con)
   if (!is.null(regions)) {
