@@ -18,13 +18,14 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
   callRatePosition <- NULL
   header <- seqminer::tabix.read.header(vcf)
   t <- tempfile("SVDFunctions", fileext = ".vcf")
-  write(header$header, file = t)
+  con <- gzfile(t, "w")
+  write(header$header, con)
   if (!is.null(regions)) {
     regionsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
     crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
     callRatePositions <- sapply(regions, crt)
     for (region in callRatePositions) {
-      write(seqminer::tabix.read(vcf, region), file = t, append = TRUE)
+      write(seqminer::tabix.read(vcf, region), file = con, append = TRUE)
     }
   }
   if (!is.null(variants)) {
@@ -32,9 +33,10 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
     vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
     variantsPosititons <- sapply(variants, vart)
     for (var in variantsPositions) {
-      write(seqminer::tabix.read(vcf, var), file = t, append = TRUE)
+      write(seqminer::tabix.read(vcf, var), file = con, append = TRUE)
     }
   }
+  close(con)
   t
 }
 
