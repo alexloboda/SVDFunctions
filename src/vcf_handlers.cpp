@@ -4,6 +4,13 @@
 
 namespace {
     using std::vector;
+    using std::any_of;
+
+    bool MAC_filter(const std::vector<vcf::Allele>& alleles) {
+        auto ref_f = [](const vcf::Allele& a) {return a.alleleType() == vcf::HOMREF || a.alleleType() == vcf::HET;};
+        auto alt_f = [](const vcf::Allele& a) {return a.alleleType() == vcf::HOM || a.alleleType() == vcf::HET;};
+        return any_of(alleles.begin(), alleles.end(), ref_f) && any_of(alleles.begin(), alleles.end(), alt_f);
+    }
 }
 
 namespace vcf {
@@ -57,9 +64,7 @@ namespace vcf {
         if (missing_rate > MISSING_RATE_THRESHOLD) {
             return;
         }
-        // MAC > 0
-        auto f = [](const Allele& a) {return a.alleleType() != HOMREF && a.alleleType() != MISSING;};
-        if (!std::any_of(alleles.begin(), alleles.end(), f)){
+        if (!MAC_filter(alleles)) {
             return;
         }
         vector<AlleleType> row;
@@ -89,6 +94,9 @@ namespace vcf {
     }
 
     void BinaryFileHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+        if (!MAC_filter(alleles)) {
+            return;
+        }
         meta << (std::string)variant << "\n";
         for (const Allele& allele: alleles) {
             binary << BinaryAllele::fromAllele(allele);
