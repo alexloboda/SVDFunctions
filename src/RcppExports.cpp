@@ -26,8 +26,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_vcf
-List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions, const CharacterVector& binary_prefix);
-RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP) {
+List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix, const CharacterVector& regions, const CharacterVector& binary_prefix);
+RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP gmatrixSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -37,9 +37,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type DP(DPSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type GQ(GQSEXP);
+    Rcpp::traits::input_parameter< const LogicalVector& >::type gmatrix(gmatrixSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type regions(regionsSEXP);
     Rcpp::traits::input_parameter< const CharacterVector& >::type binary_prefix(binary_prefixSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, regions, binary_prefix));
+    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, gmatrix, regions, binary_prefix));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -62,7 +63,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
-    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 8},
+    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 9},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 6},
     {NULL, NULL, 0}
 };

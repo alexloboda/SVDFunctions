@@ -5,8 +5,8 @@ select_controls_cpp <- function(gmatrix, residuals, cc, chi2fn, min_lambda, lb_l
     .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, residuals, cc, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, bin_size)
 }
 
-parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, regions, binary_prefix) {
-    .Call('_SVDFunctions_parse_vcf', PACKAGE = 'SVDFunctions', filename, samples, bad_positions, variants, DP, GQ, regions, binary_prefix)
+parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, regions, binary_prefix) {
+    .Call('_SVDFunctions_parse_vcf', PACKAGE = 'SVDFunctions', filename, samples, bad_positions, variants, DP, GQ, gmatrix, regions, binary_prefix)
 }
 
 parse_binary_file <- function(variants, samples, binary_file, metafile, requiredDP, requiredGQ) {

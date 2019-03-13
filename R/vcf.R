@@ -57,6 +57,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
 #' @param variants the set of variants in format "chr#:# REF ALT"
 #' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
 #' corrspoding genotype matrix will be returned
+#' @param returnGenotypeMatrix logical: whether or not return genotype matrix
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
@@ -66,6 +67,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
 #' @export
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
+                    returnGenotypeMatrix = TRUE, 
                     regions = NULL, binaryPathPrefix = NULL) {
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
@@ -77,7 +79,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   stopifnot(file.exists(vcf))
   
   tbi <- paste0(vcf, ".tbi")
-  if (is.null(binaryPathPrefix) && file.exists(tbi)) {
+  if (is.null(binaryPathPrefix) && file.exists(tbi) && 
+      !(length(variants) == 0) && returnGenotypeMatrix) {
     vcf <- createVCFFromTabixIndex(vcf, variants, regions)
   } else {
     tbi <- NULL
@@ -92,7 +95,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   tryCatch(
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                   regions, binaryPathPrefix),
+                   returnGenotypeMatrix, regions, binaryPathPrefix),
     error = function(c) {
       if (!is.null(tbi)) {
         suffix <- paste0("Note: since .tbi is provided a temp file containing ",

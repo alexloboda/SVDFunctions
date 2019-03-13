@@ -1,26 +1,54 @@
 context("parsing VCF files")
 
 vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
+file <- system.file("extdata", vcf, package = "SVDFunctions")
+DP <- 20
+
+missing_function <- function(x) {
+  startsWith(x, ".") | 
+  sapply(strsplit(x, ":"), function(x) as.integer(x[2]) < DP)
+}
+
+test_that("genotype matrix are parsed correctly", {
+  vcf <- scanVCF(file, DP = DP, GQ = 0, returnGenotypeMatrix = FALSE)
+  vcf <- scanVCF(file, DP = DP, GQ = 0, samples = vcf$samples[1:10])
+  df <- seqminer::tabix.read.table(file, paste0(c(1:22), ":1-300000000"))
+  format <- function(x) paste0("chr", df$CHROM[x], ":", df$POS[x], "\t", 
+                               df$REF[x], "\t", df$ALT[x])
+  rownames(df) <- lapply(1:nrow(df), format)
+  df <- df[, vcf$samples[1:10]]
+  df <- apply(df, c(1, 2), function(x) if(missing_function(x)) NA else x)
+  df <- apply(df, c(1, 2), function(x) {
+    if (is.na(x)) {
+      NA
+    } else if (startsWith(x, "0/1") | startsWith(x, "1/0")) {
+      1
+    } else if (startsWith(x, "0/0")) {
+      0
+    } else if (startsWith(x, "1/1")) {
+      2
+    }
+  })
+  df <- df[rowSums(is.na(df)) <= 1, ]
+  df <- df[rowSums(matrix(!is.na(df) & df == 1, nrow = nrow(df))) > 0 | 
+          (rowSums(matrix(!is.na(df) & df == 0, nrow = nrow(df))) > 0 & 
+           rowSums(matrix(!is.na(df) & df == 2, nrow = nrow(df))) > 0), ]
+  expect_equal(df, vcf$genotype)
+})
 
 test_that("callrates are calculated correctly", {
-  file <- system.file("extdata", vcf, package = "SVDFunctions")
-  DP <- 20
   regions <- data.frame(chr = c("1", "20"), 
                         from = c("1108138", "33521213"), 
                         to = c("36000000", "61665700"))
+  samples <- c("NA06989", "NA10847", "NA11840", "NA12873")
   pkgFormat = function(x) paste0("chr", x[1], " ", x[2], " ", x[3])
   seqMinerFormat = function(x) paste0(x[1], ":", x[2], "-", x[3])
   regionsPkg <- apply(regions, 1, pkgFormat)
   regionsSeqMiner <- apply(regions, 1, seqMinerFormat)
-  samples <- c("NA06989", "NA10847", "NA11840", "NA12873")
   vcf <- scanVCF(file, DP = DP, GQ = 0, regions = regionsPkg, samples = samples)
   expectedMatrix <- matrix(nrow = 0, ncol = length(samples))
   for (i in 1:nrow(regions)) {
     df <- seqminer::tabix.read.table(file, regionsSeqMiner[i])[, samples]
-    missing_function <- function(x) {
-      startsWith(x, ".") | 
-      sapply(strsplit(x, ":"), function(x) as.integer(x[2]) < DP)
-    }
     missing <- sapply(df[, samples], function(x) sum(missing_function(x)))
     expected <- (nrow(df) - missing) / nrow(df)
     expectedMatrix <- rbind(expectedMatrix, expected)

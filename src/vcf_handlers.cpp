@@ -33,7 +33,7 @@ namespace vcf {
 
     void CallRateHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
         auto it = std::lower_bound(ranges.begin(), ranges.end(), variant.position());
-        if (it == ranges.end()) {
+        if (it == ranges.end() || !it->includes(variant.position())) {
             return;
         }
         auto r = std::distance(ranges.begin(), it);
@@ -77,7 +77,7 @@ namespace vcf {
     }
 
     bool GenotypeMatrixHandler::isOfInterest(const Variant& variant) {
-        return available_variants.find(variant) != available_variants.end();
+        return available_variants.empty() || available_variants.find(variant) != available_variants.end();
     }
 
     GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs)

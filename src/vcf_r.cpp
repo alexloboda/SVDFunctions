@@ -94,8 +94,8 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
 // [[Rcpp::export]]
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
-               const IntegerVector& DP, const IntegerVector& GQ, const CharacterVector& regions,
-               const CharacterVector& binary_prefix) {
+               const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
+               const CharacterVector& regions, const CharacterVector& binary_prefix) {
     List ret;
     try {
         const char *name = filename[0];
@@ -108,7 +108,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
 
-        if (variants.length() > 0) {
+        if (gmatrix[0]) {
             vector<Variant> vs;
             for_each(variants.begin(), variants.end(), [&vs](const char *s) {
                 vector<Variant> variants = Variant::parseVariants(string(s));
@@ -131,7 +131,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 
         parser.parse_genotypes();
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
-        if (variants.length() > 0) {
+        if (gmatrix[0]) {
             ret["genotype"] = gmatrix_handler->result();
         }
         if (regions.length() > 0) {
