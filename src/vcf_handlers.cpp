@@ -32,15 +32,16 @@ namespace vcf {
     }
 
     void CallRateHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
-        for (int r = 0; r < ranges.size(); r++) {
-            const Range& range = ranges[r];
-            if (range.includes(variant.position())) {
-                n_variants[r]++;
-                for (int i = 0; i < alleles.size(); i++) {
-                    if (alleles[i].alleleType() != MISSING) {
-                        ++call_rate_matrix[r][i];
-                    }
-                }
+        auto it = std::lower_bound(ranges.begin(), ranges.end(), variant.position());
+        if (it == ranges.end()) {
+            return;
+        }
+        auto r = std::distance(ranges.begin(), it);
+
+        n_variants[r]++;
+        for (int i = 0; i < alleles.size(); i++) {
+            if (alleles[i].alleleType() != MISSING) {
+                ++call_rate_matrix[r][i];
             }
         }
     }
