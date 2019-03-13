@@ -16,7 +16,7 @@ namespace {
 namespace vcf {
     VariantsHandler::VariantsHandler(const std::vector<std::string>& samples) :samples(samples){}
 
-    void VariantsHandler::processVariant(Variant variant, std::vector<Allele> alleles) {}
+    void VariantsHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {}
 
     bool VariantsHandler::isOfInterest(const Variant& variant) {
         return false;
@@ -31,7 +31,7 @@ namespace vcf {
         std::sort(ranges.begin(), ranges.end());
     }
 
-    void CallRateHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+    void CallRateHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
         auto it = std::lower_bound(ranges.begin(), ranges.end(), variant.position());
         if (it == ranges.end()) {
             return;
@@ -55,7 +55,7 @@ namespace vcf {
         return it->includes(position);
     }
 
-    void GenotypeMatrixHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+    void GenotypeMatrixHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
         if (!isOfInterest(variant)) {
             return;
         }
@@ -94,7 +94,7 @@ namespace vcf {
         meta << "\n";
     }
 
-    void BinaryFileHandler::processVariant(Variant variant, std::vector<Allele> alleles) {
+    void BinaryFileHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
         if (!MAC_filter(alleles)) {
             return;
         }
