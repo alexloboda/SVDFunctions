@@ -237,7 +237,13 @@ namespace vcf {
         string line;
         while (getline(input, line)) {
             ++line_num;
+            if (line.empty() || std::all_of(line.begin(),line.end(),isspace)) {
+                continue;
+            }
             vector<string> tokens = split(line, DELIM, FIELDS.size());
+            if (tokens.size() < FIELDS.size()) {
+                throw ParserException("Line in the file contains too little tokens/columns");
+            }
             if (tokens[FILTER] != "PASS") {
                 continue;
             }
