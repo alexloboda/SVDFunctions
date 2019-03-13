@@ -31,7 +31,7 @@ namespace {
         for (int i = 0; i < line.length(); i++) {
             char ch = line[i];
             if (ch == delim) {
-                result.push_back(std::move(line.substr(last, i - last)));
+                result.push_back(line.substr(last, i - last));
                 last = i + 1;
                 if (result.size() == max_num_tokens) {
                     return result;
@@ -40,7 +40,7 @@ namespace {
         }
 
         if (last != line.length()) {
-            result.push_back(std::move(line.substr(last, line.length() - last)));
+            result.push_back(line.substr(last, line.length() - last));
         }
 
         return result;
@@ -176,7 +176,7 @@ namespace vcf {
         handlers.push_back(handler);
     }
 
-    VCFParser::VCFParser(std::istream& input, const VCFFilter& filter) :input(input), filter(filter), line_num(0) {}
+    VCFParser::VCFParser(std::istream& input, const VCFFilter& filter) :filter(filter), input(input), line_num(0) {}
 
     std::vector<std::string> VCFParser::sample_names() {
         return samples;

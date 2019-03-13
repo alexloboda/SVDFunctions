@@ -8,7 +8,7 @@ namespace {
 
 namespace vcf {
     VCFFilter::VCFFilter(int DP, int GQ)
-        :samples_set(false), DP(DP), GQ(GQ) {}
+        :DP(DP), GQ(GQ), samples_set(false) {}
 
     void VCFFilter::add_bad_variants(vector<Position>& positions) {
         bad_positions.insert(positions.begin(), positions.end());

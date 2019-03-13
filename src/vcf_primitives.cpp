@@ -12,7 +12,7 @@ namespace {
 }
 
 namespace vcf {
-    Position::Position(Chromosome chr, int pos) : pos(pos), chr(chr) {}
+    Position::Position(Chromosome chr, int pos) : chr(chr), pos(pos) {}
 
     Position::Position(const vcf::Position& other)
             : chr(other.chr), pos(other.pos) {}
@@ -193,7 +193,7 @@ namespace vcf {
         return chr.num() < pos.chromosome().num() || (chr == pos.chromosome() && to < pos.position());
     }
 
-    Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :type(type), depth(DP), quality(GQ){}
+    Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :depth(DP), quality(GQ), type(type) {}
 
     unsigned Allele::DP() const {
         return depth;

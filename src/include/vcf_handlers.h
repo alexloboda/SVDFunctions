@@ -14,6 +14,7 @@ namespace vcf {
 
     public:
         explicit VariantsHandler(const std::vector<std::string>& samples);
+        virtual ~VariantsHandler() = default;
         virtual void processVariant(const Variant& variant, const std::vector<Allele>& alleles);
         virtual bool isOfInterest(const Variant& position);
     };
