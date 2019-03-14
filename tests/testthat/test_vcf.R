@@ -56,3 +56,24 @@ test_that("callrates are calculated correctly", {
   rownames(expectedMatrix) <- regionsPkg
   expect_equal(vcf$callrate, expectedMatrix, tolerance = 1e-8)
 })
+
+test_that("storing/extracting data to/from binary file works ", {
+  prefix <- paste0(tempdir(), "/db")
+  scanVCF(file, DP = DP, GQ = 0, binaryPath = prefix, returnGenotypeMatrix = FALSE)
+  samples <- vcf$samples
+  variants <- rownames(vcf$genotype)
+  samples <- sample(samples, as.integer(length(samples) / 2))
+  variants <- sample(variants, as.integer(length(variants) / 2))
+  vcf <- scanVCF(file, DP = 30, GQ = 0, samples = samples, variants = variants)
+  actual <- scanBinaryFile(paste0(prefix, "_bin"), paste0(prefix, "_meta"), 
+                           samples, variants, DP = 30, GQ = 0)
+  df <- apply(vcf$genotype, c(1, 2), function(x) if (is.na(x)) -1 else x)
+  expected <- data.frame(stringsAsFactors = FALSE)
+  for (i in 1:nrow(df)) {
+    data <- df[i, ]
+    row <- list(variant = rownames(df)[i], HOM_REF = sum(data == 0), 
+                HET = sum(data == 1), HOM = sum(data == 2))
+    expected <- rbind(expected, row, stringsAsFactors = FALSE)
+  }
+  expect_equal(actual, expected)
+})
