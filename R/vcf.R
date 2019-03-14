@@ -31,7 +31,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
   if (!is.null(variants)) {
     variantsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y)[\\s]*:[\\s]*([\\d]+)[\\s]"
     vart <- function(x) transformToTabixRegions(x, variantsPattern, c(1, 2, 2))
-    variantsPosititons <- sapply(variants, vart)
+    variantsPositions <- sapply(variants, vart)
     for (var in variantsPositions) {
       write(seqminer::tabix.read(vcf, var), file = con, append = TRUE)
     }
@@ -124,14 +124,24 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @param binaryFile the name of binary file
 #' @param metafile the name of metadata file
 #' @param samples the set of samples to be analyzed
+#' @param MAC minor allele count
+#' @param MAF minor allele frequency
 #' @return data.frame with four columns: variant(position, reference allele, 
 #' alternative allele); number of samples with 
 #' both reference, one reference and alternative allele indicated in first column,
 #' and both alternative respectively.
 #' @export
-scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20) {
+scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20,
+                           MAC = 1, MAF = 0.00) {
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   res <- parse_binary_file(variants, samples, binaryFile, metafile, DP, GQ);
-  as.data.frame(res)
+  total <- as.integer(res["total"])
+  res["total"] <- NULL
+  res <- as.data.frame(res, stringsAsFactors = FALSE)
+  actualMAC <- apply(res[, 2:4], 1, function(x) 2 * min(x[1], x[3]) + x[2])
+  res <- res[actualMAC >= MAC & actualMAC / 2 * nrow(res) >= MAF, ]
+  res <- res[res$HOM_REF + res$HET + res$HOM >= 0.9 * total, ]
+  rownames(res) <- NULL
+  res
 }

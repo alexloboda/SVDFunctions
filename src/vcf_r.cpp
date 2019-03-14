@@ -207,6 +207,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         ret["HOM_REF"] = NumericVector(homrefs.begin(), homrefs.end());
         ret["HET"] = NumericVector(hets.begin(), hets.end());
         ret["HOM"] = NumericVector(homs.begin(), homs.end());
+        ret["total"] = positions.size();
         return ret;
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
