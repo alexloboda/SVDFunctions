@@ -79,3 +79,12 @@ test_that("storing/extracting data to/from binary file works ", {
   rownames(expected) <- NULL
   expect_equal(actual, expected)
 })
+
+test_that("parsing multivariant lines works", {
+  file <- system.file("extdata", "multivariant.vcf.gz", package = "SVDFunctions")
+  vcf <- scanVCF(file, DP = 0, GQ = 0)
+  expected <- matrix(c(0, 1, 1, 1, 1, 2), ncol = 3)
+  colnames(expected) <- c("A", "B", "C")
+  rownames(expected) <- c("chr1:1\tT\tG", "chr1:2\tT\t*")
+  expect_equal(vcf$genotype, expected)
+})
