@@ -25,7 +25,7 @@ namespace vcf {
         long number_of_samples;
 
         std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
-        virtual void handle_error(const ParserException& e);
+        virtual void handle_error(const ParserException& e) = 0;
         bool is_of_interest(const Variant& var);
 
     public:

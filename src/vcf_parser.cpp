@@ -289,8 +289,4 @@ namespace vcf {
             }
         }
     }
-
-    void VCFParser::handle_error(const ParserException& e) {
-        std::cerr << e.get_message() << std::endl;
-    }
 }
