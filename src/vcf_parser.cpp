@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+#include <Rcpp.h>
 
 namespace {
     using namespace vcf;
@@ -13,6 +14,9 @@ namespace {
     using std::find;
     using std::pair;
     using std::stoi;
+
+    // Rcpp conflict
+    using vcf::MISSING;
 
     vector<std::string> split(const string& line, char delim, int max_num_tokens = 0){
         unsigned long tokens = 1;
@@ -205,6 +209,7 @@ namespace vcf {
             if (line.substr(0, 1) == "#") {
                 line = line.substr(1);
                 auto tokens = split(line, DELIM);
+                number_of_samples = tokens.size() - FIELDS.size();
                 for (int i = 0; i < tokens.size(); i++) {
                     const string& token = tokens[i];
                     if (i < FIELDS.size()) {
@@ -236,18 +241,19 @@ namespace vcf {
     void VCFParser::parse_genotypes() {
         string line;
         while (getline(input, line)) {
+            Rcpp::checkUserInterrupt();
             ++line_num;
             if (line.empty() || std::all_of(line.begin(),line.end(),isspace)) {
                 continue;
             }
             vector<string> tokens = split(line, DELIM, FIELDS.size());
-            if (tokens.size() < FIELDS.size()) {
-                throw ParserException("Line in the file contains too little tokens/columns");
-            }
-            if (tokens[FILTER] != "PASS") {
-                continue;
-            }
             try {
+                if (tokens.size() < FIELDS.size()) {
+                    throw ParserException("The row is too short");
+                }
+                if (tokens[FILTER] != "PASS") {
+                    continue;
+                }
                 Position position = parse_position(tokens);
                 if (!filter.apply(position)) {
                     continue;
@@ -259,6 +265,11 @@ namespace vcf {
                     continue;
                 }
                 tokens = split(line, DELIM);
+
+                if (tokens.size() != FIELDS.size() + number_of_samples) {
+                    throw ParserException("The row has " + std::to_string(tokens.size()) +
+                                          " number of columns whereas header has " + std::to_string(FIELDS.size() + samples.size()));
+                }
 
                 Format format(tokens[FORMAT]);
 

@@ -97,6 +97,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                    returnGenotypeMatrix, regions, binaryPathPrefix),
     error = function(c) {
+      suffix <- ""
       if (!is.null(tbi)) {
         suffix <- paste0("Note: since .tbi is provided a temp file containing ",
                 "only necessary regions has been created(", vcf, "). See ",

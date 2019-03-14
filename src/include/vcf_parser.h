@@ -22,6 +22,7 @@ namespace vcf {
         std::vector<int> filtered_samples;
 
         int line_num;
+        long number_of_samples;
 
         std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
         virtual void handle_error(const ParserException& e);
