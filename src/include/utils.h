@@ -79,8 +79,8 @@ struct matching_results {
 
     matching_results(int opt_prefix, double opt_lmd, vector<double>&& p_values, vector<double>&& lmbds,
                      vector<int>&& lmbd_i, vector<int>&& pvals_number)
-            :optimal_prefix(opt_prefix), pvals(std::move(p_values)), lambdas(std::move(lmbds)),
-            optimal_lambda(opt_lmd), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)) {}
+            :optimal_prefix(opt_prefix), optimal_lambda(opt_lmd), pvals(std::move(p_values)), 
+	    lambdas(std::move(lmbds)), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)) {}
 };
 
 matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<double>& residuals,
