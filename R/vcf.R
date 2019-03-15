@@ -86,7 +86,7 @@ genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
 #' @return character vector with sample names
 #' @examples
 #' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
-#' filepath <- system.file("extdata", filename, package = "SVDFunctions")
+#' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
 #' 
 #' sampleNamesVCF(filepath)
 #' @export
