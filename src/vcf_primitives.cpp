@@ -193,6 +193,10 @@ namespace vcf {
         return chr.num() < pos.chromosome().num() || (chr == pos.chromosome() && to < pos.position());
     }
 
+    Range::operator std::string() const {
+        return "chr" + std::to_string(chr.num()) + " " + std::to_string(from) + " " + std::to_string(to);
+    }
+
     Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :depth(DP), quality(GQ), type(type) {}
 
     unsigned Allele::DP() const {

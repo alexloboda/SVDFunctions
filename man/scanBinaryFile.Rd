@@ -15,8 +15,8 @@ scanBinaryFile(binaryFile, metafile, samples, variants, DP = 10,
 \item{samples}{the set of samples to be analyzed}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
-corrspoding genotype matrix will be returned}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
+applied only for genotype matrix.}
 
 \item{DP}{integer: minimum required read depth for position to be considered,
 otherwise assumed as missing.}
@@ -24,9 +24,9 @@ otherwise assumed as missing.}
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
 
-\item{MAC}{minor allele count}
+\item{MAC}{minimum minor allele count}
 
-\item{MAF}{minor allele frequency}
+\item{MAF}{minimum minor allele frequency}
 }
 \value{
 data.frame with four columns: variant(position, reference allele, 

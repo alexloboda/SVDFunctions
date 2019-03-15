@@ -25,8 +25,8 @@ considered, otherwise assumed as missing.}
 must be eliminated from consideration.}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
-corrspoding genotype matrix will be returned}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
+applied only for genotype matrix.}
 
 \item{returnGenotypeMatrix}{logical: whether or not return genotype matrix}
 

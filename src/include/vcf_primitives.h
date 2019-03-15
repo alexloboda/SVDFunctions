@@ -91,6 +91,7 @@ namespace vcf {
         bool includes(const Position& p) const;
         bool operator<(const Range& other) const;
         bool operator<(const Position& pos) const;
+        explicit operator std::string() const;
 
         static Range parseRange(const std::string& s);
     };

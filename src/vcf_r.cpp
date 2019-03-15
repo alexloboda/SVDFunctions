@@ -51,12 +51,24 @@ namespace {
         using CallRateHandler::CallRateHandler;
 
         NumericMatrix result() {
-            NumericMatrix result(ranges.size(), samples.size());
+            vector<string> non_empty;
             for (int i = 0; i < ranges.size(); i++) {
-                for (int j = 0; j < samples.size(); j++) {
-                    result[j * ranges.size() + i] = (double)call_rate_matrix[i][j] / n_variants[i];
+                if (n_variants[i] > 0) {
+                    non_empty.push_back((std::string)ranges[i]);
                 }
             }
+            NumericMatrix result(non_empty.size(), samples.size());
+            int curr = 0;
+            for (int i = 0; i < ranges.size(); i++) {
+                if (n_variants[i] == 0) {
+                    continue;
+                }
+                for (int j = 0; j < samples.size(); j++) {
+                    result[j * ranges.size() + curr] = (double)call_rate_matrix[curr][j] / n_variants[curr];
+                }
+                ++curr;
+            }
+            rownames(result) = CharacterVector(non_empty.begin(), non_empty.end());
             return result;
         }
     };

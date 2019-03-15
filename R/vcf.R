@@ -55,8 +55,8 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
 #' @param bannedPositions the set of positions in format "chr#:#" that 
 #' must be eliminated from consideration. 
 #' @param variants the set of variants in format "chr#:# REF ALT"
-#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". If present
-#' corrspoding genotype matrix will be returned
+#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
+#' applied only for genotype matrix.
 #' @param returnGenotypeMatrix logical: whether or not return genotype matrix
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
@@ -111,9 +111,26 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   }
   if (!is.null(res$callrate)) {
       colnames(res$callrate) <- res$samples
-      rownames(res$callrate) <- regions
   }
   res
+}
+
+#' Collect counts statistics from genotype matrix
+#' 
+#' Calculate counts statistics for genotype matrix and return data.frame
+#' @param genotypeMatrix matrix containing values 0 for sample with both 
+#' reference alleles, 1 for heterozygous samples, and 2 - with both alternative
+#' alleles. Missing values are allowed
+#' @value data.frame with counts statistics 
+#' @export
+genotypesToCounts <- function(genotypeMatrix) {
+  genotypeMatrix <- apply(genotypeMatrix, c(1, 2), 
+                          function(x) if (is.na(x)) -1 else x)
+  df <- plyr::adply(genotypeMatrix, 1, function(x) {
+    data.frame(HOM_REF = sum(x == 0), HET = sum(x == 1), HOM = sum(x == 2))
+  }, .id = "variant")
+  df$variant <- as.character(df$variant)
+  df
 }
 
 #' Scan binary variant file
@@ -124,8 +141,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @param binaryFile the name of binary file
 #' @param metafile the name of metadata file
 #' @param samples the set of samples to be analyzed
-#' @param MAC minor allele count
-#' @param MAF minor allele frequency
+#' @param MAC minimum minor allele count
+#' @param MAF minimum minor allele frequency
 #' @return data.frame with four columns: variant(position, reference allele, 
 #' alternative allele); number of samples with 
 #' both reference, one reference and alternative allele indicated in first column,
