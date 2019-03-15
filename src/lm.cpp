@@ -13,7 +13,7 @@ double pval_t(double t, double df) {
     return boost::math::ibeta(df / 2, 0.5, x);
 }
 
-lm::lm(unsigned _n) :lt(_n * 2), n(_n), b(_n), R(4), v(_n), vM(_n), Q(_n * 2) {}
+lm::lm(unsigned _n) :lt(_n * 2), b(_n), v(_n), vM(_n), R(4), Q(_n * 2), n(_n) {}
 
 double lm::norm(const std::vector<double>& v) {
     double value = 0.0;
