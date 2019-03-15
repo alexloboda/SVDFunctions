@@ -10,8 +10,11 @@ missing_function <- function(x) {
 }
 
 test_that("genotype matrix are parsed correctly", {
+  bannedPos <- "chr1:18022097"
+  banned <- "chr1:18022097\tG\tT"
   vcf <- scanVCF(file, DP = DP, GQ = 0, returnGenotypeMatrix = FALSE)
-  vcf <- scanVCF(file, DP = DP, GQ = 0, samples = vcf$samples[1:10])
+  vcf <- scanVCF(file, DP = DP, GQ = 0, samples = vcf$samples[1:10], 
+                 bannedPositions = bannedPos)
   df <- seqminer::tabix.read.table(file, paste0(c(1:22), ":1-300000000"))
   format <- function(x) paste0("chr", df$CHROM[x], ":", df$POS[x], "\t", 
                                df$REF[x], "\t", df$ALT[x])
@@ -33,6 +36,7 @@ test_that("genotype matrix are parsed correctly", {
   df <- df[rowSums(matrix(!is.na(df) & df == 1, nrow = nrow(df))) > 0 | 
           (rowSums(matrix(!is.na(df) & df == 0, nrow = nrow(df))) > 0 & 
            rowSums(matrix(!is.na(df) & df == 2, nrow = nrow(df))) > 0), ]
+  df <- df[rownames(df) != banned, ]
   expect_equal(df, vcf$genotype)
 })
 

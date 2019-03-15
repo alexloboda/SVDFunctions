@@ -47,9 +47,14 @@ namespace vcf {
         }
         Chromosome chr(str.substr(0, pos));
         try {
-            return {chr, std::stoi(str.substr(pos + 1, str.length() - pos))};
+            size_t final;
+            int position = std::stoi(str.substr(pos + 1, str.length() - pos), &final);
+            if (final != str.length() - pos - 1) {
+                throw std::invalid_argument("");
+            }
+            return {chr, position};
         } catch (...) {
-            throw ParserException("Position must be in format chr#:# but " + str + " given");
+            throw ParserException("Position must be in format chr#:# but \"" + str + "\" given");
         }
     }
 
