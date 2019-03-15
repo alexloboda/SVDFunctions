@@ -19,7 +19,7 @@ names
 }
 \examples{
 vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
-filepath <- system.file("extdata", filename, package = "SVDFunctions")
+filepath <- system.file("extdata", vcf, package = "SVDFunctions")
 
 sampleNamesVCF(filepath)
 }
