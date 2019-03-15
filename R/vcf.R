@@ -40,6 +40,60 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
   t
 }
 
+#' Scan VCF file for call rate matrix
+#' 
+#' The method parses VCF file and calculate call rate for all specified regions.
+#' @inheritParams scanVCF
+#' @return numeric matrix: ratio of non-missing values to all variants in the
+#' region presented in VCF file.
+#' @examples
+#' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
+#' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
+#' 
+#' regions <- c("chr1 1108138 36000000", "chr20 33521213 61665700") 
+#' samples <- c("NA06989", "NA10847", "NA11840", "NA12873")
+#' 
+#' callRateMatrixVCF(filepath, regions, GQ = 0, samples = samples)
+#' @export
+callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL, 
+                  bannedPositions = NULL) {
+  scanVCF(vcf, DP, GQ, samples, bannedPositions, regions = regions)$callrate
+}
+
+#' Scan VCF file for genotypes
+#' 
+#' The method scans VCF files and returns genotype matrix for specified 
+#' variants after applying neccessary filters.
+#' @inheritParams scanVCF
+#' @examples
+#' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
+#' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
+#' 
+#' samples <- c("NA06989", "NA10847", "NA11840", "NA12873")
+#' genotypeMatrixVCF(filepath, GQ = 0, samples = samples) 
+#' @export
+genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
+                              samples = NULL, bannedPositions = NULL) {
+  scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
+          bannedPositions = bannedPositions, variants = variants)$genotype
+}
+
+#' Scan VCF file for sample names
+#' 
+#' The method scans only header of VCF file and returns a vector with sample 
+#' names
+#' @inheritParams scanVCF
+#' @return character vector with sample names
+#' @examples
+#' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
+#' filepath <- system.file("extdata", filename, package = "SVDFunctions")
+#' 
+#' sampleNamesVCF(filepath)
+#' @export
+sampleNamesVCF <- function(vcf) {
+    scanVCF(vcf, returnGenotypeMatrix = FALSE)$sample
+}
+
 #' Scan VCF files 
 #' 
 #' Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
@@ -121,7 +175,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @param genotypeMatrix matrix containing values 0 for sample with both 
 #' reference alleles, 1 for heterozygous samples, and 2 - with both alternative
 #' alleles. Missing values are allowed
-#' @value data.frame with counts statistics 
+#' @return data.frame with counts statistics 
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
   genotypeMatrix <- apply(genotypeMatrix, c(1, 2), 

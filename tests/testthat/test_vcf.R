@@ -12,14 +12,14 @@ missing_function <- function(x) {
 test_that("genotype matrix are parsed correctly", {
   bannedPos <- "chr1:18022097"
   banned <- "chr1:18022097\tG\tT"
-  vcf <- scanVCF(file, DP = DP, GQ = 0, returnGenotypeMatrix = FALSE)
-  vcf <- scanVCF(file, DP = DP, GQ = 0, samples = vcf$samples[1:10], 
-                 bannedPositions = bannedPos)
+  samples <- sampleNamesVCF(file)
+  vcf <- genotypeMatrixVCF(file, DP = DP, GQ = 0, samples = samples[1:10], 
+                               bannedPositions = bannedPos)
   df <- seqminer::tabix.read.table(file, paste0(c(1:22), ":1-300000000"))
   format <- function(x) paste0("chr", df$CHROM[x], ":", df$POS[x], "\t", 
                                df$REF[x], "\t", df$ALT[x])
   rownames(df) <- lapply(1:nrow(df), format)
-  df <- df[, vcf$samples[1:10]]
+  df <- df[, samples[1:10]]
   df <- apply(df, c(1, 2), function(x) if(missing_function(x)) NA else x)
   df <- apply(df, c(1, 2), function(x) {
     if (is.na(x)) {
@@ -37,7 +37,7 @@ test_that("genotype matrix are parsed correctly", {
           (rowSums(matrix(!is.na(df) & df == 0, nrow = nrow(df))) > 0 & 
            rowSums(matrix(!is.na(df) & df == 2, nrow = nrow(df))) > 0), ]
   df <- df[rownames(df) != banned, ]
-  expect_equal(df, vcf$genotype)
+  expect_equal(df, vcf)
 })
 
 test_that("callrates are calculated correctly", {
@@ -49,7 +49,8 @@ test_that("callrates are calculated correctly", {
   seqMinerFormat = function(x) paste0(x[1], ":", x[2], "-", x[3])
   regionsPkg <- apply(regions, 1, pkgFormat)
   regionsSeqMiner <- apply(regions, 1, seqMinerFormat)
-  vcf <- scanVCF(file, DP = DP, GQ = 0, regions = regionsPkg, samples = samples)
+  cr <- callRateMatrixVCF(file, DP = DP, GQ = 0, regions = regionsPkg, 
+                           samples = samples)
   expectedMatrix <- matrix(nrow = 0, ncol = length(samples))
   for (i in 1:nrow(regions)) {
     df <- seqminer::tabix.read.table(file, regionsSeqMiner[i])[, samples]
@@ -58,7 +59,7 @@ test_that("callrates are calculated correctly", {
     expectedMatrix <- rbind(expectedMatrix, expected)
   }
   rownames(expectedMatrix) <- regionsPkg
-  expect_equal(vcf$callrate, expectedMatrix, tolerance = 1e-8)
+  expect_equal(cr, expectedMatrix, tolerance = 1e-8)
 })
 
 test_that("storing/extracting data to/from binary file works ", {

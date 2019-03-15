@@ -11,6 +11,9 @@ genotypesToCounts(genotypeMatrix)
 reference alleles, 1 for heterozygous samples, and 2 - with both alternative
 alleles. Missing values are allowed}
 }
+\value{
+data.frame with counts statistics
+}
 \description{
 Calculate counts statistics for genotype matrix and return data.frame
 }

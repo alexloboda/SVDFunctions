@@ -141,7 +141,9 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             parser.register_handler(binary_handler);
         }
 
-        parser.parse_genotypes();
+        if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
+            parser.parse_genotypes();
+        }
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
         if (gmatrix[0]) {
             ret["genotype"] = gmatrix_handler->result();
