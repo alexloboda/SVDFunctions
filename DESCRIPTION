@@ -20,7 +20,8 @@ Imports:
     snpStats,
     data.table,
     methods,
-    seqminer
+    seqminer,
+    plyr
 RoxygenNote: 6.1.1
 SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
