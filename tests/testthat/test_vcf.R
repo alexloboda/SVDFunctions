@@ -41,9 +41,9 @@ test_that("genotype matrix are parsed correctly", {
 })
 
 test_that("callrates are calculated correctly", {
-  regions <- data.frame(chr = c("1", "20"), 
-                        from = c("1108138", "33521213"), 
-                        to = c("36000000", "61665700"))
+  regions <- data.frame(chr = c("1", "1", "20"), 
+                        from = c("1108138", "40000000", "33521213"), 
+                        to = c("36000000", "40000010", "61665700"))
   samples <- c("NA06989", "NA10847", "NA11840", "NA12873")
   pkgFormat = function(x) paste0("chr", x[1], " ", x[2], " ", x[3])
   seqMinerFormat = function(x) paste0(x[1], ":", x[2], "-", x[3])
@@ -53,12 +53,19 @@ test_that("callrates are calculated correctly", {
                            samples = samples)
   expectedMatrix <- matrix(nrow = 0, ncol = length(samples))
   for (i in 1:nrow(regions)) {
-    df <- seqminer::tabix.read.table(file, regionsSeqMiner[i])[, samples]
+    df <- seqminer::tabix.read.table(file, regionsSeqMiner[i])
+    if (nrow(df) == 0) {
+      expectedMatrix <- rbind(expectedMatrix, NA)
+      next
+    }
+    df <- df[, samples]
     missing <- sapply(df[, samples], function(x) sum(missing_function(x)))
     expected <- (nrow(df) - missing) / nrow(df)
     expectedMatrix <- rbind(expectedMatrix, expected)
   }
   rownames(expectedMatrix) <- regionsPkg
+  expectedMatrix <- expectedMatrix[apply(expectedMatrix, 1, 
+                                         function(x) !any(is.na(x))), ]
   expect_equal(cr, expectedMatrix, tolerance = 1e-8)
 })
 
@@ -79,9 +86,9 @@ test_that("storing/extracting data to/from binary file works ", {
 
 test_that("parsing multivariant lines works", {
   file <- system.file("extdata", "multivariant.vcf.gz", package = "SVDFunctions")
-  vcf <- scanVCF(file, DP = 0, GQ = 0)
+  GT <- genotypeMatrixVCF(file, DP = 0, GQ = 0)
   expected <- matrix(c(0, 1, 1, 1, 1, 2), ncol = 3)
   colnames(expected) <- c("A", "B", "C")
   rownames(expected) <- c("chr1:1\tT\tG", "chr1:2\tT\t*")
-  expect_equal(vcf$genotype, expected)
+  expect_equal(GT, expected)
 })

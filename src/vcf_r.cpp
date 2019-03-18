@@ -64,7 +64,7 @@ namespace {
                     continue;
                 }
                 for (int j = 0; j < samples.size(); j++) {
-                    result[j * ranges.size() + curr] = (double)call_rate_matrix[curr][j] / n_variants[curr];
+                    result[j * non_empty.size() + curr] = (double)call_rate_matrix[i][j] / n_variants[i];
                 }
                 ++curr;
             }

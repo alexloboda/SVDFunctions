@@ -146,21 +146,33 @@ namespace {
                 if (gt == "." || gt == "./." || gt == ".|.") {
                     return {MISSING, 0, 0};
                 }
-                int dp = depth_pos == -1 ? 0 : stoi(parts[depth_pos]);
-                int gq = qual_pos == -1 ? 0 : stoi(parts[qual_pos]);
+
+                int dp = depth_pos == -1 || parts[depth_pos] == "." ? 0 : stoi(parts[depth_pos]);
+                int gq = qual_pos == -1 || parts[qual_pos] == "." ? 0 : stoi(parts[qual_pos]);
+
                 if (!filter.apply(dp, gq)) {
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
                 Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
                 if (ret.alleleType() == HET) {
-                    if (ad_pos != -1) {
+                    if (ad_pos != -1 && dp != 0) {
                         std::istringstream adstream(parts[ad_pos]);
                         int ref, alt;
                         char ch;
-                        adstream >> ref >> ch >> alt;
+                        adstream >> ref;
+                        for (int i = 0; i < allele; i++) {
+                            while(!std::isdigit(adstream.peek())) {
+                                adstream >> ch;
+                            }
+                            adstream  >> alt;
+                        }
                         if (!adstream.fail()) {
-                            double ratio = ref / (double) (ref + alt);
-                            if (ratio < 0.3 || ratio > 0.7) {
+                            double ref_ratio = ref / (double)dp;
+                            double alt_ratio = alt / (double)dp;
+                            if (ref_ratio < 0.3 || ref_ratio > 0.7) {
+                                return {MISSING, 0, 0};
+                            }
+                            if (alt_ratio < 0.3 || alt_ratio > 0.7) {
                                 return {MISSING, 0, 0};
                             }
                         }
