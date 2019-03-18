@@ -133,11 +133,16 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   stopifnot(file.exists(vcf))
   
   tbi <- paste0(vcf, ".tbi")
-  if (is.null(binaryPathPrefix) && file.exists(tbi) && 
-      !(length(variants) == 0) && returnGenotypeMatrix) {
-    vcf <- createVCFFromTabixIndex(vcf, variants, regions)
-  } else {
+  
+  if (!is.null(binaryPathPrefix) | !file.exists(tbi)) {
     tbi <- NULL
+  } else {
+    if (returnGenotypeMatrix && length(variants) != 0 |
+        length(regions) != 0) {
+      vcf <- createVCFFromTabixIndex(vcf, variants, regions)
+    } else {
+      tbi <- NULL
+    }
   }
   
   fixChar <- function(x) if(is.null(x)) character(0) else x
