@@ -137,7 +137,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   if (!is.null(binaryPathPrefix) | !file.exists(tbi)) {
     tbi <- NULL
   } else {
-    if (returnGenotypeMatrix && length(variants) != 0 |
+    if ((returnGenotypeMatrix && length(variants) != 0) |
         length(regions) != 0) {
       vcf <- createVCFFromTabixIndex(vcf, variants, regions)
     } else {
