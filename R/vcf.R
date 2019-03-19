@@ -183,12 +183,14 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @return data.frame with counts statistics 
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
-  genotypeMatrix <- apply(genotypeMatrix, c(1, 2), 
-                          function(x) if (is.na(x)) -1 else x)
-  df <- plyr::adply(genotypeMatrix, 1, function(x) {
-    data.frame(HOM_REF = sum(x == 0), HET = sum(x == 1), HOM = sum(x == 2))
-  }, .id = "variant")
-  df$variant <- as.character(df$variant)
+  df <- data.frame(rownames(genotypeMatrix), stringsAsFactors = FALSE)
+  for (i in 0:2) {
+    df <- cbind(df, apply(genotypeMatrix, 1, function(x) {
+      sum(x[!is.na(x)] == i)
+    }))
+  }
+  colnames(df) <- c("variant", "HOM_REF", "HET", "HOM_ALT")
+  rownames(df) <- NULL
   df
 }
 
@@ -217,7 +219,7 @@ scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ 
   res <- as.data.frame(res, stringsAsFactors = FALSE)
   actualMAC <- apply(res[, 2:4], 1, function(x) 2 * min(x[1], x[3]) + x[2])
   res <- res[actualMAC >= MAC & actualMAC / 2 * nrow(res) >= MAF, ]
-  res <- res[res$HOM_REF + res$HET + res$HOM >= 0.9 * total, ]
+  res <- res[res$HOM_REF + res$HET + res$HOM_ALT >= 0.9 * total, ]
   rownames(res) <- NULL
   res
 }

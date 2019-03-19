@@ -5,7 +5,7 @@
 #' variant rounded to an integer.
 #' @param genotypeMatrix Matrix of genotypes (class – Matrix)
 #' @export
-ReplaceMissing <- function (genotypeMatrix) 
+replaceMissing <- function (genotypeMatrix) 
 {
     k <- which(is.na(genotypeMatrix), arr.ind = T)
     if (length(k) > 0) {
