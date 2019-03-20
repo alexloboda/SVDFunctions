@@ -15,7 +15,7 @@ datasets: \code{\link{finSwedDataset}}, \code{\link{publicExomesDataset}}.}
 
 \item{outputPathPrefix}{prefix for ouput files}
 
-\item{samples}{vector of samples to work with}
+\item{vectors}{number of vectors to be generated}
 }
 \description{
 The method generates all required files

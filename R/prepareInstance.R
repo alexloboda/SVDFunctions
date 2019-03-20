@@ -5,7 +5,7 @@
 #' @param dataset one of predefined in this package datasets. List of supported 
 #' datasets: \code{\link{finSwedDataset}}, \code{\link{publicExomesDataset}}.
 #' @param outputPathPrefix prefix for ouput files
-#' @param samples vector of samples to work with
+#' @param vectors number of vectors to be generated
 #' @export
 prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore", 
                             vectors = 10, ...) {
@@ -20,7 +20,8 @@ prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore",
                 "?scanVCF for more information about default filters."))
   }
   vectorsGM <- min(vectors, ncol(gmatrix) - 1, nrow(gmatrix) - 1)
-  u <- svd(gmatrix, nu = vectorsGM)$u
+  svdOut <- RSpectra::svds(gmatrix - rowMeans(gmatrix), k = vectorsGM)
+  u <- svdOut$u
   gmatrix <- NULL
   utils::write.table(u, file = paste0(outputPathPrefix, "U.tsv"), 
                      row.names = FALSE, col.names = FALSE)

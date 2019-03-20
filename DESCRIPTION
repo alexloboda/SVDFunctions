@@ -21,7 +21,7 @@ Imports:
     data.table,
     methods,
     seqminer,
-    plyr
+    RSpectra
 RoxygenNote: 6.1.1
 SystemRequirements: C++11
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
