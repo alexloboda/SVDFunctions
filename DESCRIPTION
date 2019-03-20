@@ -10,6 +10,7 @@ Description: Package contains set of functions used for building SVD-based
     COntrol REpository (SCORE) - platform for secure matching of control 
     subjects without genotype sharing for exome DNA sequencing studies. 
     Platform is available at dnascore.net
+Depends: R (>= 3.1.0)
 License: MIT
 Encoding: UTF-8
 biocViews: 

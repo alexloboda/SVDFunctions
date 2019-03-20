@@ -6,6 +6,7 @@
 #' datasets: \code{\link{finSwedDataset}}, \code{\link{publicExomesDataset}}.
 #' @param outputPathPrefix prefix for ouput files
 #' @param vectors number of vectors to be generated
+#' @param ... arguments that will be passed to \code{\link{scanVCF}}
 #' @export
 prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore", 
                             vectors = 10, ...) {

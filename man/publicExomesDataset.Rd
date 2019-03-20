@@ -10,6 +10,6 @@ publicExomesDataset
 }
 \description{
 A dataset containing all required information that is necessary for
-creating an instance that can be submitted to website \link{dnascore.net}
+creating an instance that can be submitted to website \url{http://dnascore.net}
 }
 \keyword{datasets}

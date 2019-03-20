@@ -16,6 +16,8 @@ datasets: \code{\link{finSwedDataset}}, \code{\link{publicExomesDataset}}.}
 \item{outputPathPrefix}{prefix for ouput files}
 
 \item{vectors}{number of vectors to be generated}
+
+\item{...}{arguments that will be passed to \code{\link{scanVCF}}}
 }
 \description{
 The method generates all required files
