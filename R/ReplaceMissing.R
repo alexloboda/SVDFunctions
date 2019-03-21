@@ -9,7 +9,7 @@ replaceMissing <- function (genotypeMatrix)
 {
   for (i in 1:nrow(genotypeMatrix)) {
     m <- round(mean(as.numeric(genotypeMatrix[i, ]), na.rm = TRUE))
-    genotypeMatrix[i, is.na(genotypeMatrix[i, ])] <- m
+    genotypeMatrix[i, which(is.na(genotypeMatrix[i, ]))] <- m
   }
   genotypeMatrix
 }
