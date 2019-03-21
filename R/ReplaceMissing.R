@@ -7,9 +7,9 @@
 #' @export
 replaceMissing <- function (genotypeMatrix) 
 {
-    k <- which(is.na(genotypeMatrix), arr.ind = T)
-    if (length(k) > 0) {
-        genotypeMatrix[k] <- round(rowMeans(genotypeMatrix, na.rm = T)[k[, 1]])
-    }
-    return(genotypeMatrix)
+  for (i in 1:nrow(genotypeMatrix)) {
+    m <- round(mean(genotypeMatrix[i, ], na.rm = TRUE))
+    genotypeMatrix[i, is.na(genotypeMatrix[i, ])] <- m
+  }
+  genotypeMatrix
 }
