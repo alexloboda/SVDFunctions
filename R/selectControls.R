@@ -27,7 +27,7 @@ selectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                            softMaxLambda = 1.05, maxLambda = 1.3, 
                            min = 500, nSV = 5, binSize = 1) {
   gmatrix <- genotypeMatrix
-  residuals <- ParallelResidEstimate(gmatrix, SVDReference, nSV)
+  residuals <- parallelResidEstimate(gmatrix, SVDReference, nSV)
   control_names <- names(residuals)[order(residuals)] 
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")

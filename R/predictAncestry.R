@@ -26,7 +26,7 @@ predictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
   }
   resid<-vector("list",length(referenceUList))
   for(i in 1:length(referenceUList)){
-    resid[[i]]<-ParallelResidEstimate(genotypeMatrix = gmatrix, 
+    resid[[i]] <- parallelResidEstimate(genotypeMatrix = gmatrix, 
                                       SVDReference = referenceUList[[i]], 
                                       nSV = SV)
   }
@@ -34,7 +34,7 @@ predictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
   rownames(resid)<-ancestryList
   svd.pred.anc<-c()
   for(i in 1:ncol(resid)){
-    svd.pred.anc<-c(svd.pred.anc,ancestryList[which.min(resid[,i])])
+    svd.pred.anc<-c(svd.pred.anc, ancestryList[which.min(resid[,i])])
   }
   names(svd.pred.anc)<-colnames(gmatrix)
   return(svd.pred.anc)

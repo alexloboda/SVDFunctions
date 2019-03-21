@@ -10,6 +10,5 @@
 #' @export
 computeResidual.preproc <- function (referenceU, SV) 
 {
-    return(diag(length(referenceU[, 1])) - tcrossprod(x = referenceU[, 
-        SV]))
+    return(diag(length(referenceU[, 1])) - tcrossprod(x = referenceU[, SV]))
 }
