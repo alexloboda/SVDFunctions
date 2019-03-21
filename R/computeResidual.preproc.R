@@ -8,7 +8,7 @@
 #' of the original vector
 #' @param referenceU Matrix of the left singular vectors of cases
 #' @export
-ComputeResidual.preproc <- function (referenceU, SV) 
+computeResidual.preproc <- function (referenceU, SV) 
 {
     return(diag(length(referenceU[, 1])) - tcrossprod(x = referenceU[, 
         SV]))

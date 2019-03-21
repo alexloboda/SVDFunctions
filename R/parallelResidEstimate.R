@@ -5,7 +5,7 @@
 #' @param nSV Number of singular vectors to be used for reconstruction of the 
 #' original vector
 #' @export
-ParallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
+parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
 {
     gmatrix <- genotypeMatrix
     preprocessed.ref <- ComputeResidual.preproc(SVDReference, seq(1, nSV, 1))

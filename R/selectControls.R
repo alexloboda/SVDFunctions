@@ -22,7 +22,7 @@ NULL
 #' @param min Minimal size of a control set that is permitted for return
 #' @param binSize sliding window size for optimal lambda search
 #' @export
-SelectControls <- function(genotypeMatrix, SVDReference, caseCounts, 
+selectControls <- function(genotypeMatrix, SVDReference, caseCounts, 
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
                            min = 500, nSV = 5, binSize = 1) {
@@ -39,6 +39,7 @@ SelectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                       stats::qchisq(stats::ppoints(100000), df = 1), 
                       minLambda, softMinLambda, maxLambda, softMaxLambda, 
                       min, binSize)
+  result$residuals <- residuals
   if (result$controls >= 1) {
     result$controls <- control_names[1:result$controls]
   } else {

@@ -10,7 +10,7 @@
 #' @param SV Number of singular vectors to use
 #' @param ancestryList Vector of ancestry names
 #' @export
-PredictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
+predictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
   gmatrix <- genotypeMatrix
   if(class(referenceUList)!="list"){
     stop("Collection of U-bases must be supplied as list object")
