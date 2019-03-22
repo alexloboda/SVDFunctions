@@ -28,7 +28,8 @@ selectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                            min = 500, nSV = 5, binSize = 1) {
   gmatrix <- genotypeMatrix
   residuals <- parallelResidEstimate(gmatrix, SVDReference, nSV)
-  control_names <- names(residuals)[order(residuals)] 
+  new_order <- order(residuals)
+  control_names <- names(residuals)[new_order] 
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
   }
@@ -39,7 +40,7 @@ selectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                       stats::qchisq(stats::ppoints(100000), df = 1), 
                       minLambda, softMinLambda, maxLambda, softMaxLambda, 
                       min, binSize)
-  result$residuals <- setNames(residuals, colnames(gmatrix))
+  result$residuals <- setNames(residuals[new_order], colnames(gmatrix))
   if (result$controls >= 1) {
     result$controls <- control_names[1:result$controls]
   } else {
