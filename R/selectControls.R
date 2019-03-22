@@ -40,7 +40,8 @@ selectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                       stats::qchisq(stats::ppoints(100000), df = 1), 
                       minLambda, softMinLambda, maxLambda, softMaxLambda, 
                       min, binSize)
-  result$residuals <- setNames(residuals[new_order], colnames(gmatrix))
+  result$residuals <- setNames(residuals, colnames(gmatrix))
+  result$residuals <- result$residuals[new_order]
   if (result$controls >= 1) {
     result$controls <- control_names[1:result$controls]
   } else {
