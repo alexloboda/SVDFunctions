@@ -6,7 +6,7 @@ NULL
 #' 
 #' The methods checks which sets of allele counts pass standard quality 
 #' control filters(minor allele frequency > 0.05, AC > 10, HWE)
-#' @param countMatrix matrix 3-column integer matrix
+#' @param countsMatrix matrix 3-column integer matrix
 #' @return logical vector(each value - whether or not the corresponding set 
 #' of allele counts passed the quality control)
 #' @export

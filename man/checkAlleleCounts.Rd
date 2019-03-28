@@ -7,7 +7,7 @@
 checkAlleleCounts(countsMatrix)
 }
 \arguments{
-\item{countMatrix}{matrix 3-column integer matrix}
+\item{countsMatrix}{matrix 3-column integer matrix}
 }
 \value{
 logical vector(each value - whether or not the corresponding set 
