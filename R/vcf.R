@@ -56,8 +56,9 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
 #' callRateMatrixVCF(filepath, regions, GQ = 0, samples = samples)
 #' @export
 callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL, 
-                  bannedPositions = NULL) {
-  scanVCF(vcf, DP, GQ, samples, bannedPositions, regions = regions)$callrate
+                  bannedPositions = NULL, verbose = FALSE) {
+  scanVCF(vcf, DP, GQ, samples, bannedPositions, regions = regions,
+          verbose = verbose)$callrate
 }
 
 #' Scan VCF file for genotypes
@@ -73,9 +74,11 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' genotypeMatrixVCF(filepath, GQ = 0, samples = samples) 
 #' @export
 genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
-                              samples = NULL, bannedPositions = NULL) {
+                              samples = NULL, bannedPositions = NULL,
+                              verbose = FALSE) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
-          bannedPositions = bannedPositions, variants = variants)$genotype
+          bannedPositions = bannedPositions, variants = variants,
+          verbose = verbose)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -90,8 +93,8 @@ genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
 #' 
 #' sampleNamesVCF(filepath)
 #' @export
-sampleNamesVCF <- function(vcf) {
-    scanVCF(vcf, returnGenotypeMatrix = FALSE)$sample
+sampleNamesVCF <- function(vcf, verbose = FALSE) {
+    scanVCF(vcf, returnGenotypeMatrix = FALSE, verbose = verbose)$sample
 }
 
 #' Scan VCF files 
@@ -115,6 +118,7 @@ sampleNamesVCF <- function(vcf) {
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
+#' @param verbose logical 
 #' metadata file prefix_meta. If not NULL corresponding files will be generated.
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested.
@@ -122,7 +126,8 @@ sampleNamesVCF <- function(vcf) {
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
                     returnGenotypeMatrix = TRUE, 
-                    regions = NULL, binaryPathPrefix = NULL) {
+                    regions = NULL, binaryPathPrefix = NULL,
+                    verbose = FALSE) {
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
@@ -154,7 +159,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   tryCatch(
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                   returnGenotypeMatrix, regions, binaryPathPrefix),
+                     returnGenotypeMatrix, regions, binaryPathPrefix),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {
@@ -164,6 +169,11 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
       }
       stop(paste0(conditionMessage(c), "\n", suffix))
   })
+  
+  if (verbose) {
+    print(data.frame(stat = names(res$stats), value = unlist(res$stats), 
+                     row.names = NULL))
+  }
   
   if (!is.null(res$genotype)) {
       colnames(res$genotype) <- res$samples

@@ -7,7 +7,7 @@
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   bannedPositions = NULL, variants = NULL,
   returnGenotypeMatrix = TRUE, regions = NULL,
-  binaryPathPrefix = NULL)
+  binaryPathPrefix = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -33,7 +33,9 @@ applied only for genotype matrix.}
 \item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}
 
-\item{binaryPathPrefix}{the path prefix for binary file prefix_bin and 
+\item{binaryPathPrefix}{the path prefix for binary file prefix_bin and}
+
+\item{verbose}{logical 
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
 }
 \value{

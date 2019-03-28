@@ -5,7 +5,7 @@
 \title{Scan VCF file for call rate matrix}
 \usage{
 callRateMatrixVCF(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
-  bannedPositions = NULL)
+  bannedPositions = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -24,6 +24,9 @@ considered, otherwise assumed as missing.}
 
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
+
+\item{verbose}{logical 
+metadata file prefix_meta. If not NULL corresponding files will be generated.}
 }
 \value{
 numeric matrix: ratio of non-missing values to all variants in the

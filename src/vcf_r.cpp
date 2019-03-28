@@ -7,6 +7,7 @@
 #include "include/vcf_binary.h"
 #include "include/zstr/zstr.hpp"
 #include "include/zstr/strict_fstream.hpp"
+#include "include/vcf_stats.h"
 
 namespace {
     using namespace Rcpp;
@@ -113,7 +114,9 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         const char *name = filename[0];
         unique_ptr<std::istream> in(new zstr::ifstream(name));
 
-        Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]));
+        VCFFilterStats stats;
+
+        Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]), stats);
         parser.parse_header();
         auto ss = parser.sample_names();
         shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
@@ -126,7 +129,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                 vector<Variant> variants = Variant::parseVariants(string(s));
                 vs.insert(vs.end(), variants.begin(), variants.end());
             });
-            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs));
+            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
             parser.register_handler(gmatrix_handler);
         }
 
@@ -151,6 +154,11 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         if (regions.length() > 0) {
             ret["callrate"] = callrate_handler->result();
         }
+        List ret_stats;
+        for (Stat stat: vcf::statsList()) {
+            ret_stats[to_string(stat)] = stats.value(stat);
+        }
+        ret["stats"] = ret_stats;
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }

@@ -63,6 +63,7 @@ namespace vcf {
             return x.alleleType() == MISSING;
         }) / (double)alleles.size();
         if (missing_rate > MISSING_RATE_THRESHOLD) {
+            stats.add(Stat::MISSING_RATE, 1);
             return;
         }
         if (!MAC_filter(alleles)) {
@@ -80,8 +81,9 @@ namespace vcf {
         return available_variants.empty() || available_variants.find(variant) != available_variants.end();
     }
 
-    GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs)
-        : VariantsHandler(ss) {
+    GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs,
+                                                 VCFFilterStats& stats)
+        : VariantsHandler(ss), stats(stats) {
         available_variants.insert(vs.begin(), vs.end());
     }
 

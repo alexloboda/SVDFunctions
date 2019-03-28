@@ -4,11 +4,14 @@
 \alias{sampleNamesVCF}
 \title{Scan VCF file for sample names}
 \usage{
-sampleNamesVCF(vcf)
+sampleNamesVCF(vcf, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
 as compressed with gzip or zlib headers.}
+
+\item{verbose}{logical 
+metadata file prefix_meta. If not NULL corresponding files will be generated.}
 }
 \value{
 character vector with sample names

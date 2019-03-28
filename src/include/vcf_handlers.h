@@ -6,6 +6,7 @@
 #include <fstream>
 #include <unordered_set>
 #include "vcf_primitives.h"
+#include "vcf_stats.h"
 
 namespace vcf {
     class VariantsHandler {
@@ -37,8 +38,10 @@ namespace vcf {
         std::vector<std::vector<AlleleType>> gmatrix;
         std::vector<Variant> variants;
         std::unordered_set<Variant> available_variants;
+        VCFFilterStats& stats;
     public:
-        GenotypeMatrixHandler(const std::vector<std::string>& samples, const std::vector<Variant>& variants);
+        GenotypeMatrixHandler(const std::vector<std::string>& samples, const std::vector<Variant>& variants,
+                              VCFFilterStats& stats);
         void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
         bool isOfInterest(const Variant& position) override;
     };

@@ -5,7 +5,7 @@
 \title{Scan VCF file for genotypes}
 \usage{
 genotypeMatrixVCF(vcf, DP = 10L, GQ = 20L, variants = NULL,
-  samples = NULL, bannedPositions = NULL)
+  samples = NULL, bannedPositions = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -25,6 +25,9 @@ applied only for genotype matrix.}
 
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
+
+\item{verbose}{logical 
+metadata file prefix_meta. If not NULL corresponding files will be generated.}
 }
 \description{
 The method scans VCF files and returns genotype matrix for specified 

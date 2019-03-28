@@ -7,10 +7,15 @@
 #' @param outputPathPrefix prefix for ouput files
 #' @param vectors number of vectors to be generated
 #' @param ... arguments that will be passed to \code{\link{scanVCF}}
+#' @param verbose logical
 #' @export
 prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore", 
-                            vectors = 10, ...) {
-  genotype <- genotypeMatrixVCF(vcf, variants = dataset$ancestryVariants, ...)
+                            vectors = 10, verbose = FALSE, ...) {
+  if (verbose) {
+    cat("Parsing genotype matrix...\n")
+  }
+  genotype <- genotypeMatrixVCF(vcf, variants = dataset$ancestryVariants, 
+                                verbose = verbose, ...)
   genotype <- genotype[unique(rownames(genotype)),]
   gmatrix <- replaceMissing(as.matrix(genotype))
   if (nrow(gmatrix) < 2 | ncol(gmatrix) < 2) {
@@ -21,6 +26,9 @@ prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore",
                 "?scanVCF for more information about default filters."))
   }
   vectorsGM <- min(vectors, ncol(gmatrix) - 1, nrow(gmatrix) - 1)
+  if (verbose) {
+    cat("Running SVD on genotype matrix...\n")
+  }
   svdOut <- RSpectra::svds(gmatrix - rowMeans(gmatrix), k = vectorsGM)
   u <- svdOut$u
   gmatrix <- NULL
@@ -34,6 +42,9 @@ prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore",
   genotype <- NULL
   caseCounts <- NULL
   
+  if (verbose) {
+    cat("Parsing VCF file for call rate matrix...\n")
+  }
   callrate <- callRateMatrixVCF(vcf, dataset$intervals, ...)
   if (nrow(callrate) == 0) {
     warning("Callrate matrix is empty. Check DP and GQ filters and ensure", 

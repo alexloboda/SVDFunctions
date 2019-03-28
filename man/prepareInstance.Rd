@@ -5,7 +5,7 @@
 \title{Prepare an instance to be submitted to website dnascore.net}
 \usage{
 prepareInstance(vcf, dataset, outputPathPrefix = "dnascore",
-  vectors = 10, ...)
+  vectors = 10, verbose = FALSE, ...)
 }
 \arguments{
 \item{vcf}{vcf file name}
@@ -16,6 +16,8 @@ datasets: \code{\link{finSwedDataset}}, \code{\link{publicExomesDataset}}.}
 \item{outputPathPrefix}{prefix for ouput files}
 
 \item{vectors}{number of vectors to be generated}
+
+\item{verbose}{logical}
 
 \item{...}{arguments that will be passed to \code{\link{scanVCF}}}
 }

@@ -139,11 +139,12 @@ namespace {
             return type(first_allele, second_allele, allele);
         }
 
-        Allele parse(const string& genotype, int allele, const VCFFilter& filter) {
+        Allele parse(const string& genotype, int allele, const VCFFilter& filter, VCFFilterStats& stats) {
             vector<string> parts = split(genotype, ':');
             try {
                 string gt = parts[genotype_pos];
                 if (gt == "." || gt == "./." || gt == ".|.") {
+                    stats.add(Stat::GT_MISS, 1);
                     return {MISSING, 0, 0};
                 }
 
@@ -151,6 +152,7 @@ namespace {
                 int gq = qual_pos == -1 || parts[qual_pos] == "." ? 0 : stoi(parts[qual_pos]);
 
                 if (!filter.apply(dp, gq)) {
+                    stats.add(Stat::DP_GQ, 1);
                     return {MISSING, (unsigned)dp, (unsigned)gq};
                 }
                 Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
@@ -170,9 +172,11 @@ namespace {
                             double ref_ratio = ref / (double)dp;
                             double alt_ratio = alt / (double)dp;
                             if (ref_ratio < 0.3 || ref_ratio > 0.7) {
+                                stats.add(Stat::ALLELE_BALANCE, 1);
                                 return {MISSING, 0, 0};
                             }
                             if (alt_ratio < 0.3 || alt_ratio > 0.7) {
+                                stats.add(Stat::ALLELE_BALANCE, 1);
                                 return {MISSING, 0, 0};
                             }
                         }
@@ -192,7 +196,8 @@ namespace vcf {
         handlers.push_back(handler);
     }
 
-    VCFParser::VCFParser(std::istream& input, const VCFFilter& filter) :filter(filter), input(input), line_num(0) {}
+    VCFParser::VCFParser(std::istream& input, const VCFFilter& filter, VCFFilterStats& stats) :filter(filter),
+                         input(input), line_num(0), stats(stats){}
 
     std::vector<std::string> VCFParser::sample_names() {
         return samples;
@@ -263,15 +268,19 @@ namespace vcf {
                 if (tokens.size() < FIELDS.size()) {
                     throw ParserException("The row is too short");
                 }
-                if (tokens[FILTER] != "PASS") {
-                    continue;
-                }
                 Position position = parse_position(tokens);
-                if (!filter.apply(position)) {
+                vector<Variant> variants = parse_variants(tokens, position);
+                stats.add(Stat::OVERALL, variants.size());
+
+                if (tokens[FILTER] != "PASS") {
+                    stats.add(Stat::NON_PASS, variants.size());
                     continue;
                 }
 
-                vector<Variant> variants = parse_variants(tokens, position);
+                if (!filter.apply(position)) {
+                    stats.add(Stat::BANNED, variants.size());
+                    continue;
+                }
 
                 if (variants.empty()) {
                     continue;
@@ -279,6 +288,7 @@ namespace vcf {
                 tokens = split(line, DELIM);
 
                 if (tokens.size() != FIELDS.size() + number_of_samples) {
+                    stats.add(Stat::WARNING, variants.size());
                     throw ParserException("The row has " + std::to_string(tokens.size()) +
                                           " number of columns whereas header has " + std::to_string(FIELDS.size() + samples.size()));
                 }
@@ -289,7 +299,7 @@ namespace vcf {
                     Variant& variant = variants[i];
                     vector<Allele> alleles;
                     for (int sample : filtered_samples) {
-                        alleles.push_back(format.parse(tokens.at(sample), i + 1, filter));
+                        alleles.push_back(format.parse(tokens.at(sample), i + 1, filter, stats));
                     }
                     for (auto& handler: handlers) {
                         handler->processVariant(variant, alleles);
