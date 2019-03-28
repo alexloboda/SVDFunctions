@@ -8,6 +8,19 @@ using namespace Rcpp;
 using std::vector;
 
 // [[Rcpp::export]]
+LogicalVector quality_control_impl(const IntegerMatrix& case_counts) {
+    int n = case_counts.nrow();
+    LogicalVector ret(n);
+    for (int i = 0; i < n; i++) {
+        int homref = case_counts(i, 0);
+        int het = case_counts(i, 1);
+        int hom = case_counts(i, 2);
+        ret[i] = check_counts(homref, het, hom);
+    }
+    return ret;
+}
+
+// [[Rcpp::export]]
 List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
                      NumericMatrix& cc, NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,

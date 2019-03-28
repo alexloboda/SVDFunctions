@@ -2,6 +2,21 @@
 #' @importFrom Rcpp sourceCpp
 NULL
 
+#' Perform quality control on a set of allele counts
+#' 
+#' The methods checks which sets of allele counts pass standard quality 
+#' control filters(minor allele frequency > 0.05, AC > 10, HWE)
+#' @param countMatrix matrix 3-column integer matrix
+#' @return logical vector(each value - whether or not the corresponding set 
+#' of allele counts passed the quality control)
+#' @export
+checkAlleleCounts <- function(countsMatrix) {
+  stopifnot(ncol(countsMatrix) == 3) 
+  countsMatrix <- matrix(as.integer(countsMatrix), ncol = 3)
+  stopifnot(all(!is.na(countsMatrix)))
+  quality_control_impl(countsMatrix)
+}
+
 #' Selection of the optimal set of controls
 #' 
 #' Finds an optimal set of controls satisfying 

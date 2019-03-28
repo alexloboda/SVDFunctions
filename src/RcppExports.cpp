@@ -5,6 +5,17 @@
 
 using namespace Rcpp;
 
+// quality_control_impl
+LogicalVector quality_control_impl(const IntegerMatrix& case_counts);
+RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const IntegerMatrix& >::type case_counts(case_countsSEXP);
+    rcpp_result_gen = Rcpp::wrap(quality_control_impl(case_counts));
+    return rcpp_result_gen;
+END_RCPP
+}
 // select_controls_cpp
 List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals, NumericMatrix& cc, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min, IntegerVector bin_size);
 RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP residualsSEXP, SEXP ccSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP bin_sizeSEXP) {
@@ -62,6 +73,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 1},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 9},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 6},
