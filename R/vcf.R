@@ -77,7 +77,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions, verbose) {
 callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL, 
                   bannedPositions = NULL, verbose = FALSE) {
   scanVCF(vcf, DP, GQ, samples, bannedPositions, regions = regions,
-          verbose = verbose)$callrate
+          verbose = verbose, returnGenotypeMatrix = FALSE)$callrate
 }
 
 #' Scan VCF file for genotypes
