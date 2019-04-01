@@ -13,19 +13,31 @@ transformToTabixRegions <- function(x, pattern, outputPattern){
          substrings[outputPattern[3]])
 }
 
-createVCFFromTabixIndex <- function(vcf, variants, regions) {
+createVCFFromTabixIndex <- function(vcf, variants, regions, verbose) {
   variantsPositions <- NULL
   callRatePosition <- NULL
   header <- seqminer::tabix.read.header(vcf)
   t <- tempfile("regions", fileext = ".vcf.gz")
+  if (verbose) {
+    print(paste("Creating temp VCF file for specific regions:", t))
+  }
   con <- gzfile(t, "w")
   write(header$header, con)
+  if (verbose) {
+    pb <- utils::txtProgressBar(max = length(regions) + length(variants), 
+                                style = 3)
+  }
+  cnt <- 0
   if (!is.null(regions)) {
     regionsPattern <- "^[\\s]*chr(\\d{1,2}|X|Y) [\\s]*([\\d]+)[\\s]*([\\d]+)[\\s]*$"
     crt <- function(x) transformToTabixRegions(x, regionsPattern, c(1, 2, 3))
     callRatePositions <- sapply(regions, crt)
     for (region in callRatePositions) {
       write(seqminer::tabix.read(vcf, region), file = con, append = TRUE)
+      if (verbose) {
+        cnt <- cnt + 1
+        utils::setTxtProgressBar(pb, cnt)
+      }
     }
   }
   if (!is.null(variants)) {
@@ -34,7 +46,14 @@ createVCFFromTabixIndex <- function(vcf, variants, regions) {
     variantsPositions <- sapply(variants, vart)
     for (var in variantsPositions) {
       write(seqminer::tabix.read(vcf, var), file = con, append = TRUE)
+      if (verbose) {
+        cnt <- cnt + 1
+        utils::setTxtProgressBar(pb, cnt)
+      }
     }
+  }
+  if (verbose) {
+    close(pb)
   }
   close(con)
   t
@@ -144,7 +163,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   } else {
     if ((returnGenotypeMatrix && length(variants) != 0) |
         length(regions) != 0) {
-      vcf <- createVCFFromTabixIndex(vcf, variants, regions)
+      vcf <- createVCFFromTabixIndex(vcf, variants, regions, verbose)
     } else {
       tbi <- NULL
     }
