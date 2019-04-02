@@ -45,7 +45,7 @@ prepareInstance <- function(vcf, dataset, outputPathPrefix = "dnascore",
   if (verbose) {
     cat("Parsing VCF file for call rate matrix...\n")
   }
-  callrate <- callRateMatrixVCF(vcf, dataset$intervals, ...)
+  callrate <- callRateMatrixVCF(vcf, dataset$intervals, verbose = verbose, ...)
   if (nrow(callrate) == 0) {
     warning("Callrate matrix is empty. Check DP and GQ filters and ensure", 
             "that vcf file contains variants that cover required intervals ", 
