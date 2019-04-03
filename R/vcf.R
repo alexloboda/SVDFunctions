@@ -212,14 +212,16 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @return data.frame with counts statistics 
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
-  df <- data.frame(rownames(genotypeMatrix), stringsAsFactors = FALSE)
+  df <- NULL
   for (i in 0:2) {
     df <- cbind(df, apply(genotypeMatrix, 1, function(x) {
       sum(x[!is.na(x)] == i)
     }))
   }
-  colnames(df) <- c("variant", "HOM_REF", "HET", "HOM_ALT")
-  rownames(df) <- NULL
+  colnames(df) <- c("HOM_REF", "HET", "HOM_ALT")
+  if (!is.null(rownames(genotypeMatrix))) {
+    rownames(df) <- rownames(genotypeMatrix)
+  }
   df
 }
 
@@ -233,22 +235,24 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @param samples the set of samples to be analyzed
 #' @param MAC minimum minor allele count
 #' @param MAF minimum minor allele frequency
-#' @return data.frame with four columns: variant(position, reference allele, 
-#' alternative allele); number of samples with 
-#' both reference, one reference and alternative allele indicated in first column,
-#' and both alternative respectively.
+#' @return matrix with three columns:  
+#' number of samples with 
+#' both reference alleles, with  one reference allele and one alternative allele,
+#' and with both alternative ones respectively.
 #' @export
 scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20,
                            MAC = 1, MAF = 0.00) {
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   res <- parse_binary_file(variants, samples, binaryFile, metafile, DP, GQ);
+  names <- res[["variant"]]
   total <- as.integer(res["total"])
-  res["total"] <- NULL
-  res <- as.data.frame(res, stringsAsFactors = FALSE)
-  actualMAC <- apply(res[, 2:4], 1, function(x) 2 * min(x[1], x[3]) + x[2])
+  res[["variant"]] <- NULL
+  res[["total"]] <- NULL
+  res <- matrix(do.call(c, res), ncol = 3, dimnames = list(NULL, names(res)))
+  rownames(res) <- names
+  actualMAC <- apply(res, 1, function(x) 2 * min(x[1], x[3]) + x[2])
   res <- res[actualMAC >= MAC & actualMAC / 2 * nrow(res) >= MAF, ]
-  res <- res[res$HOM_REF + res$HET + res$HOM_ALT >= 0.9 * total, ]
-  rownames(res) <- NULL
+  res <- res[res[, 'HOM_REF'] + res[, 'HET'] + res[, 'HOM_ALT'] >= 0.9 * total, ]
   res
 }
