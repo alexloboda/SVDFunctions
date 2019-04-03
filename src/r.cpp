@@ -21,8 +21,8 @@ LogicalVector quality_control_impl(const IntegerMatrix& case_counts) {
 }
 
 // [[Rcpp::export]]
-List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
-                     NumericMatrix& cc, NumericVector& chi2fn,
+List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
+                     IntegerMatrix& cc, NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min,
                      IntegerVector bin_size) {
@@ -41,12 +41,13 @@ List select_controls_cpp(NumericMatrix& gmatrix, NumericVector& residuals,
     for (int i = 0; i < n_c; i++) {
         resid[i] = residuals[i];
         for (int j = 0; j < gmatrix.nrow(); j++) {
-            gmatrix_c[i][j] = (int)std::lround(gmatrix(j, i));
+            int value = gmatrix(j, i);
+            gmatrix_c[i][j] = value == NA ? -1 : value;
         }
     }
     for (int i = 0; i < n_snps; i++) {
         for (int j = 0; j < 3; j++) {
-            case_counts[i][j] = (int)std::lround(cc(i, j));
+            case_counts[i][j] = cc(i, j);
         }
     }
     int min_controls = min[0];

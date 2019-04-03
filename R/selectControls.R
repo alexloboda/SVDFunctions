@@ -42,13 +42,14 @@ selectControls <- function(genotypeMatrix, SVDReference, caseCounts,
                            softMaxLambda = 1.05, maxLambda = 1.3, 
                            min = 500, nSV = 5, binSize = 1) {
   gmatrix <- genotypeMatrix
+  stopifnot(is.matrix(gmatrix))
+  mode(gmatrix) <- "integer"
   residuals <- parallelResidEstimate(gmatrix, SVDReference, nSV)
   new_order <- order(residuals)
   control_names <- names(residuals)[new_order] 
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
     stop("Check dimensions of the matrices")
   }
-  gmatrix <- as.matrix(gmatrix)
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
   result <- select_controls_cpp(gmatrix, residuals, caseCounts, 

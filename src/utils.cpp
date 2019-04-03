@@ -109,7 +109,9 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             }
             int cur = gmatrix[i][j];
             std::vector<int>& cts = counts[j];
-            ++cts[cur];
+            if (cur != -1) {
+                ++cts[cur];
+            }
             lms[j].set(cur, cur, 0, cts[cur]);
             if (i >= min_controls - 1 && (i + 1) % bin == 0) {
                 if (!check_counts(cts[0], cts[1], cts[2])) {
