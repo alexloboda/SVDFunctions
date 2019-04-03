@@ -137,8 +137,8 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
-#' @param verbose logical 
 #' metadata file prefix_meta. If not NULL corresponding files will be generated.
+#' @param verbose logical 
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested.
 #' @export
