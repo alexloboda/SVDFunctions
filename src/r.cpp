@@ -42,7 +42,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
         resid[i] = residuals[i];
         for (int j = 0; j < gmatrix.nrow(); j++) {
             int value = gmatrix(j, i);
-            gmatrix_c[i][j] = value == NA ? -1 : value;
+            gmatrix_c[i][j] = value == NA_INTEGER ? -1 : value;
         }
     }
     for (int i = 0; i < n_snps; i++) {
