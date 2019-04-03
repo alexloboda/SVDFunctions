@@ -1,3 +1,19 @@
+samplingReplaceMissing <- function(genotypeMatrix) {
+  pb <- txtProgressBar(min = 0,
+                       max = nrow(genotypeMatrix),
+                       style = 3)
+  for (i in 1:nrow(genotypeMatrix)) {
+    nas <- which(is.na(genotypeMatrix[i, ]) == TRUE)
+    if (length(nas) > 0) {
+      genotypeMatrix[i, nas] <-
+        sample(genotypeMatrix[i,-nas], length(nas), replace = TRUE)
+    }
+    setTxtProgressBar(pb, i)
+  }
+  return(genotypeMatrix)
+}
+
+
 #' Estimation of residual vector norms for all controls
 #' 
 #' @param genotypeMatrix Genotype matrix
@@ -7,7 +23,7 @@
 #' @export
 parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
 {
-    gmatrix <- genotypeMatrix
+    gmatrix <- samplingReplaceMissing(genotypeMatrix)
     preprocessed.ref <- computeResidual.preproc(SVDReference, seq(1, nSV, 1))
     resiudals <- preprocessed.ref %*% gmatrix
     apply(resiudals, MARGIN = 2, function(x) norm(x, type = "2"))
