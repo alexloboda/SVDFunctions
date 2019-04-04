@@ -31,6 +31,19 @@ namespace vcf {
         bool isOfInterest(const Variant& position) override;
     };
 
+    class GenotypeMatrixHandler;
+
+    class GenotypeMatrixIterator {
+        size_t pos;
+        GenotypeMatrixHandler& gh;
+    public:
+        explicit GenotypeMatrixIterator(GenotypeMatrixHandler& gh);
+        Variant operator*();
+        void set(std::vector<AlleleType>& genotypes);
+        GenotypeMatrixIterator& operator++();
+        bool has_next();
+    };
+
     class GenotypeMatrixHandler: public VariantsHandler {
         const double EPS = 1e-8;
         const double MISSING_RATE_THRESHOLD = 0.1 + EPS;
@@ -44,6 +57,8 @@ namespace vcf {
                               VCFFilterStats& stats);
         void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
         bool isOfInterest(const Variant& position) override;
+        GenotypeMatrixIterator iterator();
+        friend class GenotypeMatrixIterator;
     };
 
     class BinaryFileHandler: public VariantsHandler {

@@ -87,6 +87,10 @@ namespace vcf {
         available_variants.insert(vs.begin(), vs.end());
     }
 
+    GenotypeMatrixIterator GenotypeMatrixHandler::iterator() {
+        return GenotypeMatrixIterator(*this);
+    }
+
     BinaryFileHandler::BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
                                          std::string metadata_file) :VariantsHandler(samples),
                                          binary(main_filename, std::ios::binary), meta(metadata_file) {
@@ -108,5 +112,24 @@ namespace vcf {
 
     bool BinaryFileHandler::isOfInterest(const Variant& variant) {
         return true;
+    }
+
+    GenotypeMatrixIterator::GenotypeMatrixIterator(GenotypeMatrixHandler& gh) :pos(0), gh(gh) {}
+
+    bool GenotypeMatrixIterator::has_next() {
+        return pos < gh.variants.size() - 1;
+    }
+
+    GenotypeMatrixIterator& GenotypeMatrixIterator::operator++() {
+        ++pos;
+        return *this;
+    }
+
+    void GenotypeMatrixIterator::set(std::vector<AlleleType>& genotypes) {
+        gh.gmatrix[pos] = genotypes;
+    }
+
+    Variant GenotypeMatrixIterator::operator*() {
+        return gh.variants[pos];
     }
 }
