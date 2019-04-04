@@ -151,7 +151,9 @@ namespace vcf {
         return chr;
     }
 
-    ParserException::ParserException(std::string message) :msg(message) {}
+    Chromosome::Chromosome(int num) :chr(num){}
+
+    ParserException::ParserException(std::string message) :msg(std::move(message)) {}
 
     std::string ParserException::get_message() const {
         return msg;
@@ -169,6 +171,18 @@ namespace vcf {
             return false;
         }
         return p.position() >= from && p.position() < to;
+    }
+
+    Position Range::begin() const {
+        return {chr, from};
+    }
+
+    Position Range::end() const {
+        return {chr, to};
+    }
+
+    Position Position::operator+(int shift) {
+        return {chr, pos + shift};
     }
 
     Range Range::parseRange(const std::string& s) {

@@ -57,6 +57,7 @@ namespace vcf {
                               VCFFilterStats& stats);
         void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
         bool isOfInterest(const Variant& position) override;
+        std::vector<Variant> desired_variants();
         GenotypeMatrixIterator iterator();
         friend class GenotypeMatrixIterator;
     };

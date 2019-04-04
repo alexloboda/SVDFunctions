@@ -34,6 +34,7 @@ namespace vcf {
         bool parse(std::string);
 
     public:
+        explicit Chromosome(int num);
         explicit Chromosome(const std::string&);
         Chromosome(const Chromosome& other) = default;
         Chromosome(Chromosome&& other) = default;
@@ -54,6 +55,7 @@ namespace vcf {
         explicit operator std::string() const;
         Chromosome chromosome() const;
         int position() const;
+        Position operator+(int shift);
 
         static Position parse_position(const std::string& str);
 
@@ -91,6 +93,8 @@ namespace vcf {
         bool includes(const Position& p) const;
         bool operator<(const Range& other) const;
         bool operator<(const Position& pos) const;
+        Position begin() const;
+        Position end() const;
         explicit operator std::string() const;
 
         static Range parseRange(const std::string& s);

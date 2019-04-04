@@ -5,18 +5,18 @@
 
 namespace vcf {
     class PredictingHandler : public VariantsHandler {
-        const unsigned long window_size_kb;
-        const unsigned long window_size;
+        const int window_size_kb;
+        const int window_size;
 
         GenotypeMatrixHandler& gh;
         Chromosome curr_chr;
         std::unique_ptr<Variant> awaiting;
-
+        std::unordered_map<int, std::set<Range>> ranges;
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   unsigned long window_size_kb, unsigned long window_size);
+                                   int window_size_kb, int window_size);
         virtual void processVariant(const Variant& variant, const std::vector<Allele>& alleles);
-        virtual bool isOfInterest(const Variant& position);
+        bool isOfInterest(const Variant& position) override;
         void cleanup();
     };
 }

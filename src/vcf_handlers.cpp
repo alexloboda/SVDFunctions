@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "include/vcf_handlers.h"
 #include <algorithm>
 #include <iostream>
@@ -89,6 +91,10 @@ namespace vcf {
 
     GenotypeMatrixIterator GenotypeMatrixHandler::iterator() {
         return GenotypeMatrixIterator(*this);
+    }
+
+    std::vector<Variant> GenotypeMatrixHandler::desired_variants() {
+        return {available_variants.begin(), available_variants.end()};
     }
 
     BinaryFileHandler::BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
