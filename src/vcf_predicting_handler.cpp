@@ -28,9 +28,16 @@ namespace vcf {
 
     bool PredictingHandler::isOfInterest(const Variant& variant) {
         Position pos = variant.position();
-        // Workaround, c++11
         auto& set = ranges[pos.chromosome().num()];
+        // Workaround, c++11
         auto it = set.lower_bound(Range(pos.chromosome(), -1, pos.position()));
         return it != set.end() && it->includes(pos);
+    }
+
+    void PredictingHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
+    }
+
+    void PredictingHandler::cleanup() {
+
     }
 }
