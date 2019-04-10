@@ -106,13 +106,48 @@ namespace vcf {
         }
 
     private:
-        Bags split(int var, Bags& curr, AlleleType splitBy, Features& features, Labels& labels) {
+        std::tuple<double, double, double> ratios(Bags& bags, Labels& labels) {
+            double hom = 0.0;
+            double het = 0.0;
+            double alt = 0.0;
+            for (auto s: bags.list()) {
+                switch (labels[s.sample()]){
+                    case HOM:
+                        alt += s.weight();
+                        break;
+                    case HET:
+                        het += s.weight();
+                        break;
+                    case HOMREF:
+                        hom += s.weight();
+                        break;
+                }
+            }
+            double sum = hom + het + alt;
+            return {hom / sum, het / sum, alt / sum};
+        }
+
+        std::pair<Bags, Bags> split(int var, Bags& curr, AlleleType splitBy, Features& features, Labels& labels) {
             Bags left, right;
             auto list = curr.list();
             auto& var_data = features[var];
-            for (auto& el: list) {
-
+            auto rs = ratios(curr, labels);
+            double left_ratio = std::get<0>(rs);
+            if (splitBy == HET) {
+                left_ratio += std::get<1>(rs);
             }
+            for (auto& el: list) {
+                auto allele = var_data[el.sample()];
+                if (allele == MISSING) {
+                    left.add(el.sample(), el.weight() * left_ratio);
+                    right.add(el.sample(), el.weight() * (1.0 - left_ratio));
+                } else if (to_int(allele) <= to_int(splitBy)) {
+                    left.add(el.sample(), el.weight());
+                } else {
+                    right.add(el.sample(), el.weight());
+                }
+            }
+            return {left, right};
         }
 
         std::vector<int> sample(size_t n, size_t k, Random& random) {
