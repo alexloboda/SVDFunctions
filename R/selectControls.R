@@ -38,13 +38,13 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param binSize sliding window size for optimal lambda search
 #' @export
 selectControls <- function(genotypeMatrix, SVDReference, caseCounts, 
-                           residuals, 
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
                            min = 500, nSV = 5, binSize = 1) {
   gmatrix <- genotypeMatrix
   stopifnot(is.matrix(gmatrix))
   mode(gmatrix) <- "integer"
+  residuals <- parallelResidEstimate(gmatrix, SVDReference, nSV)
   new_order <- order(residuals)
   control_names <- names(residuals)[new_order] 
   if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {

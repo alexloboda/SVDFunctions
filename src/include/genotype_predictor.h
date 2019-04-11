@@ -6,6 +6,7 @@
 #include <random>
 #include <algorithm>
 #include <exception>
+#include <cmath>
 
 namespace {
     typedef std::mt19937 Random;
@@ -92,14 +93,20 @@ namespace {
             }
             return ret;
         }
+
+        double sum() {
+            return weights_sum;
+        }
     };
 }
 
 namespace vcf {
     typedef std::vector<std::vector<AlleleType>> Features;
     typedef std::vector<AlleleType> Labels;
+    typedef std::pair<Bags, Bags> Split;
 
     class DecisionTree {
+        const double EPS = 1e-8;
         Random random;
         std::unique_ptr<Node> root;
     public:
@@ -171,7 +178,24 @@ namespace vcf {
         }
 
         double score(Bags& samples, Labels& labels) {
-            double info_fain = 0.0;
+            double info_gain = 0.0;
+            auto cs_tuple = counts(samples, labels);
+            std::vector<size_t> cs{std::get<0>(cs_tuple), std::get<1>(cs_tuple), std::get<2>(cs_tuple)};
+            size_t sum = std::accumulate(cs.begin(), cs.end(), (size_t)0);
+            for (size_t cnt: cs) {
+                if (cnt != 0) {
+                    double ratio = cnt / (double)sum;
+                    info_gain -= ratio * std::log(ratio);
+                }
+            }
+            return info_gain;
+        }
+
+        double split_score(Split& split, Labels& labels) {
+            double sum = split.first.sum() + split.second.sum();
+            double lr = split.first.sum() / sum;
+            double rr = split.second.sum() / sum;
+            return lr * score(split.first, labels) + rr * score(split.second, labels);
         }
 
         Node buildSubtree(Bags& bags, Features& features, Labels& values) {
@@ -179,11 +203,24 @@ namespace vcf {
             auto vars = sample(features.size(), k, random);
             int var_best = -1;
             AlleleType best_split = MISSING;
-            double best_score = -std::numeric_limits<double>::infinity();
+            double best_score = score(bags, values) - EPS;
 
             for (int var: vars) {
                 auto hom_split = split(bags, HOMREF, features[var], values);
                 auto het_split = split(bags, HET, features[var], values);
+                double hom_score = split_score(hom_split, values);
+                double het_score = split_score(het_split, values);
+                if (hom_score < best_score) {
+                    var_best = var;
+                    best_split = HOMREF;
+                    best_score = hom_score;
+                }
+                if (het_score < best_score) {
+                    var_best = var;
+                    best_split = HET;
+                    best_score = het_score;
+
+                }
             }
         }
     };
