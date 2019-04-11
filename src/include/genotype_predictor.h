@@ -65,6 +65,7 @@ namespace {
     class Bags {
         std::vector<int> bags;
         std::vector<double> weights;
+        double weights_sum;
 
     public:
         Bags(size_t size, Random& random) {
@@ -72,6 +73,7 @@ namespace {
                 bags.push_back(random() % size);
                 weights.resize(size, 1.0);
             }
+            weights_sum = size;
         }
 
         Bags() = default;
@@ -79,6 +81,7 @@ namespace {
         void add(int sample, double weight) {
             bags.push_back(sample);
             weights.push_back(weight);
+            weights_sum += weight;
         }
 
         std::vector<Sample> list() {
@@ -106,7 +109,7 @@ namespace vcf {
         }
 
     private:
-        std::tuple<double, double, double> ratios(Bags& bags, Labels& labels) {
+        std::tuple<size_t, size_t, size_t> counts(Bags& bags, Labels& labels) {
             double hom = 0.0;
             double het = 0.0;
             double alt = 0.0;
@@ -123,21 +126,30 @@ namespace vcf {
                         break;
                 }
             }
+            return {hom, het, alt};
+        }
+
+        std::tuple<double, double, double> ratios(Bags& bags, Labels& labels) {
+            auto count = counts(bags, labels);
+
+            double hom = std::get<0>(count);
+            double het = std::get<1>(count);
+            double alt = std::get<2>(count);
+
             double sum = hom + het + alt;
             return {hom / sum, het / sum, alt / sum};
         }
 
-        std::pair<Bags, Bags> split(int var, Bags& curr, AlleleType splitBy, Features& features, Labels& labels) {
+        std::pair<Bags, Bags> split(Bags& curr, AlleleType splitBy, std::vector<AlleleType>& features, Labels& labels) {
             Bags left, right;
             auto list = curr.list();
-            auto& var_data = features[var];
             auto rs = ratios(curr, labels);
             double left_ratio = std::get<0>(rs);
             if (splitBy == HET) {
                 left_ratio += std::get<1>(rs);
             }
             for (auto& el: list) {
-                auto allele = var_data[el.sample()];
+                auto allele = features[el.sample()];
                 if (allele == MISSING) {
                     left.add(el.sample(), el.weight() * left_ratio);
                     right.add(el.sample(), el.weight() * (1.0 - left_ratio));
@@ -158,11 +170,20 @@ namespace vcf {
             return {arr.begin(), arr.begin() + k};
         }
 
+        double score(Bags& samples, Labels& labels) {
+            double info_fain = 0.0;
+        }
+
         Node buildSubtree(Bags& bags, Features& features, Labels& values) {
             int k = std::floor(std::sqrt(features.size()));
             auto vars = sample(features.size(), k, random);
-            for (int var: vars) {
+            int var_best = -1;
+            AlleleType best_split = MISSING;
+            double best_score = -std::numeric_limits<double>::infinity();
 
+            for (int var: vars) {
+                auto hom_split = split(bags, HOMREF, features[var], values);
+                auto het_split = split(bags, HET, features[var], values);
             }
         }
     };
