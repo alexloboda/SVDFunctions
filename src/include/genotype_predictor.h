@@ -10,7 +10,6 @@
 
 namespace {
     typedef std::mt19937 Random;
-    const size_t CLASSES = 3;
 
     class Node {
         std::vector<double> class_weights;
@@ -33,7 +32,10 @@ namespace {
              separator(sep) {}
     };
 
-    class LeafNode : public Node {};
+    class LeafNode : public Node {
+    public:
+        explicit LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {};
+    };
 
     int to_int(vcf::AlleleType type) {
         switch(type) {
@@ -116,7 +118,7 @@ namespace vcf {
         }
 
     private:
-        std::tuple<size_t, size_t, size_t> counts(Bags& bags, Labels& labels) {
+        std::tuple<double, double, double> counts(Bags& bags, Labels& labels) {
             double hom = 0.0;
             double het = 0.0;
             double alt = 0.0;
@@ -180,9 +182,9 @@ namespace vcf {
         double score(Bags& samples, Labels& labels) {
             double info_gain = 0.0;
             auto cs_tuple = counts(samples, labels);
-            std::vector<size_t> cs{std::get<0>(cs_tuple), std::get<1>(cs_tuple), std::get<2>(cs_tuple)};
-            size_t sum = std::accumulate(cs.begin(), cs.end(), (size_t)0);
-            for (size_t cnt: cs) {
+            std::vector<double> cs{std::get<0>(cs_tuple), std::get<1>(cs_tuple), std::get<2>(cs_tuple)};
+            double sum = std::accumulate(cs.begin(), cs.end(), 0.0);
+            for (double cnt: cs) {
                 if (cnt != 0) {
                     double ratio = cnt / (double)sum;
                     info_gain -= ratio * std::log(ratio);
@@ -219,8 +221,13 @@ namespace vcf {
                     var_best = var;
                     best_split = HET;
                     best_score = het_score;
-
                 }
+            }
+
+            if (best_split == MISSING) {
+                auto cnts = counts(bags, values);
+                std::vector<double> cs{std::get<0>(cnts), std::get<1>(cnts), std::get<2>(cnts)};
+                return LeafNode(std::move(cs));
             }
         }
     };
