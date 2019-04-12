@@ -9,43 +9,15 @@
 #include <cmath>
 
 namespace {
+    class Node;
+    class Bags;
+
     typedef std::mt19937 Random;
-
-    template<typename T, typename ...Args>
-    std::unique_ptr<T> make_unique( Args&& ...args )
-    {
-        return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
-    }
-
-    class Node {
-        std::vector<double> class_weights;
-    public:
-        explicit Node(std::vector<double>&& class_weights) :class_weights(std::move(class_weights)){}
-
-        double weight(size_t cl) {
-            return class_weights[cl];
-        }
-
-        std::vector<double> weights() {
-            return class_weights;
-        }
-    };
-
-    class InnerNode : public Node {
-        typedef std::unique_ptr<Node> nodePtr;
-        nodePtr left_node;
-        nodePtr right_node;
-        vcf::AlleleType separator;
-    public:
-        InnerNode(std::vector<double>&& class_weights, nodePtr&& left_node, nodePtr&& right_node, vcf::AlleleType sep)
-            :Node(std::move(class_weights)), left_node(std::move(left_node)), right_node(std::move(right_node)),
-             separator(sep) {}
-    };
-
-    class LeafNode : public Node {
-    public:
-        explicit LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {};
-    };
+    typedef std::shared_ptr<Node> nodePtr;
+    typedef std::vector<std::vector<vcf::AlleleType>> Features;
+    typedef std::vector<vcf::AlleleType> Labels;
+    typedef std::pair<Bags, Bags> Split;
+    typedef std::shared_ptr<Node> NodePtr;
 
     int to_int(vcf::AlleleType type) {
         switch(type) {
@@ -59,6 +31,78 @@ namespace {
                 return 3;
         }
     }
+
+    class Node {
+    protected:
+        std::vector<double> class_weights;
+
+    public:
+        explicit Node(std::vector<double>&& class_weights) :class_weights(std::move(class_weights)){}
+
+        virtual double predict(std::vector<vcf::AlleleType>& features) = 0;
+
+        double weight(size_t cl) {
+            return class_weights[cl];
+        }
+
+        std::vector<double> weights() {
+            return class_weights;
+        }
+
+    protected:
+        double prediction(std::vector<double>& alpha) {
+            // Beta(1,1,1) prior
+            double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0) + alpha.size();
+            std::transform(alpha.begin(), alpha.end(), alpha.begin(), [&sum](double x){
+                return x / sum;
+            });
+            return alpha[1] + 2 * alpha[2];
+        }
+    };
+
+    class InnerNode : public Node {
+        nodePtr left_node;
+        nodePtr right_node;
+        int var;
+        vcf::AlleleType separator;
+
+    public:
+        InnerNode(std::vector<double>&& class_weights, nodePtr& left_node, nodePtr& right_node, vcf::AlleleType sep,
+                  int variable)
+            :Node(std::move(class_weights)), left_node(left_node), right_node(right_node), separator(sep),
+             var(variable) {}
+
+
+        double predict(std::vector<vcf::AlleleType>& features) override {
+            vcf::AlleleType allele = features[var];
+            if (allele != vcf::MISSING) {
+                if (to_int(allele) <= to_int(separator)) {
+                    return left_node->predict(features);
+                } else {
+                    return right_node->predict(features);
+                }
+            } else {
+                double left_ratio = class_weights[to_int(vcf::HOMREF)];
+                double right_ratio = class_weights[to_int(vcf::HOM)];
+                double het_ratio = class_weights[to_int(vcf::HET)];
+                if (separator == vcf::HET) {
+                    left_ratio += het_ratio;
+                } else {
+                    right_ratio += het_ratio;
+                }
+                return left_ratio * left_node->predict(features) + right_ratio * right_node->predict(features);
+            }
+        }
+    };
+
+    class LeafNode : public Node {
+    public:
+        explicit LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {};
+
+        double predict(std::vector<vcf::AlleleType>& features) override {
+            return prediction(class_weights);
+        }
+    };
 
     class Sample {
         int num;
@@ -78,7 +122,7 @@ namespace {
     class Bags {
         std::vector<int> bags;
         std::vector<double> weights;
-        double weights_sum;
+        double weights_sum = 0.0;
 
     public:
         Bags(size_t size, Random& random) {
@@ -113,21 +157,22 @@ namespace {
 }
 
 namespace vcf {
-    typedef std::vector<std::vector<AlleleType>> Features;
-    typedef std::vector<AlleleType> Labels;
-    typedef std::pair<Bags, Bags> Split;
-    typedef std::unique_ptr<Node> NodePtr;
-
     class DecisionTree {
         const double EPS = 1e-8;
         Random random;
-        std::unique_ptr<Node> root;
+        NodePtr root;
     public:
-        DecisionTree(std::mt19937& random) :random(random) {}
+        explicit DecisionTree(std::mt19937& random) :random(random) {}
 
         void fit(Features& features, Labels& labels) {
             Bags bags(features.size(), random);
-            root = std::move(buildSubtree(, features, labels));
+            root = buildSubtree(bags, features, labels);
+        }
+
+        double predict(std::vector<AlleleType>& features) {
+            Bags bags;
+            bags.add(0, 1.0);
+            return root->predict(features, 1.0);
         }
 
     private:
@@ -231,8 +276,8 @@ namespace vcf {
             return variance[1] + 4 * variance[2] + 4 * cov_bc;
         }
 
-        std::unique_ptr<Node> prune(NodePtr&& left, NodePtr&& right, std::vector<double>&& class_weights,
-                                    AlleleType sep) {
+        NodePtr prune(NodePtr left, NodePtr right, std::vector<double>&& class_weights,
+                                    AlleleType sep, int variable) {
             auto left_weights = left->weights();
             auto right_weights = right->weights();
             double left_sum = std::accumulate(left_weights.begin(), left_weights.end(), 0.0);
@@ -241,13 +286,13 @@ namespace vcf {
             sep_variance /= left_sum + right_sum;
             double joint_variance = variance(class_weights);
             if (joint_variance < sep_variance - EPS) {
-                return make_unique<LeafNode>(class_weights);
+                return std::make_shared<LeafNode>(class_weights);
             } else {
-                return make_unique<InnerNode>(std::move(class_weights), std::move(left), std::move(right), sep);
+                return std::make_shared<InnerNode>(std::move(class_weights), left, right, sep, variable);
             }
         }
 
-        std::unique_ptr<Node> buildSubtree(Bags& bags, Features& features, Labels& values) {
+        NodePtr buildSubtree(Bags& bags, Features& features, Labels& values) {
             int k = std::floor(std::sqrt(features.size()));
             auto vars = sample(features.size(), k, random);
             int var_best = -1;
@@ -274,14 +319,14 @@ namespace vcf {
             auto cnts = counts(bags, values);
             std::vector<double> cs{std::get<0>(cnts), std::get<1>(cnts), std::get<2>(cnts)};
             if (best_split == MISSING) {
-                return make_unique<LeafNode>(std::move(cs));
+                return std::make_shared<LeafNode>(std::move(cs));
             } else {
                 auto the_best_split_ever = split(bags, best_split, features[var_best], values);
                 auto left = the_best_split_ever.first;
                 auto right = the_best_split_ever.second;
                 auto left_subtree = buildSubtree(left, features, values);
                 auto right_subtree = buildSubtree(right, features, values);
-                return prune(std::move(left_subtree), std::move(right_subtree), std::move(cs), best_split);
+                return prune(left_subtree, right_subtree, std::move(cs), best_split, var_best);
             }
         }
     };
