@@ -125,7 +125,9 @@ namespace vcf {
     public:
         DecisionTree(std::mt19937& random) :random(random) {}
 
-        void fit(Features& features, Labels& y) {
+        void fit(Features& features, Labels& labels) {
+            Bags bags(features.size(), random);
+            root = std::move(buildSubtree(, features, labels));
         }
 
     private:
@@ -144,6 +146,8 @@ namespace vcf {
                     case HOMREF:
                         hom += s.weight();
                         break;
+                    case MISSING:
+                        throw std::logic_error("Predictable values must not be NAs");
                 }
             }
             return {hom, het, alt};
