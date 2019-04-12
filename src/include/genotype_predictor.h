@@ -25,6 +25,10 @@ namespace {
         double weight(size_t cl) {
             return class_weights[cl];
         }
+
+        std::vector<double> weights() {
+            return class_weights;
+        }
     };
 
     class InnerNode : public Node {
@@ -207,9 +211,9 @@ namespace vcf {
             return lr * score(split.first, labels) + rr * score(split.second, labels);
         }
 
-        double variance(double a, double b, double c) {
+        double variance(std::vector<double> alpha) {
             // uniform prior (beta(1, 1, 1))
-            std::vector<double> alpha{a + 1, b + 1, c + 1};
+            std::transform(alpha.begin(), alpha.end(), alpha.begin(), [](double x) { return x + 1; });
             double sum_alpha = std::accumulate(alpha.begin(), alpha.end(), 0.0);
             std::vector<double> rel_alpha;
             std::vector<double> variance;
@@ -223,8 +227,20 @@ namespace vcf {
             return variance[1] + 4 * variance[2] + 4 * cov_bc;
         }
 
-        std::unique_ptr<Node> prune(NodePtr&& left, NodePtr&& right, std::vector<double>&& class_weights) {
-            
+        std::unique_ptr<Node> prune(NodePtr&& left, NodePtr&& right, std::vector<double>&& class_weights,
+                                    AlleleType sep) {
+            auto left_weights = left->weights();
+            auto right_weights = right->weights();
+            double left_sum = std::accumulate(left_weights.begin(), left_weights.end(), 0.0);
+            double right_sum = std::accumulate(right_weights.begin(), right_weights.end(), 0.0);
+            double sep_variance = left_sum * variance(left_weights) + right_sum * variance(right_weights);
+            sep_variance /= left_sum + right_sum;
+            double joint_variance = variance(class_weights);
+            if (joint_variance < sep_variance - EPS) {
+                return make_unique<LeafNode>(class_weights);
+            } else {
+                return make_unique<InnerNode>(std::move(class_weights), std::move(left), std::move(right), sep);
+            }
         }
 
         std::unique_ptr<Node> buildSubtree(Bags& bags, Features& features, Labels& values) {
@@ -261,7 +277,7 @@ namespace vcf {
                 auto right = the_best_split_ever.second;
                 auto left_subtree = buildSubtree(left, features, values);
                 auto right_subtree = buildSubtree(right, features, values);
-                return prune(std::move(left_subtree), std::move(right_subtree), std::move(cs));
+                return prune(std::move(left_subtree), std::move(right_subtree), std::move(cs), best_split);
             }
         }
     };
