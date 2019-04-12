@@ -11,6 +11,12 @@
 namespace {
     typedef std::mt19937 Random;
 
+    template<typename T, typename ...Args>
+    std::unique_ptr<T> make_unique( Args&& ...args )
+    {
+        return std::unique_ptr<T>( new T( std::forward<Args>(args)... ) );
+    }
+
     class Node {
         std::vector<double> class_weights;
     public:
@@ -106,6 +112,7 @@ namespace vcf {
     typedef std::vector<std::vector<AlleleType>> Features;
     typedef std::vector<AlleleType> Labels;
     typedef std::pair<Bags, Bags> Split;
+    typedef std::unique_ptr<Node> NodePtr;
 
     class DecisionTree {
         const double EPS = 1e-8;
@@ -200,7 +207,27 @@ namespace vcf {
             return lr * score(split.first, labels) + rr * score(split.second, labels);
         }
 
-        Node buildSubtree(Bags& bags, Features& features, Labels& values) {
+        double variance(double a, double b, double c) {
+            // uniform prior (beta(1, 1, 1))
+            std::vector<double> alpha{a + 1, b + 1, c + 1};
+            double sum_alpha = std::accumulate(alpha.begin(), alpha.end(), 0.0);
+            std::vector<double> rel_alpha;
+            std::vector<double> variance;
+            std::for_each(alpha.begin(), alpha.end(), [&](double x) {
+                double alpha_hat = x / sum_alpha;
+                rel_alpha.push_back(alpha_hat);
+                variance.push_back((alpha_hat * (1 - alpha_hat)) / (sum_alpha + 1));
+            });
+
+            double cov_bc = (-rel_alpha[1] * rel_alpha[2]) / (sum_alpha + 1);
+            return variance[1] + 4 * variance[2] + 4 * cov_bc;
+        }
+
+        std::unique_ptr<Node> prune(NodePtr&& left, NodePtr&& right, std::vector<double>&& class_weights) {
+            
+        }
+
+        std::unique_ptr<Node> buildSubtree(Bags& bags, Features& features, Labels& values) {
             int k = std::floor(std::sqrt(features.size()));
             auto vars = sample(features.size(), k, random);
             int var_best = -1;
@@ -224,10 +251,17 @@ namespace vcf {
                 }
             }
 
+            auto cnts = counts(bags, values);
+            std::vector<double> cs{std::get<0>(cnts), std::get<1>(cnts), std::get<2>(cnts)};
             if (best_split == MISSING) {
-                auto cnts = counts(bags, values);
-                std::vector<double> cs{std::get<0>(cnts), std::get<1>(cnts), std::get<2>(cnts)};
-                return LeafNode(std::move(cs));
+                return make_unique<LeafNode>(std::move(cs));
+            } else {
+                auto the_best_split_ever = split(bags, best_split, features[var_best], values);
+                auto left = the_best_split_ever.first;
+                auto right = the_best_split_ever.second;
+                auto left_subtree = buildSubtree(left, features, values);
+                auto right_subtree = buildSubtree(right, features, values);
+                return prune(std::move(left_subtree), std::move(right_subtree), std::move(cs));
             }
         }
     };
