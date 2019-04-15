@@ -20,8 +20,10 @@ namespace vcf {
     public:
         explicit Node(std::vector<double>&& class_weights);
 
+        virtual double accuracy() const = 0;
         virtual double predict(std::vector<vcf::AlleleType>& features) = 0;
-        double weight(size_t cl);
+        virtual ~Node() = default;
+
         std::vector<double> weights();
 
     protected:
@@ -33,9 +35,12 @@ namespace vcf {
     class DecisionTree {
         NodePtr root;
     public:
+        DecisionTree(const DecisionTree&) = delete;
+        DecisionTree(DecisionTree&& other) noexcept;
         static constexpr double EPS = 1e-8;
 
         double predict(std::vector<AlleleType>& features);
+        double accuracy();
 
         friend class TreeBuilder;
     private:
@@ -50,11 +55,8 @@ namespace vcf {
         size_t max_features;
     public:
         TreeBuilder(Features& features, Labels& labels, size_t max_features);
-        DecisionTree make_tree(Random& random);
-
+        DecisionTree build_a_tree(Random& random);
     private:
-        NodePtr build_tree(Random& random);
-
         NodePtr buildSubtree(Bags& bags, Random& random);
 
     };

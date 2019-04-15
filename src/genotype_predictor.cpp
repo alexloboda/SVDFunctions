@@ -85,6 +85,36 @@ namespace {
         }
     }
 
+    double variance(const std::vector<double>& weights) {
+        // uniform prior (beta(1, 1, 1))
+        std::vector<double> alpha(weights.size());
+        std::transform(weights.begin(), weights.end(), alpha.begin(), [](double x) { return x + 1; });
+        double sum_alpha = std::accumulate(alpha.begin(), alpha.end(), 0.0);
+        std::vector<double> rel_alpha;
+        std::vector<double> variance;
+        std::for_each(alpha.begin(), alpha.end(), [&](double x) {
+            double alpha_hat = x / sum_alpha;
+            rel_alpha.push_back(alpha_hat);
+            variance.push_back((alpha_hat * (1 - alpha_hat)) / (sum_alpha + 1));
+        });
+
+        double cov_bc = (-rel_alpha[1] * rel_alpha[2]) / (sum_alpha + 1);
+        return variance[1] + 4 * variance[2] + 4 * cov_bc;
+    }
+
+    std::pair<double, double> weight_sums(const std::vector<double>& left_weights,
+                                          const std::vector<double>& right_weights) {
+        double left_sum = std::accumulate(left_weights.begin(), left_weights.end(), 0.0);
+        double right_sum = std::accumulate(right_weights.begin(), right_weights.end(), 0.0);
+        return {left_sum, right_sum};
+    }
+
+    double joint_variance(std::vector<double>& left_weights, std::vector<double>& right_weights) {
+        auto sums = weight_sums(left_weights, right_weights);
+        double sep_variance = sums.first * variance(left_weights) + sums.second * variance(right_weights);
+        return sep_variance / sums.first + sums.second;
+    }
+
     class InnerNode : public vcf::Node {
         NodePtr left_node;
         NodePtr right_node;
@@ -95,14 +125,15 @@ namespace {
         InnerNode(std::vector<double>&& class_weights, NodePtr& left_node, NodePtr& right_node, vcf::AlleleType sep,
                   int variable);
         double predict(std::vector<vcf::AlleleType>& features) override;
+        double accuracy() const override;
     };
 
     class LeafNode : public vcf::Node {
     public:
         explicit LeafNode(std::vector<double>&& class_weights);
         double predict(std::vector<vcf::AlleleType>& features) override;
+        double accuracy() const override;
     };
-
 
     InnerNode::InnerNode(std::vector<double>&& class_weights, NodePtr& left_node, NodePtr& right_node,
                          vcf::AlleleType sep, int variable)
@@ -130,10 +161,20 @@ namespace {
         }
     }
 
+    double InnerNode::accuracy() const {
+        auto sums = weight_sums(left_node->weights(), right_node->weights());
+        double sum = sums.first + sums.second;
+        return (sums.first / sum) * left_node->accuracy() + (sums.second / sum) * right_node->accuracy();
+    }
+
     LeafNode::LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {}
 
     double LeafNode::predict(std::vector<vcf::AlleleType>& features) {
         return prediction(class_weights);
+    }
+
+    double LeafNode::accuracy() const {
+        return variance(class_weights);
     }
 
     typedef std::pair<Bags, Bags> Split;
@@ -223,33 +264,13 @@ namespace {
         return lr * score(split.first, labels) + rr * score(split.second, labels);
     }
 
-    double variance(const std::vector<double>& weights) {
-        // uniform prior (beta(1, 1, 1))
-        std::vector<double> alpha(weights.size());
-        std::transform(weights.begin(), weights.end(), alpha.begin(), [](double x) { return x + 1; });
-        double sum_alpha = std::accumulate(alpha.begin(), alpha.end(), 0.0);
-        std::vector<double> rel_alpha;
-        std::vector<double> variance;
-        std::for_each(alpha.begin(), alpha.end(), [&](double x) {
-            double alpha_hat = x / sum_alpha;
-            rel_alpha.push_back(alpha_hat);
-            variance.push_back((alpha_hat * (1 - alpha_hat)) / (sum_alpha + 1));
-        });
-
-        double cov_bc = (-rel_alpha[1] * rel_alpha[2]) / (sum_alpha + 1);
-        return variance[1] + 4 * variance[2] + 4 * cov_bc;
-    }
-
     NodePtr prune(NodePtr left, NodePtr right, std::vector<double>&& class_weights, AlleleType sep,
                                 int variable) {
         auto left_weights = left->weights();
         auto right_weights = right->weights();
-        double left_sum = std::accumulate(left_weights.begin(), left_weights.end(), 0.0);
-        double right_sum = std::accumulate(right_weights.begin(), right_weights.end(), 0.0);
-        double sep_variance = left_sum * variance(left_weights) + right_sum * variance(right_weights);
-        sep_variance /= left_sum + right_sum;
-        double joint_variance = variance(class_weights);
-        if (joint_variance < sep_variance - vcf::DecisionTree::EPS) {
+        double sep_variance = joint_variance(left_weights, right_weights);
+        double common_variance = variance(class_weights);
+        if (common_variance < sep_variance - vcf::DecisionTree::EPS) {
             return std::make_shared<LeafNode>(std::move(class_weights));
         } else {
             return std::make_shared<InnerNode>(std::move(class_weights), left, right, sep, variable);
@@ -266,11 +287,13 @@ namespace vcf {
 
     DecisionTree::DecisionTree(NodePtr root) :root(std::move(root)) {}
 
-    Node::Node(std::vector<double>&& class_weights) :class_weights(std::move(class_weights)){}
+    DecisionTree::DecisionTree(DecisionTree&& other) noexcept :root(std::move(other.root)){}
 
-    double Node::weight(size_t cl) {
-        return class_weights[cl];
+    double DecisionTree::accuracy() {
+        return root->accuracy();
     }
+
+    Node::Node(std::vector<double>&& class_weights) :class_weights(std::move(class_weights)){}
 
     std::vector<double> Node::weights() {
         return class_weights;
@@ -287,12 +310,9 @@ namespace vcf {
     TreeBuilder::TreeBuilder(Features& features, Labels& labels, size_t max_features) :features(features), values(labels),
                                                                                        max_features(max_features){}
 
-    NodePtr TreeBuilder::build_tree(Random& random) {
+    DecisionTree TreeBuilder::build_a_tree(Random& random) {
         Bags bags(values.size(), random);
-        return buildSubtree(bags, random);
-    }
-
-    DecisionTree TreeBuilder::make_tree(Random& random) {
+        return DecisionTree(buildSubtree(bags, random));
     }
 
     NodePtr TreeBuilder::buildSubtree(Bags& bags, Random& random) {
