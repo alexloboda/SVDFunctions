@@ -2,6 +2,7 @@
 
 #include "include/genotype_predictor.h"
 #include "include/vcf_primitives.h"
+#include <iostream>
 
 namespace {
     class Sample {
@@ -87,19 +88,22 @@ namespace {
 
     double variance(const std::vector<double>& weights) {
         // uniform prior (beta(1, 1, 1))
+        assert(weights.size() == 3);
+        double sum_alpha = std::accumulate(weights.begin(), weights.end(), 0.0) + weights.size();
         std::vector<double> alpha(weights.size());
-        std::transform(weights.begin(), weights.end(), alpha.begin(), [](double x) { return x + 1; });
-        double sum_alpha = std::accumulate(alpha.begin(), alpha.end(), 0.0);
-        std::vector<double> rel_alpha;
-        std::vector<double> variance;
-        std::for_each(alpha.begin(), alpha.end(), [&](double x) {
-            double alpha_hat = x / sum_alpha;
-            rel_alpha.push_back(alpha_hat);
-            variance.push_back((alpha_hat * (1 - alpha_hat)) / (sum_alpha + 1));
+        std::transform(weights.begin(), weights.end(), alpha.begin(), [&sum_alpha](double x) {
+            return (x + 1) / sum_alpha;
         });
-
-        double cov_bc = (-rel_alpha[1] * rel_alpha[2]) / (sum_alpha + 1);
-        return variance[1] + 4 * variance[2] + 4 * cov_bc;
+        // linear model
+        double mean = 0.0;
+        for (int i = 0; i < weights.size(); i++) {
+            mean += i * alpha[i];
+        }
+        double error = 0.0;
+        for (int i = 0; i < weights.size(); i++) {
+            error += alpha[i] * (i - mean) * (i - mean);
+        }
+        return error;
     }
 
     std::pair<double, double> weight_sums(const std::vector<double>& left_weights,
@@ -307,8 +311,16 @@ namespace vcf {
     TreeBuilder::TreeBuilder(Features& features, Labels& labels, size_t max_features) :features(features), values(labels),
                                                                                        max_features(max_features){}
 
-    DecisionTree TreeBuilder::build_a_tree(Random& random) {
-        Bags bags(values.size(), random);
+    DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) {
+        if (bagging) {
+            Bags bags(values.size(), random);
+            return DecisionTree(buildSubtree(bags, random));
+        }
+
+        Bags bags;
+        for (int i = 0; i < values.size(); i++) {
+            bags.add(i, 1.0);
+        }
         return DecisionTree(buildSubtree(bags, random));
     }
 
