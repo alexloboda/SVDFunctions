@@ -16,11 +16,12 @@ namespace vcf {
     class Node {
     protected:
         std::vector<double> class_weights;
+        double acc;
 
     public:
         explicit Node(std::vector<double>&& class_weights);
 
-        virtual double accuracy() const = 0;
+        double accuracy();
         virtual double predict(std::vector<vcf::AlleleType>& features) = 0;
         virtual ~Node() = default;
 

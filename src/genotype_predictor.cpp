@@ -109,12 +109,6 @@ namespace {
         return {left_sum, right_sum};
     }
 
-    double joint_variance(std::vector<double>& left_weights, std::vector<double>& right_weights) {
-        auto sums = weight_sums(left_weights, right_weights);
-        double sep_variance = sums.first * variance(left_weights) + sums.second * variance(right_weights);
-        return sep_variance / sums.first + sums.second;
-    }
-
     class InnerNode : public vcf::Node {
         NodePtr left_node;
         NodePtr right_node;
@@ -125,20 +119,22 @@ namespace {
         InnerNode(std::vector<double>&& class_weights, NodePtr& left_node, NodePtr& right_node, vcf::AlleleType sep,
                   int variable);
         double predict(std::vector<vcf::AlleleType>& features) override;
-        double accuracy() const override;
+        static double joint_accuracy(NodePtr& left_node, NodePtr& right_node);
     };
 
     class LeafNode : public vcf::Node {
     public:
         explicit LeafNode(std::vector<double>&& class_weights);
         double predict(std::vector<vcf::AlleleType>& features) override;
-        double accuracy() const override;
     };
+
 
     InnerNode::InnerNode(std::vector<double>&& class_weights, NodePtr& left_node, NodePtr& right_node,
                          vcf::AlleleType sep, int variable)
             :Node(std::move(class_weights)), left_node(left_node), right_node(right_node), var(variable),
-             separator(sep) {}
+             separator(sep) {
+        acc = joint_accuracy(left_node, right_node);
+    }
 
     double InnerNode::predict(std::vector<vcf::AlleleType>& features) {
         vcf::AlleleType allele = features[var];
@@ -161,20 +157,18 @@ namespace {
         }
     }
 
-    double InnerNode::accuracy() const {
+    double InnerNode::joint_accuracy(NodePtr& left_node, NodePtr& right_node) {
         auto sums = weight_sums(left_node->weights(), right_node->weights());
         double sum = sums.first + sums.second;
-        return (sums.first / sum) * left_node->accuracy() + (sums.second / sum) * right_node->accuracy();
+        return  (sums.first / sum) * left_node->accuracy() + (sums.second / sum) * right_node->accuracy();
     }
 
-    LeafNode::LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {}
+    LeafNode::LeafNode(std::vector<double>&& class_weights) :Node(std::move(class_weights)) {
+        acc = variance(weights());
+    }
 
     double LeafNode::predict(std::vector<vcf::AlleleType>& features) {
         return prediction(class_weights);
-    }
-
-    double LeafNode::accuracy() const {
-        return variance(class_weights);
     }
 
     typedef std::pair<Bags, Bags> Split;
@@ -266,11 +260,9 @@ namespace {
 
     NodePtr prune(NodePtr left, NodePtr right, std::vector<double>&& class_weights, AlleleType sep,
                                 int variable) {
-        auto left_weights = left->weights();
-        auto right_weights = right->weights();
-        double sep_variance = joint_variance(left_weights, right_weights);
         double common_variance = variance(class_weights);
-        if (common_variance < sep_variance - vcf::DecisionTree::EPS) {
+        double joint_variance = InnerNode::joint_accuracy(left, right);
+        if (common_variance < joint_variance - vcf::DecisionTree::EPS) {
             return std::make_shared<LeafNode>(std::move(class_weights));
         } else {
             return std::make_shared<InnerNode>(std::move(class_weights), left, right, sep, variable);
@@ -307,6 +299,11 @@ namespace vcf {
         });
         return alpha[1] + 2 * alpha[2];
     }
+
+    double Node::accuracy() {
+        return acc;
+    }
+
     TreeBuilder::TreeBuilder(Features& features, Labels& labels, size_t max_features) :features(features), values(labels),
                                                                                        max_features(max_features){}
 
