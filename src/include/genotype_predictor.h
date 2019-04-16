@@ -2,11 +2,12 @@
 #define SRC_GENOTYPE_PREDICTOR_H
 
 #include <vector>
-#include "vcf_primitives.h"
 #include <random>
 #include <algorithm>
 #include <exception>
 #include <cmath>
+
+#include "vcf_primitives.h"
 
 namespace vcf {
     typedef std::vector<std::vector<vcf::AlleleType>> Features;
@@ -62,6 +63,12 @@ namespace vcf {
 
     };
 
+    class RandomForest {
+        std::vector<DecisionTree> predictors;
+    public:
+        RandomForest(TreeBuilder& treeBuilder, size_t threads, size_t trees = 100);
+        double predict(std::vector<AlleleType>& features);
+    };
 }
 
 #endif //SRC_GENOTYPE_PREDICTOR_H

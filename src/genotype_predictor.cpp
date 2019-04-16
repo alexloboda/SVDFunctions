@@ -2,7 +2,7 @@
 
 #include "include/genotype_predictor.h"
 #include "include/vcf_primitives.h"
-#include <iostream>
+#include "include/cxxpool.h"
 
 namespace {
     class Sample {
@@ -359,5 +359,28 @@ namespace vcf {
             auto right_subtree = buildSubtree(right, random);
             return prune(left_subtree, right_subtree, std::move(cs), best_split, var_best);
         }
+    }
+
+
+    RandomForest::RandomForest(TreeBuilder& treeBuilder, size_t threads, size_t ntrees) {
+        cxxpool::thread_pool pool{threads};
+        std::vector<std::future<DecisionTree>> futures;
+        for (int i = 0; i < ntrees; i++) {
+            Random random(rand());
+            futures.push_back(pool.push([random, &treeBuilder]() mutable -> DecisionTree {
+                return treeBuilder.build_a_tree(random);
+            }));
+        }
+        for (int i = 0; i < ntrees; i++) {
+            predictors.push_back(futures[i].get());
+        }
+    }
+
+    double RandomForest::predict(std::vector<AlleleType>& features) {
+        double sum = 0.0;
+        for (DecisionTree& tree: predictors) {
+            sum += tree.predict(features);
+        }
+        return sum / predictors.size();
     }
 }
