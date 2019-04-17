@@ -44,6 +44,7 @@ namespace vcf {
         int num() const;
 
         friend bool operator==(const Chromosome& chr, const Chromosome& other);
+        friend bool operator!=(const Chromosome& chr, const Chromosome& other);
     };
 
     class Position {

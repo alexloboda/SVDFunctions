@@ -135,6 +135,10 @@ namespace vcf {
         return chr.chr == other.chr;
     }
 
+    bool operator!=(const Chromosome& chr, const Chromosome& other) {
+        return chr.chr != other.chr;
+    }
+
     Chromosome::operator std::string() const {
         string str_rep = "chr";
         if (chr == chrX) {

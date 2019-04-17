@@ -29,9 +29,17 @@ namespace vcf {
         double weights_sum = 0.0;
 
     public:
-        Bags(size_t size, Random& random) {
+        Bags(const Labels& lbls, Random& random) {
+            std::vector<size_t> idx;
+            for (int i = 0; i < lbls.size(); i++) {
+                if (lbls[i] != MISSING) {
+                    idx.push_back(i);
+                }
+            }
+
+            auto size = idx.size();
             for (int i = 0; i < size; i++) {
-                bags.push_back(random() % size);
+                bags.push_back(idx[random() % size]);
                 weights.resize(size, 1.0);
             }
             weights_sum = size;
@@ -308,18 +316,20 @@ namespace vcf {
         return acc;
     }
 
-    TreeBuilder::TreeBuilder(Features& features, Labels& labels, size_t max_features) :features(features), values(labels),
-                                                                                       max_features(max_features){}
+    TreeBuilder::TreeBuilder(const Features& features, Labels& labels, size_t max_features) :features(features),
+                                                            values(labels), max_features(max_features){}
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) {
         if (bagging) {
-            Bags bags(values.size(), random);
+            Bags bags(values, random);
             return DecisionTree(buildSubtree(bags, random));
         }
 
         Bags bags;
         for (int i = 0; i < values.size(); i++) {
-            bags.add(i, 1.0);
+            if (values[i] != MISSING) {
+                bags.add(i, 1.0);
+            }
         }
         return DecisionTree(buildSubtree(bags, random));
     }

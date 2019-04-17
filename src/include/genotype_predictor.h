@@ -52,11 +52,11 @@ namespace vcf {
     class Bags;
 
     class TreeBuilder {
-        const Features features;
-        const Labels values;
+        const Features& features;
+        const Labels& values;
         size_t max_features;
     public:
-        TreeBuilder(Features& features, Labels& labels, size_t max_features);
+        TreeBuilder(const Features& features, Labels& labels, size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true);
     private:
         NodePtr buildSubtree(Bags& bags, Random& random);
