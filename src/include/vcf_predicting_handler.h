@@ -9,21 +9,21 @@ namespace vcf {
         Features features;
         std::vector<Variant> variants;
         size_t max_size;
+        size_t max_size_kb;
+        size_t start;
     public:
-        explicit Window(size_t max_size);
+        explicit Window(size_t max_size, size_t max_size_kb);
         void clear();
-        void add(std::vector<AlleleType>& alleles, Variant& variant);
+        void add(const std::vector<AlleleType>& alleles, const Variant& variant);
         std::pair<Features, Labels> dataset(const Variant& v);
     };
 
     class PredictingHandler : public VariantsHandler {
-        const int window_size_kb;
-        const int window_size;
-
         GenotypeMatrixHandler& gh;
         Chromosome curr_chr;
         std::unordered_map<int, std::set<Range>> ranges;
         GenotypeMatrixIterator iterator;
+        Window window;
 
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
