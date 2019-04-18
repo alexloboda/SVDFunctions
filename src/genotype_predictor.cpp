@@ -81,19 +81,6 @@ namespace {
     using vcf::NodePtr;
     using vcf::Bags;
 
-    int to_int(vcf::AlleleType type) {
-        switch(type) {
-            case vcf::HOMREF:
-                return 0;
-            case vcf::HET:
-                return 1;
-            case vcf::HOM:
-                return 2;
-            case vcf::MISSING:
-                return 3;
-        }
-    }
-
     double variance(const std::vector<double>& weights) {
         // uniform prior (beta(1, 1, 1))
         assert(weights.size() == 3);
@@ -372,7 +359,8 @@ namespace vcf {
     }
 
 
-    RandomForest::RandomForest(TreeBuilder& treeBuilder, size_t threads, size_t ntrees) {
+    RandomForest::RandomForest(TreeBuilder& treeBuilder, size_t ntrees) {
+        size_t threads = std::thread::hardware_concurrency();
         cxxpool::thread_pool pool{threads};
         std::vector<std::future<DecisionTree>> futures;
         for (int i = 0; i < ntrees; i++) {

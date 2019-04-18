@@ -71,9 +71,9 @@ namespace vcf {
         if (!MAC_filter(alleles)) {
             return;
         }
-        vector<AlleleType> row;
+        vector<float> row;
         for (const Allele& allele: alleles) {
-            row.push_back(allele.alleleType());
+            row.push_back(to_int(allele.alleleType()));
         }
         gmatrix.push_back(row);
         variants.push_back(variant);
@@ -122,7 +122,7 @@ namespace vcf {
 
     GenotypeMatrixIterator::GenotypeMatrixIterator(GenotypeMatrixHandler& gh) :pos(0), gh(gh) {}
 
-    bool GenotypeMatrixIterator::has_next() {
+    bool GenotypeMatrixIterator::dereferencable() {
         return pos < gh.variants.size() - 1;
     }
 
@@ -131,7 +131,7 @@ namespace vcf {
         return *this;
     }
 
-    void GenotypeMatrixIterator::set(std::vector<AlleleType>& genotypes) {
+    void GenotypeMatrixIterator::set(std::vector<float>& genotypes) {
         gh.gmatrix[pos] = genotypes;
     }
 

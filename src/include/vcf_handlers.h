@@ -39,16 +39,16 @@ namespace vcf {
     public:
         explicit GenotypeMatrixIterator(GenotypeMatrixHandler& gh);
         Variant operator*();
-        void set(std::vector<AlleleType>& genotypes);
+        void set(std::vector<float>& genotypes);
         GenotypeMatrixIterator& operator++();
-        bool has_next();
+        bool dereferencable();
     };
 
     class GenotypeMatrixHandler: public VariantsHandler {
         const double EPS = 1e-8;
         const double MISSING_RATE_THRESHOLD = 0.1 + EPS;
     protected:
-        std::vector<std::vector<AlleleType>> gmatrix;
+        std::vector<std::vector<float>> gmatrix;
         std::vector<Variant> variants;
         std::unordered_set<Variant> available_variants;
         VCFFilterStats& stats;

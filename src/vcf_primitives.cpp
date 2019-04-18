@@ -21,6 +21,19 @@ namespace vcf {
         return pos.chr == other.chr && pos.pos == other.pos;
     }
 
+    int to_int(vcf::AlleleType type) {
+        switch(type) {
+            case vcf::HOMREF:
+                return 0;
+            case vcf::HET:
+                return 1;
+            case vcf::HOM:
+                return 2;
+            case vcf::MISSING:
+                return 3;
+        }
+    }
+
     Position::operator std::string() const {
         return (string)chr + ":" + to_string(pos);
     }

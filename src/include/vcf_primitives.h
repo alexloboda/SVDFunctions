@@ -102,6 +102,7 @@ namespace vcf {
     };
 
     enum AlleleType {HOMREF, HET, HOM, MISSING};
+    int to_int(AlleleType allele);
 
     class Allele {
         unsigned depth;

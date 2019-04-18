@@ -192,8 +192,15 @@ namespace {
 
 namespace vcf {
 
-    void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler) {
-        handlers.push_back(handler);
+    void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
+        int i_ins = 0;
+        for (int i = 0; i < handlers.size(); i++) {
+            if (handlers[i].second >= order) {
+                i_ins = i;
+            }
+        }
+        handlers.emplace_back(handler, order);
+        std::swap(handlers[handlers.size() - 1], handlers[i_ins]);
     }
 
     VCFParser::VCFParser(std::istream& input, const VCFFilter& filter, VCFFilterStats& stats) :filter(filter),
@@ -250,7 +257,7 @@ namespace vcf {
     bool VCFParser::is_of_interest(const Variant& var) {
         bool interesting = false;
         for (const auto& handler: handlers) {
-            interesting |= handler->isOfInterest(var);
+            interesting |= handler.first->isOfInterest(var);
         }
         return interesting;
     }
@@ -302,7 +309,7 @@ namespace vcf {
                         alleles.push_back(format.parse(tokens.at(sample), i + 1, filter, stats));
                     }
                     for (auto& handler: handlers) {
-                        handler->processVariant(variant, alleles);
+                        handler.first->processVariant(variant, alleles);
                     }
                 }
             } catch (const ParserException& e) {

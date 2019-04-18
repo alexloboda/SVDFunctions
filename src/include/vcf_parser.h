@@ -17,7 +17,7 @@ namespace vcf {
 
         VCFFilter filter;
 
-        std::vector<std::shared_ptr<VariantsHandler>> handlers;
+        std::vector<std::pair<std::shared_ptr<VariantsHandler>, int>> handlers;
         std::istream& input;
         std::vector<std::string> samples;
         std::vector<int> filtered_samples;
@@ -35,7 +35,7 @@ namespace vcf {
         VCFParser(std::istream& input, const VCFFilter& filter, VCFFilterStats& stats);
         void parse_header();
         void parse_genotypes();
-        void register_handler(std::shared_ptr<VariantsHandler> handler);
+        void register_handler(std::shared_ptr<VariantsHandler> handler, int order);
 
         std::vector<std::string> sample_names();
 };

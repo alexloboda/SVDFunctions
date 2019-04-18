@@ -144,7 +144,7 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @export
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
-                    returnGenotypeMatrix = TRUE, 
+                    returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
   stopifnot(length(DP) > 0)
@@ -178,7 +178,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   tryCatch(
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                     returnGenotypeMatrix, regions, binaryPathPrefix),
+                     returnGenotypeMatrix, isTRUE(predictMissing),
+                     regions, binaryPathPrefix),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {

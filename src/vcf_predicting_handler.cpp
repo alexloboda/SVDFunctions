@@ -36,26 +36,53 @@ namespace vcf {
     }
 
     void PredictingHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
-        std::vector<AlleleType> sample;
-        std::for_each(alleles.begin(), alleles.end(), [&sample](const Allele& allele){
-            sample.push_back(allele.alleleType());
-        });
         Position pos = variant.position();
         if (pos.chromosome() != curr_chr) {
             cleanup();
             curr_chr = pos.chromosome();
         }
+
+        std::vector<AlleleType> sample;
+        std::for_each(alleles.begin(), alleles.end(), [&sample](const Allele& allele){
+            sample.push_back(allele.alleleType());
+        });
         window.add(sample, variant);
+        if (window.is_full()) {
+            while (iterator.dereferencable() && (*iterator).position().position() <= window.middle_point()) {
+                auto dataset = window.dataset(*iterator);
+                fix_labels(dataset);
+            }
+        }
+
     }
 
     void PredictingHandler::cleanup() {
-        for(; iterator.has_next(); ++iterator) {
+        for(; iterator.dereferencable(); ++iterator) {
             Variant var = *iterator;
             auto dataset = window.dataset(var);
+            fix_labels(dataset);
         }
     }
 
-    Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), max_size_kb(max_size_kb) {}
+    void PredictingHandler::fix_labels(std::pair<Features, Labels>& dataset) {
+        size_t mtry = ceil(sqrt(dataset.first.size()));
+        TreeBuilder tree_builder{dataset.first, dataset.second, mtry};
+        RandomForest forest{tree_builder};
+        std::vector<double> labels;
+        for (int i = 0; i < labels.size(); i++) {
+            if (labels[i] == MISSING) {
+                std::vector<AlleleType> features;
+                for (int j = 0; j < features.size(); j++) {
+                    features.push_back(dataset.first[j][i]);
+                }
+                labels[i] = forest.predict(features);
+            } else {
+
+            }
+        }
+    }
+
+    Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), max_size_kb(max_size_kb), start(0) {}
 
     void Window::clear() {
         features.clear();
@@ -84,12 +111,21 @@ namespace vcf {
             variants.push_back(variant);
             features.push_back(alleles);
         } else {
-            variants[start] = variant;
-            features[start] = alleles;
-            ++start;
-            if (start == max_size) {
-                start = 0;
-            }
+            variants.pop_front();
+            features.pop_front();
+            variants.push_back(variant);
+            features.push_back(alleles);
         }
+    }
+
+    int Window::middle_point() {
+        if (variants.empty()) {
+            return -1;
+        }
+        return variants[variants.size() / 2].position().position();
+    }
+
+    bool Window::is_full() {
+        return features.size() == max_size;
     }
 }

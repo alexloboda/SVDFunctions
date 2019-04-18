@@ -8,6 +8,7 @@
 #include "include/zstr/zstr.hpp"
 #include "include/zstr/strict_fstream.hpp"
 #include "include/vcf_stats.h"
+#include "include/vcf_predicting_handler.h"
 
 namespace {
     using namespace Rcpp;
@@ -108,7 +109,8 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
-               const CharacterVector& regions, const CharacterVector& binary_prefix) {
+               const LogicalVector& predictMissing, const CharacterVector& regions,
+               const CharacterVector& binary_prefix) {
     List ret;
     try {
         const char *name = filename[0];
@@ -130,18 +132,21 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                 vs.insert(vs.end(), variants.begin(), variants.end());
             });
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
-            parser.register_handler(gmatrix_handler);
+            parser.register_handler(gmatrix_handler, 1);
+            if (predictMissing[0]) {
+                parser.register_handler(make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100), 2);
+            }
         }
 
         if (regions.length() > 0) {
             callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
-            parser.register_handler(callrate_handler);
+            parser.register_handler(callrate_handler, 1);
         }
 
         if (binary_prefix.length() > 0) {
             string prefix = string(binary_prefix[0]);
             binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
-            parser.register_handler(binary_handler);
+            parser.register_handler(binary_handler, 1);
         }
 
         if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
