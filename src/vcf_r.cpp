@@ -3,6 +3,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 #include <fstream>
+#include <gperftools/profiler.h>
 
 #include "include/vcf_binary.h"
 #include "include/zstr/zstr.hpp"
@@ -28,13 +29,13 @@ namespace {
     public:
         using GenotypeMatrixHandler::GenotypeMatrixHandler;
 
-        IntegerMatrix result() {
-            IntegerMatrix res(gmatrix.size(), samples.size());
+        NumericMatrix result() {
+            NumericMatrix res(gmatrix.size(), samples.size());
             for (int i = 0; i < gmatrix.size(); i++) {
                 for (int j = 0; j < samples.size(); j++) {
-                    int val = gmatrix[i][j];
-                    if (val == vcf::MISSING) {
-                        val = NA_INTEGER;
+                    float val = gmatrix[i][j];
+                    if (val == to_int(vcf::MISSING)) {
+                        val = NA_REAL;
                     }
                     res[j * gmatrix.size() + i] = val;
                 }
@@ -111,6 +112,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix) {
+    //ProfilerStart("a.prof");
     List ret;
     try {
         const char *name = filename[0];
@@ -124,6 +126,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
+        shared_ptr<PredictingHandler> predicting_handler;
 
         if (gmatrix[0]) {
             vector<Variant> vs;
@@ -134,7 +137,8 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                parser.register_handler(make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100), 2);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100);
+                parser.register_handler(predicting_handler, 2);
             }
         }
 
@@ -154,6 +158,9 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         }
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
         if (gmatrix[0]) {
+            if (predictMissing[0]) {
+                predicting_handler->cleanup();
+            }
             ret["genotype"] = gmatrix_handler->result();
         }
         if (regions.length() > 0) {
@@ -167,6 +174,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }
+    //ProfilerStop();
     return ret;
 }
 

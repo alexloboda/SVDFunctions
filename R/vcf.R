@@ -94,10 +94,10 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' @export
 genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
                               samples = NULL, bannedPositions = NULL,
-                              verbose = FALSE) {
+                              predictMissing = FALSE, verbose = FALSE) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
           bannedPositions = bannedPositions, variants = variants,
-          verbose = verbose)$genotype
+          verbose = verbose, predictMissing = predictMissing)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -176,7 +176,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
   
-  tryCatch(
+  tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing),
                      regions, binaryPathPrefix),

@@ -123,7 +123,7 @@ namespace vcf {
     GenotypeMatrixIterator::GenotypeMatrixIterator(GenotypeMatrixHandler& gh) :pos(0), gh(gh) {}
 
     bool GenotypeMatrixIterator::dereferencable() {
-        return pos < gh.variants.size() - 1;
+        return pos < gh.variants.size();
     }
 
     GenotypeMatrixIterator& GenotypeMatrixIterator::operator++() {

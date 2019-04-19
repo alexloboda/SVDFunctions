@@ -1,5 +1,6 @@
 #include "include/vcf_predicting_handler.h"
 #include "include/genotype_predictor.h"
+#include <iostream>
 
 namespace vcf {
     void insert(Range r, std::set<Range>& ranges) {
@@ -36,6 +37,9 @@ namespace vcf {
     }
 
     void PredictingHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
+        if (!isOfInterest(variant)) {
+            return;
+        }
         Position pos = variant.position();
         if (pos.chromosome() != curr_chr) {
             cleanup();
@@ -51,6 +55,7 @@ namespace vcf {
             while (iterator.dereferencable() && (*iterator).position().position() <= window.middle_point()) {
                 auto dataset = window.dataset(*iterator);
                 fix_labels(dataset);
+                ++iterator;
             }
         }
 
@@ -62,24 +67,28 @@ namespace vcf {
             auto dataset = window.dataset(var);
             fix_labels(dataset);
         }
+        window.clear();
     }
 
     void PredictingHandler::fix_labels(std::pair<Features, Labels>& dataset) {
         size_t mtry = ceil(sqrt(dataset.first.size()));
+        std::cout << mtry << std::endl;
         TreeBuilder tree_builder{dataset.first, dataset.second, mtry};
         RandomForest forest{tree_builder};
-        std::vector<double> labels;
-        for (int i = 0; i < labels.size(); i++) {
-            if (labels[i] == MISSING) {
+        std::vector<float> labels;
+        for (int i = 0; i < dataset.second.size(); i++) {
+            AlleleType curr = dataset.second[i];
+            if (curr == MISSING) {
                 std::vector<AlleleType> features;
-                for (int j = 0; j < features.size(); j++) {
+                for (int j = 0; j < dataset.first.size(); j++) {
                     features.push_back(dataset.first[j][i]);
                 }
-                labels[i] = forest.predict(features);
+                labels.push_back(forest.predict(features));
             } else {
-
+                labels.push_back(to_int(curr));
             }
         }
+        iterator.set(labels);
     }
 
     Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), max_size_kb(max_size_kb), start(0) {}
@@ -93,15 +102,21 @@ namespace vcf {
     std::pair<Features, Labels> Window::dataset(const Variant& v) {
         Features fs;
         Labels lbls;
+        size_t curr_num = -1;
         for (int i = 0; i < variants.size(); i++) {
             if (variants[i] == v) {
-                lbls = features[i];
-            } else {
-                fs.push_back(features[i]);
+                curr_num = i;
             }
         }
-        if (lbls.empty()) {
+        if (curr_num == -1) {
             throw std::logic_error("No values for training set. Potentially unreachable code.");
+        }
+        lbls = features[curr_num];
+        for (int i = 0; i < features.size(); i++) {
+            if (i != curr_num) {
+                std::vector<AlleleType> row;
+                fs.push_back(features[i]);
+            }
         }
         return {std::move(fs), std::move(lbls)};
     }

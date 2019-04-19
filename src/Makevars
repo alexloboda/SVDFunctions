@@ -1,3 +1,4 @@
-PKG_LIBS = -lz
+PKG_LIBS = -lz -lprofiler
 
 CXX_STD = CXX11
+PKG_CXXFLAGS = -g -O2

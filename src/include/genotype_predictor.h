@@ -59,14 +59,14 @@ namespace vcf {
         TreeBuilder(const Features& features, Labels& labels, size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true);
     private:
-        NodePtr buildSubtree(Bags& bags, Random& random);
+        NodePtr buildSubtree(const Bags& bags, Random& random, int depth);
 
     };
 
     class RandomForest {
         std::vector<DecisionTree> predictors;
     public:
-        RandomForest(TreeBuilder& treeBuilder, size_t trees = 100);
+        RandomForest(TreeBuilder& treeBuilder, size_t trees = 2);
         double predict(std::vector<AlleleType>& features);
     };
 }

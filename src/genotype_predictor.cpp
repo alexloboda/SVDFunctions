@@ -11,11 +11,11 @@ namespace {
     public:
         Sample(int num, double weight) :num(num), w(weight){}
 
-        int sample() {
+        int sample() const {
             return num;
         }
 
-        double weight() {
+        double weight() const {
             return w;
         }
     };
@@ -24,8 +24,7 @@ namespace {
 namespace vcf {
 
     class Bags {
-        std::vector<int> bags;
-        std::vector<double> weights;
+        std::vector<Sample> samples;
         double weights_sum = 0.0;
 
     public:
@@ -39,30 +38,26 @@ namespace vcf {
 
             auto size = idx.size();
             for (int i = 0; i < size; i++) {
-                bags.push_back(idx[random() % size]);
-                weights.resize(size, 1.0);
+                samples.emplace_back(idx[random() % size], 1.0);
             }
             weights_sum = size;
         }
 
         Bags() = default;
+        Bags(const Bags&) = delete;
+        Bags& operator=(const Bags&) = delete;
+        Bags(Bags&& other) :samples(std::move(other.samples)), weights_sum(other.weights_sum){}
 
         void add(int sample, double weight) {
-            bags.push_back(sample);
-            weights.push_back(weight);
+            samples.emplace_back(sample, weight);
             weights_sum += weight;
         }
 
-        std::vector<Sample> list() {
-            std::vector<Sample> ret;
-            ret.reserve(bags.size());
-            for (int i = 0; i < bags.size(); i++) {
-                ret.emplace_back(bags[i], weights[i]);
-            }
-            return ret;
+        const std::vector<Sample>& list() const {
+            return samples;
         }
 
-        double sum() {
+        double sum() const {
             return weights_sum;
         }
     };
@@ -170,62 +165,129 @@ namespace {
         return prediction(class_weights);
     }
 
-    typedef std::pair<Bags, Bags> Split;
-
-    std::tuple<double, double, double> counts(Bags& bags, const Labels& labels) {
-        double hom = 0.0;
-        double het = 0.0;
-        double alt = 0.0;
-        for (auto s: bags.list()) {
-            switch (labels[s.sample()]){
-                case HOM:
-                    alt += s.weight();
+    class Counts {
+        double homref_counts = 0.0;
+        double het_counts = 0.0;
+        double alt_counts = 0.0;
+    public:
+        Counts() = default;
+        void add(AlleleType type, double weight) {
+            switch (type) {
+                case HOMREF:
+                    homref_counts += weight;
                     break;
                 case HET:
-                    het += s.weight();
+                    het_counts += weight;
                     break;
-                case HOMREF:
-                    hom += s.weight();
+                case HOM:
+                    alt_counts += weight;
                     break;
                 case MISSING:
-                    throw std::logic_error("Predictable values must not be NAs");
+                    throw std::logic_error("Unreachable statement int class Counts");
             }
         }
-        return {hom, het, alt};
+
+        double ref() const {
+            return homref_counts;
+        }
+
+        double het() const {
+            return het_counts;
+        }
+
+        double alt() const {
+            return alt_counts;
+        }
+
+        double hom_ratio() const {
+            return homref_counts / sum();
+        }
+
+        double het_ratio() const {
+            return het_counts / sum();
+        }
+
+        double alt_ratio() const {
+            return alt_counts / sum();
+        }
+
+        double entropy() const {
+            std::vector<double> ratios{hom_ratio(), het_ratio(), alt_ratio()};
+            double ret = 0.0;
+            for (double r: ratios) {
+                if (r > vcf::DecisionTree::EPS) {
+                    ret -= r * std::log(r);
+                }
+            }
+            return ret;
+        }
+
+        double sum() const {
+            return homref_counts + het_counts + alt_counts;
+        }
+    };
+
+    class Split {
+        Bags l;
+        Bags r;
+        double gain;
+    public:
+        Split(Bags&& left, Bags&& right, double gain) :l(std::move(left)), r(std::move(right)), gain(gain) {}
+        Split(Split&& other) :l(std::move(other.l)), r(std::move(other.r)), gain(other.gain) {}
+        const Bags& left() {
+            return l;
+        }
+        const Bags& right() {
+            return r;
+        }
+
+        double score() {
+            return gain;
+        }
+    };
+
+
+    Counts counts(const Bags& bags, const Labels& labels) {
+        Counts ret{};
+        for (auto s: bags.list()) {
+            ret.add(labels[s.sample()], s.weight());
+        }
+        return ret;
     }
 
-    std::tuple<double, double, double> ratios(Bags& bags, const Labels& labels) {
-        auto count = counts(bags, labels);
-
-        double hom = std::get<0>(count);
-        double het = std::get<1>(count);
-        double alt = std::get<2>(count);
-
-        double sum = hom + het + alt;
-        return {hom / sum, het / sum, alt / sum};
-    }
-
-    std::pair<Bags, Bags> split(Bags& curr, AlleleType splitBy, const std::vector<AlleleType>& features,
+    Split split(const Bags& curr, AlleleType splitBy, const std::vector<AlleleType>& features,
                                 const Labels& labels) {
         Bags left, right;
+        Counts left_nm, right_nm, all_nm;
+        Counts cnts = counts(curr, labels);
+
         auto list = curr.list();
-        auto rs = ratios(curr, labels);
-        double left_ratio = std::get<0>(rs);
+        double left_ratio = cnts.hom_ratio();
         if (splitBy == HET) {
-            left_ratio += std::get<1>(rs);
+            left_ratio += cnts.het_ratio();
         }
+
         for (auto& el: list) {
             auto allele = features[el.sample()];
             if (allele == MISSING) {
                 left.add(el.sample(), el.weight() * left_ratio);
                 right.add(el.sample(), el.weight() * (1.0 - left_ratio));
-            } else if (to_int(allele) <= to_int(splitBy)) {
-                left.add(el.sample(), el.weight());
             } else {
-                right.add(el.sample(), el.weight());
+                all_nm.add(labels[el.sample()], el.weight());
+                if (to_int(allele) <= to_int(splitBy)) {
+                    left.add(el.sample(), el.weight());
+                    left_nm.add(labels[el.sample()], el.weight());
+                } else {
+                    right.add(el.sample(), el.weight());
+                    right_nm.add(labels[el.sample()], el.weight());
+                }
             }
         }
-        return {left, right};
+        double nm_ratio = all_nm.sum() / cnts.sum();
+        double left_ratio_nm = left_nm.sum() / all_nm.sum();
+        double split_entropy = left_ratio_nm * left_nm.entropy() + (1.0 - left_ratio_nm) * right_nm.entropy();
+        double gain = nm_ratio * (all_nm.entropy() - split_entropy) - vcf::DecisionTree::EPS;
+        return {std::move(left), std::move(right), gain};
     }
 
     std::vector<int> sample(size_t n, size_t k, Random& random) {
@@ -234,27 +296,6 @@ namespace {
         std::iota(arr.begin(), arr.end(), 0);
         std::shuffle(arr.begin(), arr.end(), random);
         return {arr.begin(), arr.begin() + k};
-    }
-
-    double score(Bags& samples, const Labels& labels) {
-        double info_gain = 0.0;
-        auto cs_tuple = counts(samples, labels);
-        std::vector<double> cs{std::get<0>(cs_tuple), std::get<1>(cs_tuple), std::get<2>(cs_tuple)};
-        double sum = std::accumulate(cs.begin(), cs.end(), 0.0);
-        for (double cnt: cs) {
-            if (cnt != 0) {
-                double ratio = cnt / (double)sum;
-                info_gain -= ratio * std::log(ratio);
-            }
-        }
-        return info_gain;
-    }
-
-    double split_score(Split& split, const Labels& labels) {
-        double sum = split.first.sum() + split.second.sum();
-        double lr = split.first.sum() / sum;
-        double rr = split.second.sum() / sum;
-        return lr * score(split.first, labels) + rr * score(split.second, labels);
     }
 
     NodePtr prune(NodePtr left, NodePtr right, std::vector<double>&& class_weights, AlleleType sep,
@@ -307,70 +348,80 @@ namespace vcf {
                                                             values(labels), max_features(max_features){}
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) {
-        if (bagging) {
-            Bags bags(values, random);
-            return DecisionTree(buildSubtree(bags, random));
-        }
-
         Bags bags;
         for (int i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
                 bags.add(i, 1.0);
             }
         }
-        return DecisionTree(buildSubtree(bags, random));
+        if (features.size() == 0) {
+            auto cts = counts(bags, values);
+            std::vector<double> weights{cts.ref(), cts.het(), cts.alt()};
+            return DecisionTree(std::make_shared<LeafNode>(std::move(weights)));
+        }
+        if (bagging) {
+            Bags bags(values, random);
+            return DecisionTree(buildSubtree(bags, random, 0));
+        }
+        return DecisionTree(buildSubtree(bags, random, 0));
     }
 
-    NodePtr TreeBuilder::buildSubtree(Bags& bags, Random& random) {
+    std::string spaces(int l) {
+        std::string s = "";
+        for (int i = 0; i < l; i++) {
+            s += " ";
+        }
+        return s;
+    }
+
+    NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random, int depth) {
         auto vars = sample(features.size(), max_features, random);
         int var_best = -1;
         AlleleType best_split = MISSING;
-        double best_score = score(bags, values) - vcf::DecisionTree::EPS;
+        double best_score = 0.0;
 
         for (int var: vars) {
             auto hom_split = split(bags, HOMREF, features[var], values);
             auto het_split = split(bags, HET, features[var], values);
-            double hom_score = split_score(hom_split, values);
-            double het_score = split_score(het_split, values);
-            if (hom_score < best_score) {
+            if (hom_split.score() > best_score) {
                 var_best = var;
                 best_split = HOMREF;
-                best_score = hom_score;
+                best_score = hom_split.score();
             }
-            if (het_score < best_score) {
+            if (het_split.score() > best_score) {
                 var_best = var;
                 best_split = HET;
-                best_score = het_score;
+                best_score = het_split.score();
             }
         }
 
         auto cnts = counts(bags, values);
-        std::vector<double> cs{std::get<0>(cnts), std::get<1>(cnts), std::get<2>(cnts)};
+        std::vector<double> cs{cnts.ref(), cnts.het(), cnts.alt()};
         if (best_split == MISSING) {
             return std::make_shared<LeafNode>(std::move(cs));
         } else {
             auto the_best_split_ever = split(bags, best_split, features[var_best], values);
-            auto left = the_best_split_ever.first;
-            auto right = the_best_split_ever.second;
-            auto left_subtree = buildSubtree(left, random);
-            auto right_subtree = buildSubtree(right, random);
+            auto& left = the_best_split_ever.left();
+            auto& right = the_best_split_ever.right();
+            auto left_subtree = buildSubtree(left, random, depth + 1);
+            auto right_subtree = buildSubtree(right, random, depth + 1);
             return prune(left_subtree, right_subtree, std::move(cs), best_split, var_best);
         }
     }
 
-
     RandomForest::RandomForest(TreeBuilder& treeBuilder, size_t ntrees) {
         size_t threads = std::thread::hardware_concurrency();
-        cxxpool::thread_pool pool{threads};
-        std::vector<std::future<DecisionTree>> futures;
+        //cxxpool::thread_pool pool{threads};
+        //std::vector<std::future<DecisionTree>> futures;
         for (int i = 0; i < ntrees; i++) {
             Random random(rand());
-            futures.push_back(pool.push([random, &treeBuilder]() mutable -> DecisionTree {
-                return treeBuilder.build_a_tree(random);
-            }));
+            predictors.push_back(treeBuilder.build_a_tree(random));
+        //    futures.push_back(pool.push([random, &treeBuilder]() mutable -> DecisionTree {
+        //        return treeBuilder.build_a_tree(random);
+        //    }));
         }
         for (int i = 0; i < ntrees; i++) {
-            predictors.push_back(futures[i].get());
+        //    predictors.push_back(futures[i].get());
         }
     }
 
