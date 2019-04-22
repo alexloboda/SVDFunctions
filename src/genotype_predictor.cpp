@@ -2,7 +2,7 @@
 
 #include "include/genotype_predictor.h"
 #include "include/vcf_primitives.h"
-#include "include/cxxpool.h"
+#include "include/third-party/cxxpool.h"
 
 namespace {
     class Sample {
@@ -112,14 +112,14 @@ namespace {
     public:
         InnerNode(std::vector<double>&& class_weights, NodePtr& left_node, NodePtr& right_node, vcf::AlleleType sep,
                   int variable);
-        double predict(std::vector<vcf::AlleleType>& features) override;
+        double predict(std::vector<vcf::AlleleType>& features) const override;
         static double joint_accuracy(NodePtr& left_node, NodePtr& right_node);
     };
 
     class LeafNode : public vcf::Node {
     public:
         explicit LeafNode(std::vector<double>&& class_weights);
-        double predict(std::vector<vcf::AlleleType>& features) override;
+        double predict(std::vector<vcf::AlleleType>& features) const override;
     };
 
 
@@ -130,7 +130,7 @@ namespace {
         acc = joint_accuracy(left_node, right_node);
     }
 
-    double InnerNode::predict(std::vector<vcf::AlleleType>& features) {
+    double InnerNode::predict(std::vector<vcf::AlleleType>& features) const {
         vcf::AlleleType allele = features[var];
         if (allele != vcf::MISSING) {
             if (to_int(allele) <= to_int(separator)) {
@@ -139,9 +139,10 @@ namespace {
                 return right_node->predict(features);
             }
         } else {
-            double left_ratio = class_weights[to_int(vcf::HOMREF)];
-            double right_ratio = class_weights[to_int(vcf::HOM)];
-            double het_ratio = class_weights[to_int(vcf::HET)];
+            double sum = std::accumulate(class_weights.begin(), class_weights.end(), 0.0);
+            double left_ratio = class_weights[to_int(vcf::HOMREF)] / sum;
+            double right_ratio = class_weights[to_int(vcf::HOM)] / sum;
+            double het_ratio = class_weights[to_int(vcf::HET)] / sum;
             if (separator == vcf::HET) {
                 left_ratio += het_ratio;
             } else {
@@ -161,7 +162,7 @@ namespace {
         acc = variance(weights());
     }
 
-    double LeafNode::predict(std::vector<vcf::AlleleType>& features) {
+    double LeafNode::predict(std::vector<vcf::AlleleType>& features) const {
         return prediction(class_weights);
     }
 
@@ -311,10 +312,14 @@ namespace {
 }
 
 namespace vcf {
-    double DecisionTree::predict(std::vector<AlleleType>& features) {
+    double DecisionTree::predict(std::vector<AlleleType>& features) const {
         Bags bags;
         bags.add(0, 1.0);
-        return root->predict(features);
+        double ret = root->predict(features);
+        if (ret < -EPS || ret > 2.0 + EPS) {
+            throw std::logic_error("Error: predicted genotype is out of range");
+        }
+        return ret;
     }
 
     DecisionTree::DecisionTree(NodePtr root) :root(std::move(root)) {}
@@ -331,13 +336,14 @@ namespace vcf {
         return class_weights;
     }
 
-    double Node::prediction(std::vector<double>& alpha) {
+    double Node::prediction(const std::vector<double>& alpha) {
         // Beta(1,1,1) prior
         double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0) + alpha.size();
-        std::transform(alpha.begin(), alpha.end(), alpha.begin(), [&sum](double x){
-            return x / sum;
+        std::vector<double> rel_alpha;
+        std::for_each(alpha.begin(), alpha.end(), [&sum, &rel_alpha](double x){
+            rel_alpha.push_back(x / sum);
         });
-        return alpha[1] + 2 * alpha[2];
+        return rel_alpha[1] + 2 * rel_alpha[2];
     }
 
     double Node::accuracy() {
@@ -361,20 +367,12 @@ namespace vcf {
         }
         if (bagging) {
             Bags bags(values, random);
-            return DecisionTree(buildSubtree(bags, random, 0));
+            return DecisionTree(buildSubtree(bags, random));
         }
-        return DecisionTree(buildSubtree(bags, random, 0));
+        return DecisionTree(buildSubtree(bags, random));
     }
 
-    std::string spaces(int l) {
-        std::string s = "";
-        for (int i = 0; i < l; i++) {
-            s += " ";
-        }
-        return s;
-    }
-
-    NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random, int depth) {
+    NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random) {
         auto vars = sample(features.size(), max_features, random);
         int var_best = -1;
         AlleleType best_split = MISSING;
@@ -403,8 +401,8 @@ namespace vcf {
             auto the_best_split_ever = split(bags, best_split, features[var_best], values);
             auto& left = the_best_split_ever.left();
             auto& right = the_best_split_ever.right();
-            auto left_subtree = buildSubtree(left, random, depth + 1);
-            auto right_subtree = buildSubtree(right, random, depth + 1);
+            auto left_subtree = buildSubtree(left, random);
+            auto right_subtree = buildSubtree(right, random);
             return prune(left_subtree, right_subtree, std::move(cs), best_split, var_best);
         }
     }

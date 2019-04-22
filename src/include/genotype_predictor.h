@@ -23,13 +23,13 @@ namespace vcf {
         explicit Node(std::vector<double>&& class_weights);
 
         double accuracy();
-        virtual double predict(std::vector<vcf::AlleleType>& features) = 0;
+        virtual double predict(std::vector<vcf::AlleleType>& features) const = 0;
         virtual ~Node() = default;
 
         std::vector<double> weights();
 
     protected:
-        static double prediction(std::vector<double>& alpha);
+        static double prediction(const std::vector<double>& alpha);
     };
 
     typedef std::shared_ptr<Node> NodePtr;
@@ -41,7 +41,7 @@ namespace vcf {
         DecisionTree(DecisionTree&& other) noexcept;
         static constexpr double EPS = 1e-8;
 
-        double predict(std::vector<AlleleType>& features);
+        double predict(std::vector<AlleleType>& features) const;
         double accuracy();
 
         friend class TreeBuilder;
@@ -59,7 +59,7 @@ namespace vcf {
         TreeBuilder(const Features& features, Labels& labels, size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true);
     private:
-        NodePtr buildSubtree(const Bags& bags, Random& random, int depth);
+        NodePtr buildSubtree(const Bags& bags, Random& random);
 
     };
 

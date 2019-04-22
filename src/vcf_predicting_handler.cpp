@@ -1,6 +1,5 @@
 #include "include/vcf_predicting_handler.h"
 #include "include/genotype_predictor.h"
-#include <iostream>
 
 namespace vcf {
     void insert(Range r, std::set<Range>& ranges) {
@@ -72,7 +71,6 @@ namespace vcf {
 
     void PredictingHandler::fix_labels(std::pair<Features, Labels>& dataset) {
         size_t mtry = ceil(sqrt(dataset.first.size()));
-        std::cout << mtry << std::endl;
         TreeBuilder tree_builder{dataset.first, dataset.second, mtry};
         RandomForest forest{tree_builder};
         std::vector<float> labels;

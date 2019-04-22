@@ -6,8 +6,8 @@
 #include <gperftools/profiler.h>
 
 #include "include/vcf_binary.h"
-#include "include/zstr/zstr.hpp"
-#include "include/zstr/strict_fstream.hpp"
+#include "include/third-party/zstr/zstr.hpp"
+#include "include/third-party/zstr/strict_fstream.hpp"
 #include "include/vcf_stats.h"
 #include "include/vcf_predicting_handler.h"
 

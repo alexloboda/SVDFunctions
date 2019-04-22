@@ -1,6 +1,6 @@
 #define CATCH_CONFIG_MAIN
 
-#include "../include/test/catch.hpp"
+#include "../include/third-party/catch.hpp"
 #include "../include/genotype_predictor.h"
 
 namespace {
