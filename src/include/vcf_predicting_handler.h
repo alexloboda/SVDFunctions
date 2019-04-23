@@ -30,7 +30,7 @@ namespace vcf {
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                    int window_size_kb, int window_size);
-        void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
+        void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
         void fix_labels(std::pair<Features, Labels>& dataset);

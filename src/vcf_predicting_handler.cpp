@@ -1,5 +1,6 @@
 #include "include/vcf_predicting_handler.h"
 #include "include/genotype_predictor.h"
+#include "include/vcf_parser.h"
 
 namespace vcf {
     void insert(Range r, std::set<Range>& ranges) {
@@ -12,6 +13,7 @@ namespace vcf {
         }
         ranges.insert(r);
     }
+
 
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                          int window_size_kb, int window_size)
@@ -35,7 +37,7 @@ namespace vcf {
         return it != set.end() && it->includes(pos);
     }
 
-    void PredictingHandler::processVariant(const Variant& variant, const std::vector<Allele>& alleles) {
+    void PredictingHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {
         if (!isOfInterest(variant)) {
             return;
         }
@@ -46,7 +48,7 @@ namespace vcf {
         }
 
         std::vector<AlleleType> sample;
-        std::for_each(alleles.begin(), alleles.end(), [&sample](const Allele& allele){
+        std::for_each(alleles->begin(), alleles->end(), [&sample](const Allele& allele){
             sample.push_back(allele.alleleType());
         });
         window.add(sample, variant);
@@ -74,11 +76,11 @@ namespace vcf {
         TreeBuilder tree_builder{dataset.first, dataset.second, mtry};
         RandomForest forest{tree_builder};
         std::vector<float> labels;
-        for (int i = 0; i < dataset.second.size(); i++) {
+        for (size_t i = 0; i < dataset.second.size(); i++) {
             AlleleType curr = dataset.second[i];
             if (curr == MISSING) {
                 std::vector<AlleleType> features;
-                for (int j = 0; j < dataset.first.size(); j++) {
+                for (size_t j = 0; j < dataset.first.size(); j++) {
                     features.push_back(dataset.first[j][i]);
                 }
                 labels.push_back(forest.predict(features));
@@ -100,17 +102,18 @@ namespace vcf {
     std::pair<Features, Labels> Window::dataset(const Variant& v) {
         Features fs;
         Labels lbls;
-        size_t curr_num = -1;
-        for (int i = 0; i < variants.size(); i++) {
+        size_t none = std::numeric_limits<size_t>::max();
+        size_t curr_num = none;
+        for (size_t i = 0; i < variants.size(); i++) {
             if (variants[i] == v) {
                 curr_num = i;
             }
         }
-        if (curr_num == -1) {
+        if (curr_num == none) {
             throw std::logic_error("No values for training set. Potentially unreachable code.");
         }
         lbls = features[curr_num];
-        for (int i = 0; i < features.size(); i++) {
+        for (size_t i = 0; i < features.size(); i++) {
             if (i != curr_num) {
                 std::vector<AlleleType> row;
                 fs.push_back(features[i]);

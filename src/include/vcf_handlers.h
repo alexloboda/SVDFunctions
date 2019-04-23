@@ -9,6 +9,8 @@
 #include "vcf_stats.h"
 
 namespace vcf {
+    class AlleleVector;
+
     class VariantsHandler {
     protected:
         const std::vector<std::string> samples;
@@ -16,7 +18,7 @@ namespace vcf {
     public:
         explicit VariantsHandler(const std::vector<std::string>& samples);
         virtual ~VariantsHandler() = default;
-        virtual void processVariant(const Variant& variant, const std::vector<Allele>& alleles);
+        virtual void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles);
         virtual bool isOfInterest(const Variant& position);
     };
 
@@ -27,7 +29,7 @@ namespace vcf {
         std::vector<std::vector<int>> call_rate_matrix;
     public:
         CallRateHandler(const std::vector<std::string>& samples, const std::vector<Range>& ranges);
-        void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
+        void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
     };
 
@@ -55,7 +57,7 @@ namespace vcf {
     public:
         GenotypeMatrixHandler(const std::vector<std::string>& samples, const std::vector<Variant>& variants,
                               VCFFilterStats& stats);
-        void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
+        void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         std::vector<Variant> desired_variants();
         GenotypeMatrixIterator iterator();
@@ -70,7 +72,7 @@ namespace vcf {
     public:
         BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,
                 std::string metadata_file);
-        void processVariant(const Variant& variant, const std::vector<Allele>& alleles) override;
+        void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
     };
 }

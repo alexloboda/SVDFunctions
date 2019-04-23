@@ -1,4 +1,5 @@
 #include "include/vcf_parser.h"
+#include <gperftools/profiler.h>
 
 #include <algorithm>
 #include <sstream>
@@ -61,136 +62,164 @@ namespace {
         return {chr, pos};
     }
 
-    class Format {
-        const string DP_FIELD = "DP";
-        const string GQ_FIELD = "GQ";
-        const string GT_FIELD = "GT" ;
-        const string AD_FIELD = "AD";
-
-        const char DELIM_1 = '|';
-        const char DELIM_2 = '/';
-
-        long depth_pos;
-        long qual_pos;
-        long genotype_pos;
-        long ad_pos;
-
-        void find_pos(const vector<string>& tokens, const string& field, long& pos) {
-            auto position = find(tokens.begin(), tokens.end(), field);
-            if (position == tokens.end()) {
-                pos = -1;
-            } else {
-                pos = position - tokens.begin();
-            }
+    void find_pos(const vector<string>& tokens, const string& field, long& pos) {
+        auto position = find(tokens.begin(), tokens.end(), field);
+        if (position == tokens.end()) {
+            pos = -1;
+        } else {
+            pos = position - tokens.begin();
         }
+    }
 
-        AlleleType type(int first, int second, int allele) {
-            if (first > second) {
-                std::swap(first, second);
-            }
-            if (first == second) {
-                if (first == 0) {
-                    return HOMREF;
-                } else if (first == allele) {
-                    return HOM;
-                }
-            } else {
-                if (first == 0 && second == allele) {
-                    return HET;
-                }
-            }
-            return MISSING;
+    AlleleType type(int first, int second, int allele) {
+        if (first > second) {
+            std::swap(first, second);
         }
-
-    public:
-        Format(const string& format) {
-            vector<string> parts = split(format, ':');
-            find_pos(parts, DP_FIELD, depth_pos);
-            find_pos(parts, GQ_FIELD, qual_pos);
-            find_pos(parts, AD_FIELD, ad_pos);
-            find_pos(parts, GT_FIELD, genotype_pos);
-            if (genotype_pos == -1) {
-                throw ParserException("No GT field available for a variant");
-            }
-        }
-
-        AlleleType parse_gt(const string& gt, int allele){
-            if (allele == 0) {
+        if (first == second) {
+            if (first == 0) {
+                return HOMREF;
+            } else if (first == allele) {
                 return HOM;
             }
-            int first_allele, second_allele;
-            std::istringstream iss(gt);
-            iss >> first_allele;
-            if (iss.eof()) {
-                if (first_allele == 0) {
-                    return HOMREF;
-                }
-                return first_allele == allele ? HOM : MISSING;
-            }
-            char ch;
-            iss >> ch;
-            if (ch != DELIM_1 && ch != DELIM_2) {
-                throw ParserException("Wrong GT format: " + gt);
-            }
-            iss >> second_allele;
-            if (iss.fail()) {
-                throw ParserException("Wrong GT format: " + gt);
-            }
-            return type(first_allele, second_allele, allele);
-        }
-
-        Allele parse(const string& genotype, int allele, const VCFFilter& filter, VCFFilterStats& stats) {
-            vector<string> parts = split(genotype, ':');
-            try {
-                string gt = parts[genotype_pos];
-                if (gt == "." || gt == "./." || gt == ".|.") {
-                    stats.add(Stat::GT_MISS, 1);
-                    return {MISSING, 0, 0};
-                }
-
-                int dp = depth_pos == -1 || parts[depth_pos] == "." ? 0 : stoi(parts[depth_pos]);
-                int gq = qual_pos == -1 || parts[qual_pos] == "." ? 0 : stoi(parts[qual_pos]);
-
-                if (!filter.apply(dp, gq)) {
-                    stats.add(Stat::DP_GQ, 1);
-                    return {MISSING, (unsigned)dp, (unsigned)gq};
-                }
-                Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
-                if (ret.alleleType() == HET) {
-                    if (ad_pos != -1 && dp != 0) {
-                        std::istringstream adstream(parts[ad_pos]);
-                        int ref, alt;
-                        char ch;
-                        adstream >> ref;
-                        for (int i = 0; i < allele; i++) {
-                            while(!std::isdigit(adstream.peek())) {
-                                adstream >> ch;
-                            }
-                            adstream  >> alt;
-                        }
-                        if (!adstream.fail()) {
-                            double ref_ratio = ref / (double)dp;
-                            double alt_ratio = alt / (double)dp;
-                            if (ref_ratio < 0.3 || ref_ratio > 0.7) {
-                                stats.add(Stat::ALLELE_BALANCE, 1);
-                                return {MISSING, 0, 0};
-                            }
-                            if (alt_ratio < 0.3 || alt_ratio > 0.7) {
-                                stats.add(Stat::ALLELE_BALANCE, 1);
-                                return {MISSING, 0, 0};
-                            }
-                        }
-                    }
-                }
-                return ret;
-            } catch (...) {
-                throw ParserException("Wrong GT format: " + genotype);
+        } else {
+            if (first == 0 && second == allele) {
+                return HET;
             }
         }
-    };
+        return MISSING;
+    }
 }
 
 namespace vcf {
+    Format::Format(const string& format) {
+        vector<string> parts = split(format, ':');
+        find_pos(parts, DP_FIELD, depth_pos);
+        find_pos(parts, GQ_FIELD, qual_pos);
+        find_pos(parts, AD_FIELD, ad_pos);
+        find_pos(parts, GT_FIELD, genotype_pos);
+        if (genotype_pos == -1) {
+            throw ParserException("No GT field available for a variant");
+        }
+    }
+
+    AlleleType Format::parse_gt(const string& gt, int allele){
+        if (allele == 0) {
+            return HOM;
+        }
+        int first_allele, second_allele;
+        std::istringstream iss(gt);
+        iss >> first_allele;
+        if (iss.eof()) {
+            if (first_allele == 0) {
+                return HOMREF;
+            }
+            return first_allele == allele ? HOM : MISSING;
+        }
+        char ch;
+        iss >> ch;
+        if (ch != DELIM_1 && ch != DELIM_2) {
+            throw ParserException("Wrong GT format: " + gt);
+        }
+        iss >> second_allele;
+        if (iss.fail()) {
+            throw ParserException("Wrong GT format: " + gt);
+        }
+        return type(first_allele, second_allele, allele);
+    }
+
+    Allele Format::parse(const string& genotype, int allele, const VCFFilter& filter, VCFFilterStats& stats) {
+        vector<string> parts = split(genotype, ':');
+        try {
+            string gt = parts[genotype_pos];
+            if (gt == "." || gt == "./." || gt == ".|.") {
+                stats.add(Stat::GT_MISS, 1);
+                return {MISSING, 0, 0};
+            }
+
+            int dp = depth_pos == -1 || parts[depth_pos] == "." ? 0 : stoi(parts[depth_pos]);
+            int gq = qual_pos == -1 || parts[qual_pos] == "." ? 0 : stoi(parts[qual_pos]);
+
+            if (!filter.apply(dp, gq)) {
+                stats.add(Stat::DP_GQ, 1);
+                return {MISSING, (unsigned)dp, (unsigned)gq};
+            }
+            Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
+            if (ret.alleleType() == HET) {
+                if (ad_pos != -1 && dp != 0) {
+                    std::istringstream adstream(parts[ad_pos]);
+                    int ref, alt;
+                    char ch;
+                    adstream >> ref;
+                    for (int i = 0; i < allele; i++) {
+                        while(!std::isdigit(adstream.peek())) {
+                            adstream >> ch;
+                        }
+                        adstream  >> alt;
+                    }
+                    if (!adstream.fail()) {
+                        double ref_ratio = ref / (double)dp;
+                        double alt_ratio = alt / (double)dp;
+                        if (ref_ratio < 0.3 || ref_ratio > 0.7) {
+                            stats.add(Stat::ALLELE_BALANCE, 1);
+                            return {MISSING, 0, 0};
+                        }
+                        if (alt_ratio < 0.3 || alt_ratio > 0.7) {
+                            stats.add(Stat::ALLELE_BALANCE, 1);
+                            return {MISSING, 0, 0};
+                        }
+                    }
+                }
+            }
+            return ret;
+        } catch (...) {
+            throw ParserException("Wrong GT format: " + genotype);
+        }
+    }
+
+    AlleleVector::AlleleVector(std::shared_ptr<std::string>& line, std::shared_ptr<std::vector<size_t>>& indices,
+            std::shared_ptr<vcf::VCFFilter>& filter, vcf::VCFFilterStats& stats, size_t variant)
+                                :line(line), indices(indices), filter(filter), stats(stats), variant(variant) {}
+
+    Allele AlleleVector::operator[](size_t i) {
+        resolve();
+        return alleles.at(i);
+    }
+
+    size_t AlleleVector::size() {
+        resolve();
+        return indices->size();
+    }
+
+    std::vector<Allele>::const_iterator AlleleVector::begin() {
+        resolve();
+        return alleles.begin();
+    }
+
+    std::vector<Allele>::const_iterator AlleleVector::end() {
+        resolve();
+        return alleles.end();
+    }
+
+    void AlleleVector::resolve() {
+        if (resolved) {
+            return;
+        }
+        resolved = true;
+        auto tokens = split(*line, VCFParser::DELIM);
+
+        size_t expected_ncol = FIELDS.size() + indices->size();
+        if (tokens.size() != expected_ncol) {
+            stats.add(Stat::WARNING, 1);
+            throw ParserException("The row has " + std::to_string(tokens.size()) +
+                                  " number of columns whereas header has " + std::to_string(expected_ncol));
+        }
+        Format format{tokens[FORMAT]};
+
+        for (int sample : *indices) {
+            alleles.push_back(format.parse(tokens.at(sample), variant + 1, *filter, stats));
+        }
+
+    }
 
     void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
         int i_ins = 0;
@@ -264,6 +293,9 @@ namespace vcf {
 
     void VCFParser::parse_genotypes() {
         string line;
+        std::shared_ptr<std::vector<size_t>> sample_indices = std::make_shared<std::vector<size_t>>(filtered_samples);
+        std::shared_ptr<VCFFilter> vcf_filter = std::make_shared<VCFFilter>(filter);
+
         while (getline(input, line)) {
             Rcpp::checkUserInterrupt();
             ++line_num;
@@ -292,22 +324,11 @@ namespace vcf {
                 if (variants.empty()) {
                     continue;
                 }
-                tokens = split(line, DELIM);
+                std::shared_ptr<std::string> line_pointer = std::make_shared<std::string>(std::move(line));
 
-                if (tokens.size() != FIELDS.size() + number_of_samples) {
-                    stats.add(Stat::WARNING, variants.size());
-                    throw ParserException("The row has " + std::to_string(tokens.size()) +
-                                          " number of columns whereas header has " + std::to_string(FIELDS.size() + samples.size()));
-                }
-
-                Format format(tokens[FORMAT]);
-
-                for (int i = 0; i < variants.size(); i++) {
+                for (size_t i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
-                    vector<Allele> alleles;
-                    for (int sample : filtered_samples) {
-                        alleles.push_back(format.parse(tokens.at(sample), i + 1, filter, stats));
-                    }
+                    auto alleles = std::make_shared<AlleleVector>(line_pointer, sample_indices, vcf_filter, stats, i);
                     for (auto& handler: handlers) {
                         handler.first->processVariant(variant, alleles);
                     }
