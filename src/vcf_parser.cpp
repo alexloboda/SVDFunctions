@@ -221,6 +221,16 @@ namespace vcf {
 
     }
 
+    std::vector<AlleleType> AlleleVector::vector() {
+        resolve();
+        std::vector<AlleleType> ret;
+        ret.reserve(alleles.size());
+        for (auto a: alleles) {
+            ret.push_back(a.alleleType());
+        }
+        return ret;
+    }
+
     void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
         int i_ins = 0;
         for (int i = 0; i < handlers.size(); i++) {

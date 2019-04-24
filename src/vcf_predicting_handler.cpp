@@ -47,11 +47,7 @@ namespace vcf {
             curr_chr = pos.chromosome();
         }
 
-        std::vector<AlleleType> sample;
-        std::for_each(alleles->begin(), alleles->end(), [&sample](const Allele& allele){
-            sample.push_back(allele.alleleType());
-        });
-        window.add(sample, variant);
+        window.add(alleles, variant);
         if (window.is_full()) {
             while (iterator.dereferencable() && (*iterator).position().position() <= window.middle_point()) {
                 auto dataset = window.dataset(*iterator);
@@ -112,17 +108,17 @@ namespace vcf {
         if (curr_num == none) {
             throw std::logic_error("No values for training set. Potentially unreachable code.");
         }
-        lbls = features[curr_num];
+        lbls = features[curr_num]->vector();
         for (size_t i = 0; i < features.size(); i++) {
             if (i != curr_num) {
                 std::vector<AlleleType> row;
-                fs.push_back(features[i]);
+                fs.push_back(features[i]->vector());
             }
         }
         return {std::move(fs), std::move(lbls)};
     }
 
-    void Window::add(const std::vector<AlleleType>& alleles, const Variant& variant) {
+    void Window::add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant) {
         if (features.size() < max_size) {
             variants.push_back(variant);
             features.push_back(alleles);

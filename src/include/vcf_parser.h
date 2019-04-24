@@ -50,6 +50,7 @@ namespace vcf {
 
         std::vector<Allele>::const_iterator begin();
         std::vector<Allele>::const_iterator end();
+        std::vector<AlleleType> vector();
         size_t size();
         Allele operator[](size_t i);
     };

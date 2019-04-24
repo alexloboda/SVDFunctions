@@ -112,7 +112,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix) {
-    //ProfilerStart("a.prof");
+    ProfilerStart("a.prof");
     List ret;
     try {
         const char *name = filename[0];
@@ -174,7 +174,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }
-    //ProfilerStop();
+    ProfilerStop();
     return ret;
 }
 

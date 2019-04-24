@@ -31,6 +31,8 @@ namespace vcf {
                 return 2;
             case vcf::MISSING:
                 return 3;
+            default:
+                throw std::logic_error("[internal] unknown allele type");
         }
     }
 

@@ -3,10 +3,11 @@
 
 #include "vcf_handlers.h"
 #include "genotype_predictor.h"
+#include "vcf_parser.h"
 
 namespace vcf {
     class Window {
-        std::deque<std::vector<AlleleType>> features;
+        std::deque<std::shared_ptr<AlleleVector>> features;
         std::deque<Variant> variants;
         size_t max_size;
         size_t max_size_kb;
@@ -14,7 +15,7 @@ namespace vcf {
     public:
         explicit Window(size_t max_size, size_t max_size_kb);
         void clear();
-        void add(const std::vector<AlleleType>& alleles, const Variant& variant);
+        void add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant);
         std::pair<Features, Labels> dataset(const Variant& v);
         int middle_point();
         bool is_full();
