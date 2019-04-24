@@ -8,6 +8,7 @@
 #include <cmath>
 
 #include "vcf_primitives.h"
+#include "third-party/cxxpool.h"
 
 namespace vcf {
     typedef std::vector<std::vector<vcf::AlleleType>> Features;
@@ -57,16 +58,17 @@ namespace vcf {
         size_t max_features;
     public:
         TreeBuilder(const Features& features, Labels& labels, size_t max_features);
-        DecisionTree build_a_tree(Random& random, bool bagging = true);
+        DecisionTree build_a_tree(Random& random, bool bagging = true) const;
     private:
-        NodePtr buildSubtree(const Bags& bags, Random& random);
+        NodePtr buildSubtree(const Bags& bags, Random& random) const;
 
     };
 
     class RandomForest {
+        cxxpool::thread_pool& thread_pool;
         std::vector<DecisionTree> predictors;
     public:
-        RandomForest(TreeBuilder& treeBuilder, size_t trees = 2);
+        RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, size_t trees = 100);
         double predict(std::vector<AlleleType>& features);
     };
 }

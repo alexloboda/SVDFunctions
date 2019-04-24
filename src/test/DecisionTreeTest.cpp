@@ -23,7 +23,8 @@ TEST_CASE("Decision trees constructed correctly"){
 
     SECTION("random forest check") {
         TreeBuilder tree_builder(data, labels, 2);
-        RandomForest rf{tree_builder, 4};
+        cxxpool::thread_pool thread_pool{1};
+        RandomForest rf{tree_builder, thread_pool, 4};
         std::vector<AlleleType> features{HOM, HOM};
         REQUIRE(rf.predict(features) <= 1);
     }

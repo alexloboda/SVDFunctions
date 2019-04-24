@@ -1,9 +1,7 @@
 #include "include/vcf_parser.h"
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
-#include <iostream>
 #include <fstream>
-#include <gperftools/profiler.h>
 
 #include "include/vcf_binary.h"
 #include "include/third-party/zstr/zstr.hpp"
@@ -112,7 +110,6 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix) {
-    ProfilerStart("a.prof");
     List ret;
     try {
         const char *name = filename[0];
@@ -174,7 +171,6 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }
-    ProfilerStop();
     return ret;
 }
 

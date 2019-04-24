@@ -353,7 +353,7 @@ namespace vcf {
     TreeBuilder::TreeBuilder(const Features& features, Labels& labels, size_t max_features) :features(features),
                                                             values(labels), max_features(max_features){}
 
-    DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) {
+    DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
         Bags bags;
         for (int i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
@@ -372,7 +372,7 @@ namespace vcf {
         return DecisionTree(buildSubtree(bags, random));
     }
 
-    NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random) {
+    NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random) const {
         auto vars = sample(features.size(), max_features, random);
         int var_best = -1;
         AlleleType best_split = MISSING;
@@ -407,19 +407,17 @@ namespace vcf {
         }
     }
 
-    RandomForest::RandomForest(TreeBuilder& treeBuilder, size_t ntrees) {
-        size_t threads = std::thread::hardware_concurrency();
-        //cxxpool::thread_pool pool{threads};
-        //std::vector<std::future<DecisionTree>> futures;
+    RandomForest::RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) :thread_pool(pool){
+        std::vector<std::future<DecisionTree>> futures;
         for (int i = 0; i < ntrees; i++) {
-            Random random(rand());
-            predictors.push_back(treeBuilder.build_a_tree(random));
-        //    futures.push_back(pool.push([random, &treeBuilder]() mutable -> DecisionTree {
-        //        return treeBuilder.build_a_tree(random);
-        //    }));
+            int seed = rand();
+            futures.push_back(pool.push([seed, &treeBuilder]() mutable -> DecisionTree {
+                Random random(seed);
+                return treeBuilder.build_a_tree(random);
+            }));
         }
         for (int i = 0; i < ntrees; i++) {
-        //    predictors.push_back(futures[i].get());
+            predictors.push_back(futures[i].get());
         }
     }
 

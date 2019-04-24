@@ -27,6 +27,7 @@ namespace vcf {
         std::unordered_map<int, std::set<Range>> ranges;
         GenotypeMatrixIterator iterator;
         Window window;
+        cxxpool::thread_pool thread_pool;
 
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
