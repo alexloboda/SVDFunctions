@@ -1,5 +1,4 @@
 #include "include/vcf_parser.h"
-#include <gperftools/profiler.h>
 
 #include <algorithm>
 #include <sstream>
