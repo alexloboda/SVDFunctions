@@ -56,7 +56,7 @@ namespace vcf {
     }
 
     Position Position::parse_position(const std::string& str) {
-        long pos = std::find(str.begin(), str.end(), ':') - str.begin();
+        size_t pos = std::find(str.begin(), str.end(), ':') - str.begin();
         if (pos >= str.length() - 1 || pos == 0) {
             throw ParserException("Position must be in format chr#:# but " + str + " given");
         }

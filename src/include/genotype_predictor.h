@@ -65,7 +65,6 @@ namespace vcf {
     };
 
     class RandomForest {
-        cxxpool::thread_pool& thread_pool;
         std::vector<DecisionTree> predictors;
     public:
         RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, size_t trees = 100);

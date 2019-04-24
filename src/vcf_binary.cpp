@@ -13,7 +13,7 @@ vcf::MemoryMappedScanner::MemoryMappedScanner(const std::string& filename) {
 vcf::BinaryAllele vcf::MemoryMappedScanner::scan(int pos) {
     char* bytes = new char[sizeof(BinaryAllele)];
     int offset = pos * sizeof(BinaryAllele);
-    for (int i = 0; i < sizeof(BinaryAllele); i++) {
+    for (size_t i = 0; i < sizeof(BinaryAllele); i++) {
         bytes[i] = mmap[offset + i];
     }
     auto* obj = (BinaryAllele*)bytes;

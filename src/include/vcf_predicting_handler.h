@@ -10,7 +10,6 @@ namespace vcf {
         std::deque<std::shared_ptr<AlleleVector>> features;
         std::deque<Variant> variants;
         size_t max_size;
-        size_t max_size_kb;
         size_t start;
     public:
         explicit Window(size_t max_size, size_t max_size_kb);
@@ -22,7 +21,6 @@ namespace vcf {
     };
 
     class PredictingHandler : public VariantsHandler {
-        GenotypeMatrixHandler& gh;
         Chromosome curr_chr;
         std::unordered_map<int, std::set<Range>> ranges;
         GenotypeMatrixIterator iterator;

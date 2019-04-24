@@ -17,7 +17,7 @@ namespace vcf {
 
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                          int window_size_kb, int window_size)
-                                         :VariantsHandler(samples), gh(gh), curr_chr(-1), iterator{gh},
+                                         :VariantsHandler(samples), curr_chr(-1), iterator{gh},
                                           window(window_size, window_size_kb),
                                           thread_pool(std::thread::hardware_concurrency()) {
         auto variants = gh.desired_variants();
@@ -88,7 +88,7 @@ namespace vcf {
         iterator.set(labels);
     }
 
-    Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), max_size_kb(max_size_kb), start(0) {}
+    Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), start(0) {}
 
     void Window::clear() {
         features.clear();

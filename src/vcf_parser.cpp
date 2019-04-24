@@ -18,8 +18,8 @@ namespace {
     // Rcpp conflict
     using vcf::MISSING;
 
-    vector<std::string> split(const string& line, char delim, int max_num_tokens = 0){
-        unsigned long tokens = 1;
+    vector<std::string> split(const string& line, char delim, size_t max_num_tokens = 0){
+        size_t tokens = 1;
         for (char ch: line) {
             if (ch == delim) {
                 ++tokens;
@@ -32,7 +32,7 @@ namespace {
         vector<string> result;
         result.reserve(tokens);
         unsigned long last = 0;
-        for (int i = 0; i < line.length(); i++) {
+        for (size_t i = 0; i < line.length(); i++) {
             char ch = line[i];
             if (ch == delim) {
                 result.push_back(line.substr(last, i - last));
@@ -232,7 +232,7 @@ namespace vcf {
 
     void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
         int i_ins = 0;
-        for (int i = 0; i < handlers.size(); i++) {
+        for (size_t i = 0; i < handlers.size(); i++) {
             if (handlers[i].second >= order) {
                 i_ins = i;
             }
@@ -272,7 +272,7 @@ namespace vcf {
                 line = line.substr(1);
                 auto tokens = split(line, DELIM);
                 number_of_samples = tokens.size() - FIELDS.size();
-                for (int i = 0; i < tokens.size(); i++) {
+                for (size_t i = 0; i < tokens.size(); i++) {
                     const string& token = tokens[i];
                     if (i < FIELDS.size()) {
                         if (token != FIELDS[i]) {

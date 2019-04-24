@@ -30,14 +30,14 @@ namespace vcf {
     public:
         Bags(const Labels& lbls, Random& random) {
             std::vector<size_t> idx;
-            for (int i = 0; i < lbls.size(); i++) {
+            for (size_t i = 0; i < lbls.size(); i++) {
                 if (lbls[i] != MISSING) {
                     idx.push_back(i);
                 }
             }
 
             auto size = idx.size();
-            for (int i = 0; i < size; i++) {
+            for (size_t i = 0; i < size; i++) {
                 samples.emplace_back(idx[random() % size], 1.0);
             }
             weights_sum = size;
@@ -86,11 +86,11 @@ namespace {
         });
         // linear model
         double mean = 0.0;
-        for (int i = 0; i < weights.size(); i++) {
+        for (size_t i = 0; i < weights.size(); i++) {
             mean += i * alpha[i];
         }
         double error = 0.0;
-        for (int i = 0; i < weights.size(); i++) {
+        for (size_t i = 0; i < weights.size(); i++) {
             error += alpha[i] * (i - mean) * (i - mean);
         }
         return error;
@@ -355,7 +355,7 @@ namespace vcf {
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
         Bags bags;
-        for (int i = 0; i < values.size(); i++) {
+        for (size_t i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
                 bags.add(i, 1.0);
             }
@@ -407,16 +407,16 @@ namespace vcf {
         }
     }
 
-    RandomForest::RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) :thread_pool(pool){
+    RandomForest::RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) {
         std::vector<std::future<DecisionTree>> futures;
-        for (int i = 0; i < ntrees; i++) {
+        for (size_t i = 0; i < ntrees; i++) {
             int seed = rand();
             futures.push_back(pool.push([seed, &treeBuilder]() mutable -> DecisionTree {
                 Random random(seed);
                 return treeBuilder.build_a_tree(random);
             }));
         }
-        for (int i = 0; i < ntrees; i++) {
+        for (size_t i = 0; i < ntrees; i++) {
             predictors.push_back(futures[i].get());
         }
     }

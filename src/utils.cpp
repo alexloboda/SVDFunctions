@@ -1,5 +1,6 @@
 #include "include/utils.h"
 #include <Rcpp.h>
+#include <algorithm>
 
 namespace {
 
@@ -16,7 +17,7 @@ void sort_controls(vector<vector<int>>& gmatrix, vector<double>& residuals) {
     });
     vector<vector<int>> gm;
     vector<double> sorted_residuals;
-    for (int i = 0; i < residuals.size(); i++) {
+    for (size_t i = 0; i < residuals.size(); i++) {
         gm.push_back(std::move(gmatrix[perm[i]]));
         sorted_residuals.push_back(residuals[perm[i]]);
     }
@@ -68,8 +69,9 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
                                                   vector<vector<int>>& case_counts, std::function<double(double)>& qchisq,
                                                   double min_lambda, double lb_lambda,
                                                   double max_lambda, double ub_lambda,
-                                                  int min_controls, int bin) {
+                                                  size_t min_controls, int bin) {
     bin = std::max(bin, 1);
+    min_controls = std::max(min_controls, 1UL);
     std::vector<bool> snp_mask = check_user_counts(case_counts);
 
     sort_controls(gmatrix, residuals);
@@ -78,7 +80,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     std::vector<std::vector<int>> counts(m, vector<int>(3));
     std::vector<lm> lms;
     unsigned rank = 0;
-    for (int i = 0; i < m; i++) {
+    for (size_t i = 0; i < m; i++) {
         lm model(6);
         for (int j = 0; j < 3; j++) {
             model.set(3 + j, j, 1, case_counts[i][j]);
@@ -96,14 +98,14 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     std::vector<int> pvals_num;
     int optimal_prefix = -1;
 
-    for (int i = 0; i < n; i++) {
+    for (size_t i = 0; i < n; i++) {
         if (i % 100 == 0) {
             Rcpp::checkUserInterrupt();
         }
 
         ++rank;
         std::vector<double> pvals;
-        for (int j = 0; j < m; j++) {
+        for (size_t j = 0; j < m; j++) {
             if (!snp_mask[j]) {
                 continue;
             }
@@ -125,7 +127,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
         if (i >= min_controls - 1 && pvals.size() > 1 && (i + 1) % bin == 0) {
             lm pvals_lm(n_pvals);
             std::sort(pvals.begin(), pvals.end());
-            for (int j = 0; j < n_pvals; j++) {
+            for (size_t j = 0; j < n_pvals; j++) {
                 pvals_lm.set(j, chi2(j, n_pvals, qchisq), qchisq(pvals[j]), 1, false);
             }
             pvals_lm.solve();

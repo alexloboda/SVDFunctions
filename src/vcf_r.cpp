@@ -29,8 +29,8 @@ namespace {
 
         NumericMatrix result() {
             NumericMatrix res(gmatrix.size(), samples.size());
-            for (int i = 0; i < gmatrix.size(); i++) {
-                for (int j = 0; j < samples.size(); j++) {
+            for (size_t i = 0; i < gmatrix.size(); i++) {
+                for (size_t j = 0; j < samples.size(); j++) {
                     float val = gmatrix[i][j];
                     if (val == to_int(vcf::MISSING)) {
                         val = NA_REAL;
@@ -53,18 +53,18 @@ namespace {
 
         NumericMatrix result() {
             vector<string> non_empty;
-            for (int i = 0; i < ranges.size(); i++) {
+            for (size_t i = 0; i < ranges.size(); i++) {
                 if (n_variants[i] > 0) {
                     non_empty.push_back((std::string)ranges[i]);
                 }
             }
             NumericMatrix result(non_empty.size(), samples.size());
             int curr = 0;
-            for (int i = 0; i < ranges.size(); i++) {
+            for (size_t i = 0; i < ranges.size(); i++) {
                 if (n_variants[i] == 0) {
                     continue;
                 }
-                for (int j = 0; j < samples.size(); j++) {
+                for (size_t j = 0; j < samples.size(); j++) {
                     result[j * non_empty.size() + curr] = (double)call_rate_matrix[i][j] / n_variants[i];
                 }
                 ++curr;
