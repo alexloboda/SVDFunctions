@@ -29,6 +29,6 @@ matching_results select_controls_impl(std::vector<std::vector<int>>& gmatrix, st
                                                   std::vector<std::vector<int>>& case_counts,
                                                   std::function<double(double)>& qchisq, double min_lambda,
                                                   double lb_lambda, double max_lambda, double ub_lambda,
-                                                  int min_controls = 500, int bin = 1);
+                                                  size_t min_controls = 500, int bin = 1);
 
 #endif
