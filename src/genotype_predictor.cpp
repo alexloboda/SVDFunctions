@@ -341,7 +341,7 @@ namespace vcf {
         double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0) + alpha.size();
         std::vector<double> rel_alpha;
         std::for_each(alpha.begin(), alpha.end(), [&sum, &rel_alpha](double x){
-            rel_alpha.push_back(x / sum);
+            rel_alpha.push_back((x + 1) / sum);
         });
         return rel_alpha[1] + 2 * rel_alpha[2];
     }
@@ -349,9 +349,6 @@ namespace vcf {
     double Node::accuracy() {
         return acc;
     }
-
-    TreeBuilder::TreeBuilder(Features&& features, Labels&& labels, size_t max_features) :features(std::move(features)),
-                                                            values(std::move(labels)), max_features(max_features){}
 
     TreeBuilder::TreeBuilder(const Features& features, const Labels& labels, size_t max_features)
         :features(features), values(labels), max_features(max_features) {}

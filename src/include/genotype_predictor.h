@@ -57,7 +57,6 @@ namespace vcf {
         const Labels values;
         size_t max_features;
     public:
-        TreeBuilder(Features&& features, Labels&& labels, size_t max_features);
         TreeBuilder(const Features&, const Labels& labels, size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true) const;
     private:

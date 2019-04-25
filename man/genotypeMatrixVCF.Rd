@@ -27,6 +27,9 @@ applied only for genotype matrix.}
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
 
+\item{predictMissing}{if TRUE missing values will be replaced with predicted
+values.}
+
 \item{verbose}{logical}
 }
 \description{

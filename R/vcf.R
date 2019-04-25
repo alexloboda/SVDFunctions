@@ -94,10 +94,13 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' @export
 genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
                               samples = NULL, bannedPositions = NULL,
-                              predictMissing = FALSE, verbose = FALSE) {
+                              predictMissing = FALSE, 
+                              excludedPredictorSamples = NULL, 
+                              verbose = FALSE) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
           bannedPositions = bannedPositions, variants = variants,
-          verbose = verbose, predictMissing = predictMissing)$genotype
+          verbose = verbose, predictMissing = predictMissing,
+          excludedPredictorSamples = excludedPredictorSamples)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -134,6 +137,10 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
 #' applied only for genotype matrix.
 #' @param returnGenotypeMatrix logical: whether or not return genotype matrix
+#' @param predictMissing if TRUE missing values will be replaced with predicted
+#' values.
+#' @param excludedPredictorSamples sample names that will not be used for
+#' prediction of missing values. Ignored if predictMissing is FALSE.
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 

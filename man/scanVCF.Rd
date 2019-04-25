@@ -31,6 +31,12 @@ applied only for genotype matrix.}
 
 \item{returnGenotypeMatrix}{logical: whether or not return genotype matrix}
 
+\item{predictMissing}{if TRUE missing values will be replaced with predicted
+values.}
+
+\item{excludedPredictorSamples}{sample names that will not be used for
+prediction of missing values. Ignored if predictMissing is FALSE.}
+
 \item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}
 

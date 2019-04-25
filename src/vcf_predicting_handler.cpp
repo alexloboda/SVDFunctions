@@ -18,7 +18,7 @@ namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                          int window_size_kb, int window_size, std::vector<size_t>& dataset_samples)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
-                                          window(window_size, window_size_kb), dataset_samples(dataset_samples),
+                                          window(window_size), dataset_samples(dataset_samples),
                                           thread_pool(std::thread::hardware_concurrency()) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
@@ -32,6 +32,9 @@ namespace vcf {
 
     bool PredictingHandler::isOfInterest(const Variant& variant) {
         Position pos = variant.position();
+        if (ranges.empty()) {
+            return true;
+        }
         auto& set = ranges[pos.chromosome().num()];
         // Workaround, c++11
         auto it = set.lower_bound(Range(pos.chromosome(), -1, pos.position()));
@@ -43,6 +46,9 @@ namespace vcf {
             return;
         }
         Position pos = variant.position();
+        if (curr_chr.num() == -1) {
+            curr_chr = pos.chromosome();
+        }
         if (pos.chromosome() != curr_chr) {
             cleanup();
             curr_chr = pos.chromosome();
@@ -69,6 +75,15 @@ namespace vcf {
     }
 
     void PredictingHandler::fix_labels(std::pair<Features, Labels>& dataset) {
+        bool missing = false;
+        for (auto l: dataset.second) {
+            if (l == MISSING) {
+                missing = true;
+            }
+        }
+        if (!missing) {
+            return;
+        }
         TreeBuilder tree_builder = make_tree_builder(dataset);
         RandomForest forest{tree_builder, thread_pool};
         std::vector<float> labels;
@@ -87,10 +102,10 @@ namespace vcf {
         iterator.set(labels);
     }
 
-    TreeBuilder PredictingHandler::make_tree_builder(std::pair<Features, Labels>& dataset) {
+    TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset) {
         if (dataset_samples.size() == dataset.second.size()) {
             size_t mtry = ceil(sqrt(dataset.first.size()));
-            return {std::move(dataset.first), std::move(dataset.second), mtry};
+            return {dataset.first, dataset.second, mtry};
         } else {
             Features features;
             Labels labels;
@@ -101,14 +116,14 @@ namespace vcf {
                 }
             }
             for (size_t s: dataset_samples) {
-                labels.push_back(labels[s]);
+                labels.push_back(dataset.second[s]);
             }
             size_t mtry = ceil(sqrt(features.size()));
-            return {std::move(features), std::move(labels), mtry};
+            return {features, labels, mtry};
         }
     }
 
-    Window::Window(size_t max_size, size_t max_size_kb) :max_size(max_size), start(0) {}
+    Window::Window(size_t max_size) :max_size(max_size), start(0) {}
 
     void Window::clear() {
         features.clear();

@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <sstream>
-#include <iostream>
 #include <Rcpp.h>
 
 namespace {
@@ -231,10 +230,11 @@ namespace vcf {
     }
 
     void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
-        int i_ins = 0;
+        int i_ins = handlers.size();
         for (size_t i = 0; i < handlers.size(); i++) {
             if (handlers[i].second >= order) {
                 i_ins = i;
+                break;
             }
         }
         handlers.emplace_back(handler, order);

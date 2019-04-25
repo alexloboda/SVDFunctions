@@ -12,7 +12,7 @@ namespace vcf {
         size_t max_size;
         size_t start;
     public:
-        explicit Window(size_t max_size, size_t max_size_kb);
+        explicit Window(size_t max_size);
         void clear();
         void add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant);
         std::pair<Features, Labels> dataset(const Variant& v);
@@ -28,7 +28,7 @@ namespace vcf {
         std::vector<size_t> dataset_samples;
         cxxpool::thread_pool thread_pool;
 
-        TreeBuilder make_tree_builder(std::pair<Features, Labels>& dataset);
+        TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                    int window_size_kb, int window_size, std::vector<size_t>& dataset_samples);
