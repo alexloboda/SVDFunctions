@@ -6,7 +6,7 @@
 \usage{
 genotypeMatrixVCF(vcf, DP = 10L, GQ = 20L, variants = NULL,
   samples = NULL, bannedPositions = NULL, predictMissing = FALSE,
-  verbose = FALSE)
+  excludedPredictorSamples = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -29,6 +29,9 @@ must be eliminated from consideration.}
 
 \item{predictMissing}{if TRUE missing values will be replaced with predicted
 values.}
+
+\item{excludedPredictorSamples}{sample names that will not be used for
+prediction of missing values. Ignored if predictMissing is FALSE.}
 
 \item{verbose}{logical}
 }
