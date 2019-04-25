@@ -176,8 +176,9 @@ namespace vcf {
     }
 
     AlleleVector::AlleleVector(std::shared_ptr<std::string>& line, std::shared_ptr<std::vector<size_t>>& indices,
-            std::shared_ptr<vcf::VCFFilter>& filter, vcf::VCFFilterStats& stats, size_t variant)
-                                :line(line), indices(indices), filter(filter), stats(stats), variant(variant) {}
+            std::shared_ptr<vcf::VCFFilter>& filter, vcf::VCFFilterStats& stats, size_t variant, size_t ncols)
+                                :line(line), indices(indices), filter(filter), stats(stats), variant(variant),
+                                 expected_ncols(ncols) {}
 
     Allele AlleleVector::operator[](size_t i) {
         resolve();
@@ -206,11 +207,10 @@ namespace vcf {
         resolved = true;
         auto tokens = split(*line, VCFParser::DELIM);
 
-        size_t expected_ncol = FIELDS.size() + indices->size();
-        if (tokens.size() != expected_ncol) {
+        if (tokens.size() != expected_ncols) {
             stats.add(Stat::WARNING, 1);
             throw ParserException("The row has " + std::to_string(tokens.size()) +
-                                  " number of columns whereas header has " + std::to_string(expected_ncol));
+                                  " number of columns whereas header has " + std::to_string(expected_ncols));
         }
         Format format{tokens[FORMAT]};
 
@@ -337,7 +337,8 @@ namespace vcf {
 
                 for (size_t i = 0; i < variants.size(); i++) {
                     Variant& variant = variants[i];
-                    auto alleles = std::make_shared<AlleleVector>(line_pointer, sample_indices, vcf_filter, stats, i);
+                    auto alleles = std::make_shared<AlleleVector>(line_pointer, sample_indices, vcf_filter, stats, i,
+                                                                  FIELDS.size() + number_of_samples);
                     for (auto& handler: handlers) {
                         handler.first->processVariant(variant, alleles);
                     }

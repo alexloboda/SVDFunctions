@@ -7,7 +7,8 @@
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   bannedPositions = NULL, variants = NULL,
   returnGenotypeMatrix = TRUE, predictMissing = FALSE,
-  regions = NULL, binaryPathPrefix = NULL, verbose = FALSE)
+  excludedPredictorSamples = NULL, regions = NULL,
+  binaryPathPrefix = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well

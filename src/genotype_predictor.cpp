@@ -350,8 +350,11 @@ namespace vcf {
         return acc;
     }
 
-    TreeBuilder::TreeBuilder(const Features& features, Labels& labels, size_t max_features) :features(features),
-                                                            values(labels), max_features(max_features){}
+    TreeBuilder::TreeBuilder(Features&& features, Labels&& labels, size_t max_features) :features(std::move(features)),
+                                                            values(std::move(labels)), max_features(max_features){}
+
+    TreeBuilder::TreeBuilder(const Features& features, const Labels& labels, size_t max_features)
+        :features(features), values(labels), max_features(max_features) {}
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
         Bags bags;

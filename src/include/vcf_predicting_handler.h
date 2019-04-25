@@ -25,11 +25,13 @@ namespace vcf {
         std::unordered_map<int, std::set<Range>> ranges;
         GenotypeMatrixIterator iterator;
         Window window;
+        std::vector<size_t> dataset_samples;
         cxxpool::thread_pool thread_pool;
 
+        TreeBuilder make_tree_builder(std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size);
+                                   int window_size_kb, int window_size, std::vector<size_t>& dataset_samples);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();

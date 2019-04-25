@@ -145,8 +145,12 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
+                    excludedPredictorSamples = NULL, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
+  if (is.null(excludedPredictorSamples)) {
+    excludedPredictorSamples <- character()
+  }
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
@@ -179,7 +183,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing),
-                     regions, binaryPathPrefix),
+                     excludedPredictorSamples, regions, binaryPathPrefix),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {

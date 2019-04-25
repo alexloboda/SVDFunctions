@@ -41,11 +41,12 @@ namespace vcf {
         std::vector<Allele> alleles;
         size_t variant;
         bool resolved = false;
+        size_t expected_ncols;
 
         void resolve();
     public:
         AlleleVector(std::shared_ptr<std::string>& line, std::shared_ptr<std::vector<size_t>>& indices,
-                std::shared_ptr<VCFFilter>& filter, VCFFilterStats& stats, size_t variant);
+                std::shared_ptr<VCFFilter>& filter, VCFFilterStats& stats, size_t variant, size_t ncols);
         AlleleVector(const AlleleVector&) = delete;
 
         std::vector<Allele>::const_iterator begin();

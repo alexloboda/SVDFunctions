@@ -104,12 +104,27 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
     return ranges;
 }
 
+vector<size_t> predictor_positions(const vector<string>& samples, const CharacterVector& exclude) {
+    unordered_set<string> exclude_set;
+    for_each(exclude.begin(), exclude.end(), [&exclude_set](const char* s) {
+        string sample(s);
+        exclude_set.insert(sample);
+    });
+    vector<size_t> ret;
+    for (size_t i = 0; i < samples.size(); i++) {
+        if (exclude_set.find(samples[i]) == exclude_set.end()) {
+            ret.push_back(i);
+        }
+    }
+    return ret;
+}
+
 // [[Rcpp::export]]
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
-               const LogicalVector& predictMissing, const CharacterVector& regions,
-               const CharacterVector& binary_prefix) {
+               const LogicalVector& predictMissing, const CharacterVector& excludedPredictors,
+               const CharacterVector& regions, const CharacterVector& binary_prefix) {
     List ret;
     try {
         const char *name = filename[0];
@@ -134,7 +149,9 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100);
+                auto predictor_samples = predictor_positions(ss, excludedPredictors);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100,
+                                                                    predictor_samples);
                 parser.register_handler(predicting_handler, 2);
             }
         }
