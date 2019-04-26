@@ -64,7 +64,7 @@ namespace vcf {
         double missing_rate = std::count_if(alleles->begin(), alleles->end(), [](const Allele& x){
             return x.alleleType() == MISSING;
         }) / (double)alleles->size();
-        if (missing_rate > missing_rate_threshold - EPS) {
+        if (missing_rate > missing_rate_threshold + EPS) {
             stats.add(Stat::MISSING_RATE, 1);
             return;
         }
