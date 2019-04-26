@@ -48,15 +48,15 @@ namespace vcf {
 
     class GenotypeMatrixHandler: public VariantsHandler {
         const double EPS = 1e-8;
-        const double MISSING_RATE_THRESHOLD = 0.1 + EPS;
     protected:
         std::vector<std::vector<float>> gmatrix;
         std::vector<Variant> variants;
         std::unordered_set<Variant> available_variants;
         VCFFilterStats& stats;
+        double missing_rate_threshold;
     public:
         GenotypeMatrixHandler(const std::vector<std::string>& samples, const std::vector<Variant>& variants,
-                              VCFFilterStats& stats);
+                              VCFFilterStats& stats, double missing_rate_threshold);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         std::vector<Variant> desired_variants();

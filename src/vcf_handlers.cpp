@@ -25,7 +25,7 @@ namespace vcf {
     }
 
     CallRateHandler::CallRateHandler(const std::vector<std::string>& _samples, const std::vector<Range>& _ranges)
-        :VariantsHandler(_samples), ranges(_ranges) {
+            :VariantsHandler(_samples), ranges(_ranges) {
         auto val = vector<int>();
         val.resize(samples.size());
         call_rate_matrix.resize(ranges.size(), val);
@@ -64,7 +64,7 @@ namespace vcf {
         double missing_rate = std::count_if(alleles->begin(), alleles->end(), [](const Allele& x){
             return x.alleleType() == MISSING;
         }) / (double)alleles->size();
-        if (missing_rate > MISSING_RATE_THRESHOLD) {
+        if (missing_rate > missing_rate_threshold - EPS) {
             stats.add(Stat::MISSING_RATE, 1);
             return;
         }
@@ -84,8 +84,8 @@ namespace vcf {
     }
 
     GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs,
-                                                 VCFFilterStats& stats)
-        : VariantsHandler(ss), stats(stats) {
+                                                 VCFFilterStats& stats, double missing_rate_threshold)
+        : VariantsHandler(ss), stats(stats), missing_rate_threshold(missing_rate_threshold) {
         available_variants.insert(vs.begin(), vs.end());
     }
 

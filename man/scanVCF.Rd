@@ -7,8 +7,8 @@
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   bannedPositions = NULL, variants = NULL,
   returnGenotypeMatrix = TRUE, predictMissing = FALSE,
-  excludedPredictorSamples = NULL, regions = NULL,
-  binaryPathPrefix = NULL, verbose = FALSE)
+  excludedPredictorSamples = NULL, missingRateThreshold = 0.1,
+  regions = NULL, binaryPathPrefix = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -36,6 +36,9 @@ values.}
 
 \item{excludedPredictorSamples}{sample names that will not be used for
 prediction of missing values. Ignored if predictMissing is FALSE.}
+
+\item{missingRateThreshold}{the rows of VCF file with missing rate more
+than threshold will be filtered out.}
 
 \item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}

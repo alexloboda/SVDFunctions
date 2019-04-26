@@ -85,6 +85,7 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' The method scans VCF files and returns genotype matrix for specified 
 #' variants after applying neccessary filters.
 #' @inheritParams scanVCF
+#' @param ... other arguments to be passed to scanVCF function
 #' @examples
 #' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
 #' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
@@ -96,11 +97,11 @@ genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
                               samples = NULL, bannedPositions = NULL,
                               predictMissing = FALSE, 
                               excludedPredictorSamples = NULL, 
-                              verbose = FALSE) {
+                              verbose = FALSE, ...) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
           bannedPositions = bannedPositions, variants = variants,
           verbose = verbose, predictMissing = predictMissing,
-          excludedPredictorSamples = excludedPredictorSamples)$genotype
+          excludedPredictorSamples = excludedPredictorSamples, ...)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -141,6 +142,8 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' values.
 #' @param excludedPredictorSamples sample names that will not be used for
 #' prediction of missing values. Ignored if predictMissing is FALSE.
+#' @param missingRateThreshold the rows of VCF file with missing rate more
+#' than threshold will be filtered out.
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
@@ -153,6 +156,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
                     excludedPredictorSamples = NULL, 
+                    missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
   if (is.null(excludedPredictorSamples)) {
@@ -190,7 +194,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing),
-                     excludedPredictorSamples, regions, binaryPathPrefix),
+                     excludedPredictorSamples, regions, binaryPathPrefix, 
+                     missingRateThreshold),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {

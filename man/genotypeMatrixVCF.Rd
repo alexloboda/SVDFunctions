@@ -6,7 +6,7 @@
 \usage{
 genotypeMatrixVCF(vcf, DP = 10L, GQ = 20L, variants = NULL,
   samples = NULL, bannedPositions = NULL, predictMissing = FALSE,
-  excludedPredictorSamples = NULL, verbose = FALSE)
+  excludedPredictorSamples = NULL, verbose = FALSE, ...)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -34,6 +34,8 @@ values.}
 prediction of missing values. Ignored if predictMissing is FALSE.}
 
 \item{verbose}{logical}
+
+\item{...}{other arguments to be passed to scanVCF function}
 }
 \description{
 The method scans VCF files and returns genotype matrix for specified 

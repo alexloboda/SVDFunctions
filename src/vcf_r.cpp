@@ -124,7 +124,8 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& excludedPredictors,
-               const CharacterVector& regions, const CharacterVector& binary_prefix) {
+               const CharacterVector& regions, const CharacterVector& binary_prefix,
+               const NumericVector& missingRateThreshold) {
     List ret;
     try {
         const char *name = filename[0];
@@ -146,7 +147,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                 vector<Variant> variants = Variant::parseVariants(string(s));
                 vs.insert(vs.end(), variants.begin(), variants.end());
             });
-            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
+            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
                 auto predictor_samples = predictor_positions(ss, excludedPredictors);
