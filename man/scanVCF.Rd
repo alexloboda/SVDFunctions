@@ -44,9 +44,6 @@ region call rate will be calculated and corresponding matrix will be returned.}
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
 
 \item{verbose}{logical}
-
-\item{excludedPredictorSamples}{sample names that will not be used for
-prediction of missing values. Ignored if predictMissing is FALSE.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

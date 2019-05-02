@@ -138,8 +138,6 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @param returnGenotypeMatrix logical: whether or not return genotype matrix
 #' @param predictMissing if TRUE missing values will be replaced with predicted
 #' values.
-#' @param excludedPredictorSamples sample names that will not be used for
-#' prediction of missing values. Ignored if predictMissing is FALSE.
 #' @param missingRateThreshold the rows of VCF file with missing rate more
 #' than threshold will be filtered out.
 #' @param regions the set of regions in format "chr# startPos endPos". For each
