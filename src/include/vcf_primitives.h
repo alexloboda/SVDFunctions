@@ -34,6 +34,7 @@ namespace vcf {
         bool parse(std::string);
 
     public:
+        explicit Chromosome(int num);
         explicit Chromosome(const std::string&);
         Chromosome(const Chromosome& other) = default;
         Chromosome(Chromosome&& other) = default;
@@ -43,6 +44,7 @@ namespace vcf {
         int num() const;
 
         friend bool operator==(const Chromosome& chr, const Chromosome& other);
+        friend bool operator!=(const Chromosome& chr, const Chromosome& other);
     };
 
     class Position {
@@ -54,6 +56,7 @@ namespace vcf {
         explicit operator std::string() const;
         Chromosome chromosome() const;
         int position() const;
+        Position operator+(int shift);
 
         static Position parse_position(const std::string& str);
 
@@ -91,12 +94,15 @@ namespace vcf {
         bool includes(const Position& p) const;
         bool operator<(const Range& other) const;
         bool operator<(const Position& pos) const;
+        Position begin() const;
+        Position end() const;
         explicit operator std::string() const;
 
         static Range parseRange(const std::string& s);
     };
 
     enum AlleleType {HOMREF, HET, HOM, MISSING};
+    int to_int(AlleleType allele);
 
     class Allele {
         unsigned depth;

@@ -5,7 +5,7 @@
 #include <fstream>
 
 #include "vcf_primitives.h"
-#include "mio.hpp"
+#include "third-party/mio.hpp"
 
 namespace vcf {
     class BinaryVCFScanner {
