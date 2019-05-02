@@ -35,25 +35,25 @@ namespace vcf {
 
     class AlleleVector {
         std::shared_ptr<std::string> line;
-        std::shared_ptr<std::vector<size_t>> indices;
+        std::shared_ptr<std::vector<std::size_t>> indices;
         std::shared_ptr<VCFFilter> filter;
         vcf::VCFFilterStats& stats;
         std::vector<Allele> alleles;
-        size_t variant;
+        std::size_t variant;
         bool resolved = false;
-        size_t expected_ncols;
+        std::size_t expected_ncols;
 
         void resolve();
     public:
-        AlleleVector(std::shared_ptr<std::string>& line, std::shared_ptr<std::vector<size_t>>& indices,
-                std::shared_ptr<VCFFilter>& filter, VCFFilterStats& stats, size_t variant, size_t ncols);
+        AlleleVector(std::shared_ptr<std::string>& line, std::shared_ptr<std::vector<std::size_t>>& indices,
+                std::shared_ptr<VCFFilter>& filter, VCFFilterStats& stats, std::size_t variant, std::size_t ncols);
         AlleleVector(const AlleleVector&) = delete;
 
         std::vector<Allele>::const_iterator begin();
         std::vector<Allele>::const_iterator end();
         std::vector<AlleleType> vector();
-        size_t size();
-        Allele operator[](size_t i);
+        std::size_t size();
+        Allele operator[](std::size_t i);
     };
 
     class VCFParser {
@@ -62,7 +62,7 @@ namespace vcf {
         std::vector<std::pair<std::shared_ptr<VariantsHandler>, int>> handlers;
         std::istream& input;
         std::vector<std::string> samples;
-        std::vector<size_t> filtered_samples;
+        std::vector<std::size_t> filtered_samples;
 
         int line_num;
         long number_of_samples;

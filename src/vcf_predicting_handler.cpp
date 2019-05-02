@@ -2,6 +2,10 @@
 #include "include/genotype_predictor.h"
 #include "include/vcf_parser.h"
 
+namespace {
+    using std::size_t;
+}
+
 namespace vcf {
     void insert(Range r, std::set<Range>& ranges) {
         auto pos = ranges.lower_bound(r);
@@ -16,9 +20,9 @@ namespace vcf {
 
 
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                         int window_size_kb, int window_size, std::vector<size_t>& dataset_samples)
+                                         int window_size_kb, int window_size)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
-                                          window(window_size), dataset_samples(dataset_samples),
+                                          window(window_size),
                                           thread_pool(std::thread::hardware_concurrency()) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
@@ -74,7 +78,7 @@ namespace vcf {
         window.clear();
     }
 
-    void PredictingHandler::fix_labels(std::pair<Features, Labels>& dataset) {
+    void PredictingHandler::fix_labels(const std::pair<Features, Labels>& dataset) {
         bool missing = false;
         for (auto l: dataset.second) {
             if (l == MISSING) {
@@ -103,24 +107,8 @@ namespace vcf {
     }
 
     TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset) {
-        if (dataset_samples.size() == dataset.second.size()) {
-            size_t mtry = ceil(sqrt(dataset.first.size()));
-            return {dataset.first, dataset.second, mtry};
-        } else {
-            Features features;
-            Labels labels;
-            for (size_t i = 0; i < features.size(); i++) {
-                features.emplace_back();
-                for (size_t s: dataset_samples) {
-                    features[i].push_back(dataset.first[i][s]);
-                }
-            }
-            for (size_t s: dataset_samples) {
-                labels.push_back(dataset.second[s]);
-            }
-            size_t mtry = ceil(sqrt(features.size()));
-            return {features, labels, mtry};
-        }
+        size_t mtry = ceil(sqrt(dataset.first.size()));
+        return {dataset.first, dataset.second, mtry};
     }
 
     Window::Window(size_t max_size) :max_size(max_size), start(0) {}

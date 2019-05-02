@@ -55,9 +55,9 @@ namespace vcf {
     class TreeBuilder {
         const Features features;
         const Labels values;
-        size_t max_features;
+        std::size_t max_features;
     public:
-        TreeBuilder(const Features&, const Labels& labels, size_t max_features);
+        TreeBuilder(const Features&, const Labels& labels, std::size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true) const;
     private:
         NodePtr buildSubtree(const Bags& bags, Random& random) const;
@@ -67,7 +67,7 @@ namespace vcf {
     class RandomForest {
         std::vector<DecisionTree> predictors;
     public:
-        RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, size_t trees = 10);
+        RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, std::size_t trees = 10);
         double predict(std::vector<AlleleType>& features);
     };
 }

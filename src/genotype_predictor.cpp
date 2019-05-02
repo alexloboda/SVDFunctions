@@ -1,10 +1,14 @@
 #include <utility>
+#include <random>
+#include <iostream>
 
 #include "include/genotype_predictor.h"
 #include "include/vcf_primitives.h"
 #include "include/third-party/cxxpool.h"
 
 namespace {
+    using std::size_t;
+
     class Sample {
         int num;
         double w;
@@ -28,19 +32,25 @@ namespace vcf {
         double weights_sum = 0.0;
 
     public:
-        Bags(const Labels& lbls, Random& random) {
-            std::vector<size_t> idx;
-            for (size_t i = 0; i < lbls.size(); i++) {
-                if (lbls[i] != MISSING) {
-                    idx.push_back(i);
-                }
+        Bags(const Bags& bags, Random& random) {
+            std::vector<double> prefix_weights;
+            double curr = 0.0;
+            auto list = bags.list();
+            for (auto s: list) {
+                curr += s.weight();
+                prefix_weights.push_back(curr);
             }
+            // just to be sure lower_bound won't return end()
+            prefix_weights[prefix_weights.size() - 1] += 1.0;
+            std::uniform_real_distribution<double> r(0.0, curr);
+            for (size_t i = 0; i < list.size(); i++) {
+                auto it = std::lower_bound(prefix_weights.begin(), prefix_weights.end(), r(random));
+                size_t pos = std::distance(prefix_weights.begin(), it);
 
-            auto size = idx.size();
-            for (size_t i = 0; i < size; i++) {
-                samples.emplace_back(idx[random() % size], 1.0);
+                Sample insertion = list[pos];
+                samples.push_back(insertion);
+                weights_sum += insertion.weight();
             }
-            weights_sum = size;
         }
 
         Bags() = default;
@@ -269,7 +279,7 @@ namespace {
         }
 
         for (auto& el: list) {
-            auto allele = features[el.sample()];
+            auto allele = features.at(el.sample());
             if (allele == MISSING) {
                 left.add(el.sample(), el.weight() * left_ratio);
                 right.add(el.sample(), el.weight() * (1.0 - left_ratio));
@@ -354,20 +364,38 @@ namespace vcf {
         :features(features), values(labels), max_features(max_features) {}
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
-        Bags bags;
+        Bags tmp;
         for (size_t i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
-                bags.add(i, 1.0);
+                tmp.add(i, 1.0);
             }
         }
+        auto tmp_cts = counts(tmp, values);
+        Bags bags;
+        for (size_t i = 0; i < values.size(); i++) {
+                switch(values[i]) {
+                    case HOMREF:
+                        bags.add(i, (1.0 / 3) / tmp_cts.hom_ratio());
+                        break;
+                    case HET:
+                        bags.add(i, (1.0 / 3) / tmp_cts.het_ratio());
+                        break;
+                    case HOM:
+                        bags.add(i, (1.0 / 3) / tmp_cts.alt_ratio());
+                        break;
+                    default:
+                        continue;
+                }
+        }
+
         if (features.size() == 0) {
-            auto cts = counts(bags, values);
+            auto cts = counts(tmp, values);
             std::vector<double> weights{cts.ref(), cts.het(), cts.alt()};
             return DecisionTree(std::make_shared<LeafNode>(std::move(weights)));
         }
         if (bagging) {
-            Bags bags(values, random);
-            return DecisionTree(buildSubtree(bags, random));
+            Bags randomBags(bags, random);
+            return DecisionTree(buildSubtree(randomBags, random));
         }
         return DecisionTree(buildSubtree(bags, random));
     }
@@ -407,11 +435,11 @@ namespace vcf {
         }
     }
 
-    RandomForest::RandomForest(TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) {
+    RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) {
         std::vector<std::future<DecisionTree>> futures;
         for (size_t i = 0; i < ntrees; i++) {
             int seed = rand();
-            futures.push_back(pool.push([seed, &treeBuilder]() mutable -> DecisionTree {
+            futures.push_back(pool.push([seed, &treeBuilder]() -> DecisionTree {
                 Random random(seed);
                 return treeBuilder.build_a_tree(random);
             }));

@@ -7,8 +7,8 @@
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   bannedPositions = NULL, variants = NULL,
   returnGenotypeMatrix = TRUE, predictMissing = FALSE,
-  excludedPredictorSamples = NULL, missingRateThreshold = 0.1,
-  regions = NULL, binaryPathPrefix = NULL, verbose = FALSE)
+  missingRateThreshold = 0.1, regions = NULL,
+  binaryPathPrefix = NULL, verbose = FALSE)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
@@ -34,9 +34,6 @@ applied only for genotype matrix.}
 \item{predictMissing}{if TRUE missing values will be replaced with predicted
 values.}
 
-\item{excludedPredictorSamples}{sample names that will not be used for
-prediction of missing values. Ignored if predictMissing is FALSE.}
-
 \item{missingRateThreshold}{the rows of VCF file with missing rate more
 than threshold will be filtered out.}
 
@@ -47,6 +44,9 @@ region call rate will be calculated and corresponding matrix will be returned.}
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
 
 \item{verbose}{logical}
+
+\item{excludedPredictorSamples}{sample names that will not be used for
+prediction of missing values. Ignored if predictMissing is FALSE.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

@@ -9,10 +9,10 @@ namespace vcf {
     class Window {
         std::deque<std::shared_ptr<AlleleVector>> features;
         std::deque<Variant> variants;
-        size_t max_size;
-        size_t start;
+        std::size_t max_size;
+        std::size_t start;
     public:
-        explicit Window(size_t max_size);
+        explicit Window(std::size_t max_size);
         void clear();
         void add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant);
         std::pair<Features, Labels> dataset(const Variant& v);
@@ -25,17 +25,16 @@ namespace vcf {
         std::unordered_map<int, std::set<Range>> ranges;
         GenotypeMatrixIterator iterator;
         Window window;
-        std::vector<size_t> dataset_samples;
         cxxpool::thread_pool thread_pool;
 
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size, std::vector<size_t>& dataset_samples);
+                                   int window_size_kb, int window_size);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
-        void fix_labels(std::pair<Features, Labels>& dataset);
+        void fix_labels(const std::pair<Features, Labels>& dataset);
     };
 }
 

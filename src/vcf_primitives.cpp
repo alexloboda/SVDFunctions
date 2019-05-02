@@ -9,6 +9,8 @@ namespace {
     using std::transform;
     using std::invalid_argument;
     using std::vector;
+
+    using std::size_t;
 }
 
 namespace vcf {

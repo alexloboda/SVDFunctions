@@ -36,7 +36,7 @@ namespace vcf {
     class GenotypeMatrixHandler;
 
     class GenotypeMatrixIterator {
-        size_t pos;
+        std::size_t pos;
         GenotypeMatrixHandler& gh;
     public:
         explicit GenotypeMatrixIterator(GenotypeMatrixHandler& gh);

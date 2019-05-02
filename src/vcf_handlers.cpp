@@ -41,7 +41,7 @@ namespace vcf {
         auto r = std::distance(ranges.begin(), it);
 
         n_variants[r]++;
-        for (size_t i = 0; i < alleles->size(); i++) {
+        for (std::size_t i = 0; i < alleles->size(); i++) {
             if ((*alleles)[i].alleleType() != MISSING) {
                 ++call_rate_matrix[r][i];
             }

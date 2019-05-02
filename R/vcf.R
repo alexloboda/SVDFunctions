@@ -96,12 +96,10 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
                               samples = NULL, bannedPositions = NULL,
                               predictMissing = FALSE, 
-                              excludedPredictorSamples = NULL, 
                               verbose = FALSE, ...) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
           bannedPositions = bannedPositions, variants = variants,
-          verbose = verbose, predictMissing = predictMissing,
-          excludedPredictorSamples = excludedPredictorSamples, ...)$genotype
+          verbose = verbose, predictMissing = predictMissing, ...)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -155,13 +153,9 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
-                    excludedPredictorSamples = NULL, 
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
-  if (is.null(excludedPredictorSamples)) {
-    excludedPredictorSamples <- character()
-  }
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
@@ -193,9 +187,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                     returnGenotypeMatrix, isTRUE(predictMissing),
-                     excludedPredictorSamples, regions, binaryPathPrefix, 
-                     missingRateThreshold),
+                     returnGenotypeMatrix, isTRUE(predictMissing), regions, 
+                     binaryPathPrefix, missingRateThreshold),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {
