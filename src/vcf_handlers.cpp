@@ -72,10 +72,15 @@ namespace vcf {
             return;
         }
         vector<float> row;
+        vector<bool> missing_row;
+        row.reserve(alleles->size());
+        missing_row.reserve(alleles->size());
         for (const Allele& allele: *alleles) {
             row.push_back(to_int(allele.alleleType()));
+            missing_row.push_back(allele.alleleType() == MISSING);
         }
         gmatrix.push_back(row);
+        missing.push_back(missing_row);
         variants.push_back(variant);
     }
 

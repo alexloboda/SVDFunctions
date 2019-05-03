@@ -18,7 +18,6 @@ Imports:
     magrittr,
     Rcpp,
     BH,
-    snpStats,
     data.table,
     methods,
     seqminer,

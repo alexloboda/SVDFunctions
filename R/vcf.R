@@ -203,7 +203,10 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   }
   
   if (!is.null(res$genotype)) {
-      colnames(res$genotype) <- res$samples
+      colnames(res$genotype$genotype) <- res$samples
+  }
+  if (!isTRUE(predictMissing)) {
+      res$genotype <- res$genotype$genotype
   }
   if (!is.null(res$callrate)) {
       colnames(res$callrate) <- res$samples

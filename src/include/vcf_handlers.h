@@ -50,6 +50,7 @@ namespace vcf {
         const double EPS = 1e-8;
     protected:
         std::vector<std::vector<float>> gmatrix;
+        std::vector<std::vector<bool>> missing;
         std::vector<Variant> variants;
         std::unordered_set<Variant> available_variants;
         VCFFilterStats& stats;

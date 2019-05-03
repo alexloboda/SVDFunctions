@@ -27,8 +27,9 @@ namespace {
     public:
         using GenotypeMatrixHandler::GenotypeMatrixHandler;
 
-        NumericMatrix result() {
+        List result() {
             NumericMatrix res(gmatrix.size(), samples.size());
+            LogicalMatrix predicted(missing.size(), samples.size());
             for (size_t i = 0; i < gmatrix.size(); i++) {
                 for (size_t j = 0; j < samples.size(); j++) {
                     float val = gmatrix[i][j];
@@ -36,6 +37,7 @@ namespace {
                         val = NA_REAL;
                     }
                     res[j * gmatrix.size() + i] = val;
+                    predicted[j * missing.size() + i] = missing[i][j];
                 }
             }
             vector<string> row_names;
@@ -43,7 +45,11 @@ namespace {
                 row_names.push_back((string)v);
             });
             rownames(res) = CharacterVector(row_names.begin(), row_names.end());
-            return res;
+            rownames(predicted) = CharacterVector(row_names.begin(), row_names.end());
+            List ret;
+            ret["genotype"] = res;
+            ret["predicted"] = predicted;
+            return ret;
         }
     };
 
