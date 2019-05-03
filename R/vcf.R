@@ -85,6 +85,7 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' The method scans VCF files and returns genotype matrix for specified 
 #' variants after applying neccessary filters.
 #' @inheritParams scanVCF
+#' @param ... other arguments to be passed to scanVCF function
 #' @examples
 #' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
 #' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
@@ -94,10 +95,11 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
 #' @export
 genotypeMatrixVCF <- function(vcf, DP = 10L, GQ = 20L, variants = NULL,
                               samples = NULL, bannedPositions = NULL,
-                              verbose = FALSE) {
+                              predictMissing = FALSE, 
+                              verbose = FALSE, ...) {
   scanVCF(vcf, DP = DP, GQ = GQ, samples = samples, 
           bannedPositions = bannedPositions, variants = variants,
-          verbose = verbose)$genotype
+          verbose = verbose, predictMissing = predictMissing, ...)$genotype
 }
 
 #' Scan VCF file for sample names
@@ -134,6 +136,10 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
 #' applied only for genotype matrix.
 #' @param returnGenotypeMatrix logical: whether or not return genotype matrix
+#' @param predictMissing if TRUE missing values will be replaced with predicted
+#' values.
+#' @param missingRateThreshold the rows of VCF file with missing rate more
+#' than threshold will be filtered out.
 #' @param regions the set of regions in format "chr# startPos endPos". For each
 #' region call rate will be calculated and corresponding matrix will be returned. 
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
@@ -144,7 +150,8 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @export
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     bannedPositions = NULL, variants = NULL, 
-                    returnGenotypeMatrix = TRUE, 
+                    returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
+                    missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
   stopifnot(length(DP) > 0)
@@ -161,7 +168,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   if (!is.null(binaryPathPrefix) | !file.exists(tbi)) {
     tbi <- NULL
   } else {
-    if ((returnGenotypeMatrix && length(variants) != 0) |
+    if ((returnGenotypeMatrix && length(variants) != 0 && !predictMissing) |
         length(regions) != 0) {
       vcf <- createVCFFromTabixIndex(vcf, variants, regions, verbose)
     } else {
@@ -176,9 +183,10 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
   
-  tryCatch(
+  tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
-                     returnGenotypeMatrix, regions, binaryPathPrefix),
+                     returnGenotypeMatrix, isTRUE(predictMissing), regions, 
+                     binaryPathPrefix, missingRateThreshold),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {
@@ -195,7 +203,10 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   }
   
   if (!is.null(res$genotype)) {
-      colnames(res$genotype) <- res$samples
+      colnames(res$genotype$genotype) <- res$samples
+  }
+  if (!isTRUE(predictMissing)) {
+      res$genotype <- res$genotype$genotype
   }
   if (!is.null(res$callrate)) {
       colnames(res$callrate) <- res$samples

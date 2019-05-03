@@ -1,13 +1,13 @@
 #include "include/vcf_parser.h"
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
-#include <iostream>
 #include <fstream>
 
 #include "include/vcf_binary.h"
-#include "include/zstr/zstr.hpp"
-#include "include/zstr/strict_fstream.hpp"
+#include "include/third-party/zstr/zstr.hpp"
+#include "include/third-party/zstr/strict_fstream.hpp"
 #include "include/vcf_stats.h"
+#include "include/vcf_predicting_handler.h"
 
 namespace {
     using namespace Rcpp;
@@ -27,15 +27,17 @@ namespace {
     public:
         using GenotypeMatrixHandler::GenotypeMatrixHandler;
 
-        IntegerMatrix result() {
-            IntegerMatrix res(gmatrix.size(), samples.size());
-            for (int i = 0; i < gmatrix.size(); i++) {
-                for (int j = 0; j < samples.size(); j++) {
-                    int val = gmatrix[i][j];
-                    if (val == vcf::MISSING) {
-                        val = NA_INTEGER;
+        List result() {
+            NumericMatrix res(gmatrix.size(), samples.size());
+            LogicalMatrix predicted(missing.size(), samples.size());
+            for (size_t i = 0; i < gmatrix.size(); i++) {
+                for (size_t j = 0; j < samples.size(); j++) {
+                    float val = gmatrix[i][j];
+                    if (val == to_int(vcf::MISSING)) {
+                        val = NA_REAL;
                     }
                     res[j * gmatrix.size() + i] = val;
+                    predicted[j * missing.size() + i] = missing[i][j];
                 }
             }
             vector<string> row_names;
@@ -43,7 +45,11 @@ namespace {
                 row_names.push_back((string)v);
             });
             rownames(res) = CharacterVector(row_names.begin(), row_names.end());
-            return res;
+            rownames(predicted) = CharacterVector(row_names.begin(), row_names.end());
+            List ret;
+            ret["genotype"] = res;
+            ret["predicted"] = predicted;
+            return ret;
         }
     };
 
@@ -53,18 +59,18 @@ namespace {
 
         NumericMatrix result() {
             vector<string> non_empty;
-            for (int i = 0; i < ranges.size(); i++) {
+            for (size_t i = 0; i < ranges.size(); i++) {
                 if (n_variants[i] > 0) {
                     non_empty.push_back((std::string)ranges[i]);
                 }
             }
             NumericMatrix result(non_empty.size(), samples.size());
             int curr = 0;
-            for (int i = 0; i < ranges.size(); i++) {
+            for (size_t i = 0; i < ranges.size(); i++) {
                 if (n_variants[i] == 0) {
                     continue;
                 }
-                for (int j = 0; j < samples.size(); j++) {
+                for (size_t j = 0; j < samples.size(); j++) {
                     result[j * non_empty.size() + curr] = (double)call_rate_matrix[i][j] / n_variants[i];
                 }
                 ++curr;
@@ -108,7 +114,8 @@ vector<vcf::Range> parse_regions(const CharacterVector& regions){
 List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
-               const CharacterVector& regions, const CharacterVector& binary_prefix) {
+               const LogicalVector& predictMissing, const CharacterVector& regions,
+               const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold) {
     List ret;
     try {
         const char *name = filename[0];
@@ -122,6 +129,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
+        shared_ptr<PredictingHandler> predicting_handler;
 
         if (gmatrix[0]) {
             vector<Variant> vs;
@@ -129,19 +137,23 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                 vector<Variant> variants = Variant::parseVariants(string(s));
                 vs.insert(vs.end(), variants.begin(), variants.end());
             });
-            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats));
-            parser.register_handler(gmatrix_handler);
+            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
+            parser.register_handler(gmatrix_handler, 1);
+            if (predictMissing[0]) {
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100);
+                parser.register_handler(predicting_handler, 2);
+            }
         }
 
         if (regions.length() > 0) {
             callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
-            parser.register_handler(callrate_handler);
+            parser.register_handler(callrate_handler, 1);
         }
 
         if (binary_prefix.length() > 0) {
             string prefix = string(binary_prefix[0]);
             binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
-            parser.register_handler(binary_handler);
+            parser.register_handler(binary_handler, 1);
         }
 
         if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
@@ -149,6 +161,9 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         }
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
         if (gmatrix[0]) {
+            if (predictMissing[0]) {
+                predicting_handler->cleanup();
+            }
             ret["genotype"] = gmatrix_handler->result();
         }
         if (regions.length() > 0) {

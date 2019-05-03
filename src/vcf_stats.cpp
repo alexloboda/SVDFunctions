@@ -1,4 +1,5 @@
 #include "include/vcf_stats.h"
+#include <stdexcept>
 
 namespace vcf {
 
@@ -37,6 +38,8 @@ namespace vcf {
                 return "GT_DP_GQ_FILTERS";
             case Stat::ALLELE_BALANCE:
                 return "Allele balance";
+            default:
+                throw std::logic_error("Unreachable statement");
         }
     }
 

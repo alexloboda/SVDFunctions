@@ -9,6 +9,8 @@ namespace {
     using std::transform;
     using std::invalid_argument;
     using std::vector;
+
+    using std::size_t;
 }
 
 namespace vcf {
@@ -19,6 +21,21 @@ namespace vcf {
 
     bool operator==(const Position& pos, const Position& other) {
         return pos.chr == other.chr && pos.pos == other.pos;
+    }
+
+    int to_int(vcf::AlleleType type) {
+        switch(type) {
+            case vcf::HOMREF:
+                return 0;
+            case vcf::HET:
+                return 1;
+            case vcf::HOM:
+                return 2;
+            case vcf::MISSING:
+                return 3;
+            default:
+                throw std::logic_error("[internal] unknown allele type");
+        }
     }
 
     Position::operator std::string() const {
@@ -41,7 +58,7 @@ namespace vcf {
     }
 
     Position Position::parse_position(const std::string& str) {
-        long pos = std::find(str.begin(), str.end(), ':') - str.begin();
+        size_t pos = std::find(str.begin(), str.end(), ':') - str.begin();
         if (pos >= str.length() - 1 || pos == 0) {
             throw ParserException("Position must be in format chr#:# but " + str + " given");
         }
@@ -135,6 +152,10 @@ namespace vcf {
         return chr.chr == other.chr;
     }
 
+    bool operator!=(const Chromosome& chr, const Chromosome& other) {
+        return chr.chr != other.chr;
+    }
+
     Chromosome::operator std::string() const {
         string str_rep = "chr";
         if (chr == chrX) {
@@ -151,7 +172,9 @@ namespace vcf {
         return chr;
     }
 
-    ParserException::ParserException(std::string message) :msg(message) {}
+    Chromosome::Chromosome(int num) :chr(num){}
+
+    ParserException::ParserException(std::string message) :msg(std::move(message)) {}
 
     std::string ParserException::get_message() const {
         return msg;
@@ -169,6 +192,18 @@ namespace vcf {
             return false;
         }
         return p.position() >= from && p.position() < to;
+    }
+
+    Position Range::begin() const {
+        return {chr, from};
+    }
+
+    Position Range::end() const {
+        return {chr, to};
+    }
+
+    Position Position::operator+(int shift) {
+        return {chr, pos + shift};
     }
 
     Range Range::parseRange(const std::string& s) {

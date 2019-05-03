@@ -25,8 +25,7 @@ considered, otherwise assumed as missing.}
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
 
-\item{verbose}{logical 
-metadata file prefix_meta. If not NULL corresponding files will be generated.}
+\item{verbose}{logical}
 }
 \value{
 numeric matrix: ratio of non-missing values to all variants in the

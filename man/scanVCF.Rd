@@ -6,7 +6,8 @@
 \usage{
 scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
   bannedPositions = NULL, variants = NULL,
-  returnGenotypeMatrix = TRUE, regions = NULL,
+  returnGenotypeMatrix = TRUE, predictMissing = FALSE,
+  missingRateThreshold = 0.1, regions = NULL,
   binaryPathPrefix = NULL, verbose = FALSE)
 }
 \arguments{
@@ -30,13 +31,19 @@ applied only for genotype matrix.}
 
 \item{returnGenotypeMatrix}{logical: whether or not return genotype matrix}
 
+\item{predictMissing}{if TRUE missing values will be replaced with predicted
+values.}
+
+\item{missingRateThreshold}{the rows of VCF file with missing rate more
+than threshold will be filtered out.}
+
 \item{regions}{the set of regions in format "chr# startPos endPos". For each
 region call rate will be calculated and corresponding matrix will be returned.}
 
-\item{binaryPathPrefix}{the path prefix for binary file prefix_bin and}
-
-\item{verbose}{logical 
+\item{binaryPathPrefix}{the path prefix for binary file prefix_bin and 
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
+
+\item{verbose}{logical}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

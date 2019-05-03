@@ -29,10 +29,10 @@ considered, otherwise assumed as missing.}
 \item{MAF}{minimum minor allele frequency}
 }
 \value{
-data.frame with four columns: variant(position, reference allele, 
-alternative allele); number of samples with 
-both reference, one reference and alternative allele indicated in first column,
-and both alternative respectively.
+matrix with three columns:  
+number of samples with 
+both reference alleles, with  one reference allele and one alternative allele,
+and with both alternative ones respectively.
 }
 \description{
 Scan binary file produced by \code{\link{scanVCF}} and collect required 
