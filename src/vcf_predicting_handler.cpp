@@ -62,6 +62,9 @@ namespace vcf {
         if (window.is_full()) {
             while (iterator.dereferencable() && (*iterator).position().position() <= window.middle_point()) {
                 auto dataset = window.dataset(*iterator);
+                if (dataset.second.empty()) {
+                    return;
+                }
                 fix_labels(dataset);
                 ++iterator;
             }
@@ -73,6 +76,9 @@ namespace vcf {
         for(; iterator.dereferencable(); ++iterator) {
             Variant var = *iterator;
             auto dataset = window.dataset(var);
+            if (dataset.second.empty()) {
+                break;
+            }
             fix_labels(dataset);
         }
         window.clear();
@@ -130,7 +136,7 @@ namespace vcf {
             }
         }
         if (curr_num == none) {
-            throw std::logic_error("No values for training set. Potentially unreachable code.");
+            return {};
         }
         lbls = features[curr_num]->vector();
         for (size_t i = 0; i < features.size(); i++) {
