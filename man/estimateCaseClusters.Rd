@@ -13,8 +13,10 @@ estimateCaseClusters(PCA, plotBIC = FALSE, plotDendrogram = FALSE)
 \arguments{
 \item{PCA}{results of gmatrix principal component analysis}
 
-\item{plot}{logical whether a plot of Bayesian Information 
+\item{plotBIC}{logical whether a plot of Bayesian Information 
 Criterion vs cluster number should be returned}
+
+\item{plotDendrogram}{whether dendrogram should be plotted}
 }
 \description{
 Estimate clusters within case data

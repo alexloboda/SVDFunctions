@@ -5,12 +5,14 @@
 \title{Write yaml file given the list of US and case counts for 
 all clusters}
 \usage{
-writeYaml(clusterResults, outputFileName, collapsing,
+writeYaml(clusterResults, variants, outputFileName, collapsing,
   title = "DNAscoreInput")
 }
 \arguments{
 \item{clusterResults}{list of 2 objects - list of US and list of 
 case counts list(US, case_counts)}
+
+\item{variants}{vector of variant identifiers with REF and ALT alleles}
 
 \item{outputFileName}{name of the yaml file to write to}
 

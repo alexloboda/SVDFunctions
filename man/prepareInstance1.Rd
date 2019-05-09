@@ -16,6 +16,11 @@ were imputed}
 \item{minVariantCallRate}{minimal variant call rate}
 
 \item{minSampleCallRate}{minimal sample call rate}
+
+\item{outputFileName}{name of the YAML file to output}
+
+\item{title}{title to put as a first line in yaml file
+not working so far}
 }
 \description{
 prepare instance and write yaml file from QC-ed gmatrix

@@ -69,10 +69,10 @@ gmatrixPCA <- function(gmatrix, clusters = NULL){
   pca <- cbind(pca, clusters)
   colnames(pca) <- c(paste("PC", c(1:min(30, ncol(gmatrix))), sep = ""),
                      "Cluster")
-  p <- plotly::add_markers(plotly::plot_ly(x = PC1, 
-                                           y = PC2,
-                                           z = PC3, 
-                                           color = Cluster,
+  p <- plotly::add_markers(plotly::plot_ly(x = pca$PC1, 
+                                           y = pca$PC2,
+                                           z = pca$PC3, 
+                                           color = pca$Cluster,
                                            marker = list(size = 2 )))
   
   list(PCA = pca, plot = p)  
