@@ -27,8 +27,9 @@ dendrogramEstimate <- function(combiM){
 #' using ellipsoidal, varying volume, shape, and orientation
 #' model ("VVV")
 #' @param PCA results of gmatrix principal component analysis
-#' @param plot logical whether a plot of Bayesian Information 
+#' @param plotBIC logical whether a plot of Bayesian Information 
 #' Criterion vs cluster number should be returned
+#' @param plotDendrogram whether dendrogram should be plotted
 #' @export
 estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
   stopifnot(class(PCA) %in% c("matrix", "data.frame"))
@@ -61,6 +62,7 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
 #' @param gmatrix Genotype matrix wihout missing values
 #' @param clusters character vector of cluster assignment for every
 #' sample in gmatrix
+#' @import plotly
 #' @export
 gmatrixPCA <- function(gmatrix, clusters = NULL){
   pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), k = min(30, ncol(gmatrix)))$v
@@ -77,33 +79,11 @@ gmatrixPCA <- function(gmatrix, clusters = NULL){
 }
 
 
-#' QC gmatrix
-#' performs callrate estimate on samples and variants
-#' checks for Hardy-Weinberg equilibrium and finds consistent
-#' set of variants across all clusters
-#' 
-
-gmatrixQC <- function(gmatrix, imputationResults, clusters, minVariantCallRate = 0.95,
-                      minSampleCallRate = 0.95){
-  sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
-    length(x[x == 0]) / length(x) })
-  gmatrix <- gmatrix[, which(sampleCallRate > minSampleCallRate)]
-  
-  variantCallRate <- apply(imputationResults, MARGIN = 1, function(x){
-    length(x[x == 0]) / length(x) })
-  gmatrix <- gmatrix[which(variantCallRate > minVariantCallRate), ]
-  
-  pass_variants <- vector("list", length(unique(clusters)))
-  for (i in 1:length(unique(clusters))){
-    pass_variants <- genotypesToCounts()
-  }
-  
-}
-
 #' Write yaml file given the list of US and case counts for 
 #' all clusters
 #' @param clusterResults list of 2 objects - list of US and list of 
 #' case counts list(US, case_counts)
+#' @param variants vector of variant identifiers with REF and ALT alleles
 #' @param outputFileName name of the yaml file to write to
 #' @param collapsing matrix representing cluster collapsing
 #' scheme
@@ -174,6 +154,9 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing, titl
 #' were imputed
 #' @param minVariantCallRate minimal variant call rate
 #' @param minSampleCallRate minimal sample call rate
+#' @param outputFileName name of the YAML file to output
+#' @param title title to put as a first line in yaml file
+#' not working so far
 #' @import mclust
 #' @export
 
