@@ -2,7 +2,6 @@
 #' uses combiM output of clustCombi() function
 #' from Mclust package
 #' @param combiM combiM output of clustCombi() function
-#'
 dendrogramEstimate <- function(combiM){
   stopifnot(class(combiM) == "list")
   G <- length(combiM)
@@ -65,7 +64,8 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
 #' @import plotly
 #' @export
 gmatrixPCA <- function(gmatrix, clusters = NULL){
-  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), k = min(30, ncol(gmatrix)))$v
+  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
+                        k = min(30, ncol(gmatrix)))$v
   pca <- cbind(pca, clusters)
   colnames(pca) <- c(paste("PC", c(1:min(30, ncol(gmatrix))), sep = ""),
                      "Cluster")
@@ -73,7 +73,7 @@ gmatrixPCA <- function(gmatrix, clusters = NULL){
                                            y = pca$PC2,
                                            z = pca$PC3, 
                                            color = pca$Cluster,
-                                           marker = list(size = 2 )))
+                                           marker = list(size = 2)))
   
   list(PCA = pca, plot = p)  
 }
@@ -88,9 +88,9 @@ gmatrixPCA <- function(gmatrix, clusters = NULL){
 #' @param collapsing matrix representing cluster collapsing
 #' scheme
 #' @param title dataset name
-
-writeYaml <- function(clusterResults, variants, outputFileName, collapsing, title = "DNAscoreInput"){
-  if (length(clusterResults) > 1 & missing(collapsing)){
+writeYaml <- function(clusterResults, variants, outputFileName, collapsing, 
+                      title = "DNAscoreInput"){
+  if (length(clusterResults) > 1 && is.null(collapsing) ){
     stop("More than 1 cluster detected, but no collapsing scheme supplied")
   }
   if(missing(outputFileName)){
@@ -107,21 +107,8 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing, titl
                                                        MARGIN = 1,
                                                        paste, collapse = ", "),
                                                  "]", sep = ""))
-    # clusterResults[[i]][[1]] <- 
-    # data.frame(US = paste("[", 
-    #                       apply(clusterResults[[i]]$US, 
-    #                             MARGIN = 1, 
-    #                             paste, collapse = ", "), 
-    #                       "]", sep = ""))
-    # clusterResults[[i]][[2]] <- 
-    #   data.frame(Counts = paste("[", 
-    #                       apply(clusterResults[[i]]$counts, 
-    #                             MARGIN = 1, 
-    #                             paste, collapse = ", "), 
-    #                       "]", sep = ""))
-    # names(clusterResults[[i]]) <- ""
   }
-  if(missing(collapsing)){
+  if(is.null(collapsing)){
     collapsingScheme <- clusterResults
   } else{
     collapsingScheme <- vector("list", nrow(collapsing))
@@ -140,13 +127,11 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing, titl
     }
   }
   
-  collapsingScheme
   yaml::write_yaml(list(Population = collapsingScheme,
                         Variants = variants), 
                    file = outputFileName,
                    column.major = TRUE)
 }
-
 
 #' prepare instance and write yaml file from QC-ed gmatrix
 #' @param gmatrix gmatrix with imputed missing values
@@ -163,19 +148,18 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing, titl
 prepareInstance1 <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
                              minSampleCallRate = 0.95, outputFileName,
                              title = "DNAScoreInput"){
-  nSamples <- ncol(gmatrix)
-  nVariants <- nrow(gmatrix)
   sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
-    length(x[! x]) / length(x) })
+    length(x[! x]) / length(x)
+  })
   gmatrix <- gmatrix[, which(sampleCallRate > minSampleCallRate)]
   
-  
   variantCallRate <- apply(imputationResults, MARGIN = 1, function(x){
-    length(x[! x]) / length(x) })
+    length(x[! x]) / length(x) 
+  })
+  
   gmatrix <- gmatrix[which(variantCallRate > minVariantCallRate), ]
-  imputationResults <- 
-    imputationResults[which(variantCallRate > minVariantCallRate), 
-                      which(sampleCallRate > minSampleCallRate)]
+  imputationResults <- imputationResults[variantCallRate > minVariantCallRate, 
+                                         sampleCallRate > minSampleCallRate]
   
   pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
                         k = min(30, ncol(gmatrix), nrow(gmatrix)))$v
@@ -191,13 +175,12 @@ prepareInstance1 <- function(gmatrix, imputationResults, minVariantCallRate = 0.
     
     case_counts <- vector("list", numberOfClusters)
     for (i in 1:numberOfClusters){
-      case_counts[[i]] <- 
-        genotypesToCounts(gmatrixForCounts[, which(clResults$classification == i)])
+      cluster <- which(clResults$classification == i)
+      case_counts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
     }
+    
     pass_variants <- lapply(case_counts, checkAlleleCounts)
-    pass_variants <- lapply(pass_variants, function(x){
-      which(x)
-    })
+    pass_variants <- lapply(pass_variants, which)
     pass_variants <- Reduce(intersect, pass_variants)
   } else{
     case_counts <- genotypesToCounts(gmatrixForCounts) 
@@ -211,40 +194,25 @@ prepareInstance1 <- function(gmatrix, imputationResults, minVariantCallRate = 0.
   clusterResults <- vector("list", numberOfClusters)
   if (numberOfClusters > 1) {
     for (i in 1:numberOfClusters){
-      
-      svdResult <- 
-        RSpectra::svds(A = gmatrix[, which(clResults$classification == i)], 
-                       k = min(ncol(gmatrix[, which(clResults$classification == i)]),
-                               nrow(gmatrix[, which(clResults$classification == i)])))
+      cluster <- which(clResults$classification == i) 
+      svdResult <- RSpectra::svds(A = gmatrix[, cluster], 
+                                  k = min(length(cluster), 
+                                          nrow(gmatrix)))
       US <- svdResult$u %*% diag(svdResult$d)
-      counts <- genotypesToCounts(gmatrix[, which(clResults$classification == i)])
+      counts <- genotypesToCounts(gmatrix[, cluster])
       clusterResults[[i]] <- list(US = US[, -1], counts = counts)
     }
     names(clusterResults) <- c(1:numberOfClusters)
-  } else {
-    svdResult <- 
-      RSpectra::svds(A = gmatrix, 
-                     k = min(ncol(gmatrix),
-                             nrow(gmatrix)))
-    US <- svdResult$u %*% diag(svdResult$d)
-    counts <- genotypesToCounts(gmatrix)
-    clusterResults[[i]] <- list(US = US[, -1], counts = counts)
-  }
+  } 
   
   if(numberOfClusters == 1){
-    writeYaml(clusterResults = clusterResults,
-              variants = rownames(gmatrix),
-              outputFileName = outputFileName, 
-              title = title)
-  } else{
-    writeYaml(clusterResults = clusterResults, 
-              variants = rownames(gmatrix),
-              outputFileName = outputFileName, 
-              collapsing = collapsing, title = title)
+    collapsing <- NULL
   }
+  writeYaml(clusterResults = clusterResults, 
+            variants = rownames(gmatrix),
+            outputFileName = outputFileName, 
+            collapsing = collapsing, title = title)
   
   message("Kept ", ncol(gmatrix), " out of ", nSamples, " individuals")
   message("Kept ", nrow(gmatrix), " out of ", nVariants, " variants")
-  #list(population = clusterResults, variants = rownames(gmatrix))
-    
 }
