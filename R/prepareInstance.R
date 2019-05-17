@@ -219,19 +219,17 @@ prepareInstance <- function(gmatrix, imputationResults, outputFileName,
   }
   gmatrix <- gmatrix[pass_variants, ]
   clusterResults <- vector("list", numberOfClusters)
-  if (numberOfClusters > 1) {
-    for (i in 1:numberOfClusters){
-      cluster <- which(clResults$classification == i) 
-      k <- min(length(cluster), nrow(gmatrix), maxVectors)
-      svdResult <- suppressWarnings(RSpectra::svds(A = gmatrix[, cluster], 
-                                                   k = k))
-      US <- svdResult$u %*% diag(svdResult$d)
-      counts <- genotypesToCounts(gmatrix[, cluster])
-      clusterResults[[i]] <- list(US = US[, -1], counts = counts, 
-                                  title = paste0("cluster", i))
-    }
-    names(clusterResults) <- c(1:numberOfClusters)
-  } 
+  for (i in 1:numberOfClusters){
+    cluster <- which(clResults$classification == i) 
+    k <- min(length(cluster), nrow(gmatrix), maxVectors)
+    svdResult <- suppressWarnings(RSpectra::svds(A = gmatrix[, cluster], 
+                                                 k = k))
+    US <- svdResult$u %*% diag(svdResult$d)
+    counts <- genotypesToCounts(gmatrix[, cluster])
+    clusterResults[[i]] <- list(US = US[, -1], counts = counts, 
+                                title = paste0("cluster", i))
+  }
+  names(clusterResults) <- c(1:numberOfClusters)
   
   if(numberOfClusters == 1){
     collapsing <- NULL
