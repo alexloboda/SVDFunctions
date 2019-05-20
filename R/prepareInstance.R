@@ -36,14 +36,14 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
   clResults <- mclust::Mclust(data = PCA, G = 1:20, modelNames = "VVV")
   
   if (plotBIC){
-    mclust::plot.Mclust(x = clResults, 
-                        what = "BIC", 
-                        xlab = "Number of Components", 
-                        ylab = "Bayesian Information Criterion")
+    mclust::plot(x = clResults, 
+                 what = "BIC", 
+                 xlab = "Number of Components", 
+                 ylab = "Bayesian Information Criterion")
   }
   
   clCombi <- mclust::clustCombi(clResults)
-  collapsing <- dendrogramEstimate(clCombi)
+  collapsing <- dendrogramEstimate(clCombi$combiM)
   
   if (plotDendrogram){
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
@@ -66,13 +66,15 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
 gmatrixPCA <- function(gmatrix, clusters = NULL){
   pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
                         k = min(30, ncol(gmatrix)))$v
-  pca <- cbind(pca, clusters)
-  colnames(pca) <- c(paste("PC", c(1:min(30, ncol(gmatrix))), sep = ""),
-                     "Cluster")
-  p <- plotly::add_markers(plotly::plot_ly(x = pca$PC1, 
-                                           y = pca$PC2,
-                                           z = pca$PC3, 
-                                           color = pca$Cluster,
+  
+  colnames(pca) <- c(paste("PC", c(1:min(30, ncol(gmatrix))), sep = ""))
+  colors <- if (is.null(clusters)) 1 else clusters 
+  texts <- paste("Sample:", colnames(gmatrix))
+  p <- plotly::add_markers(plotly::plot_ly(x = pca[, "PC1"], 
+                                           y = pca[, "PC2"],
+                                           z = pca[, "PC3"], 
+                                           text = texts, 
+                                           color = colors, 
                                            marker = list(size = 2)))
   
   list(PCA = pca, plot = p)  
@@ -82,6 +84,10 @@ spaces <- function(depth) {
   strrep("  ", depth)
 }
 
+cats <- function(file, depth, ...) {
+  cat(spaces(depth), ..., file = file, sep = "")
+}
+
 writeMatrix <- function(fd, depth, m, title) {
   cat(spaces(depth), title, ":\n", sep = "", file = fd)
   ss <- spaces(depth + 1)
@@ -89,29 +95,10 @@ writeMatrix <- function(fd, depth, m, title) {
   cat(paste0(apply(m, 1, rowF)), file = fd, sep = "")
 }
 
-writeCluster <- function(fd, cluster, depth) {
-  cat("cluster: ", cluster$title, "\n", file = fd)
-  writeMatrix(fd, depth, cluster$US, "US")
-  writeMatrix(fd, depth, cluster$counts, "counts")
-}
-
-writeNode <- function(fd, cluster, clusterResults, depth) {
-  if (class(cluster) == "list") {
-    titles <- c()
-    cat("population:\n", file = fd)
-    cat(spaces(depth + 1), "structure:\n", sep = "", file = fd)
-    for (cl in cluster) {
-      cat(spaces(depth + 2), "- ", file = fd, sep = "")
-      titles <- c(titles, writeNode(fd, cl, clusterResults, depth + 3))
-    }
-    cat(spaces(depth + 1), "cluster: ", paste(titles, collapse = " & "), "\n",
-        file = fd, sep = "")
-    titles
-  } else {
-    cl <- clusterResults[[cluster]]
-    writeCluster(fd, cl, depth)
-    cl$title
-  }
+writeCluster <- function(fd, cluster) {
+  cat("  - cluster: ", cluster$title, "\n", file = fd)
+  writeMatrix(fd, 2, cluster$US, "US")
+  writeMatrix(fd, 2, cluster$counts, "counts")
 }
 
 collapsingToTree <- function(collapsing) {
@@ -134,6 +121,21 @@ collapsingToTree <- function(collapsing) {
   nodes[[length(nodes)]]
 }
 
+writePopulationStructure <- function(tree, fd, depth, titles) {
+  if (length(tree) == 1) {
+    cats(fd, 0, "cluster:\n")
+    id <- tree[[1]]
+    cats(fd, depth + 1, "id: ", id, "\n")
+    cats(fd, depth + 1, "name: ", titles[id], "\n")
+  } else {
+    cats(fd, 0, "split:\n")
+    for (i in 1:length(tree)) {
+      cats(fd, depth + 1, "- ")
+      writePopulationStructure(tree[[i]], fd, depth + 2, titles)
+    }
+  }
+}
+
 writeYaml <- function(clusterResults, variants, outputFileName, collapsing, 
                       title) {
   if (length(clusterResults) > 1 && is.null(collapsing) ){
@@ -148,12 +150,17 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing,
   fd <- file(outputFileName, open = "w")
   on.exit(close(fd))
   cat("title: ", title, "\n", file = fd, sep = "")
-  writeNode(fd, tree, clusterResults, 0)
+  cat("hierarchy:\n  ")
+  titleF <- function(x) x[["title"]]
+  writePopulationStructure(tree, fd, 1, sapply(clusterResults, titleF))
   cat("\nvariants:\n", file = fd)
   for (v in variants) {
     cat("  - ", v, "\n", sep = "", file = fd)
   }
-  cat("\n", file = fd)
+  cat("population:\n", file = fd, sep = "")
+  for (i in 1:length(clusterResults)) {
+    writeCluster(fd, clusterResults[[i]])
+  }
 }
 
 #' prepare instance and write yaml file from QC-ed gmatrix
