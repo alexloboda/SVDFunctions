@@ -33,7 +33,7 @@ dendrogramEstimate <- function(combiM){
 estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
   stopifnot(class(PCA) %in% c("matrix", "data.frame"))
   
-  clResults <- mclust::Mclust(data = PCA, G = 1:20, modelNames = "VVV")
+  clResults <- mclust::Mclust(data = PCA, G = 1:6, modelNames = "VVV")
   
   if (plotBIC){
     mclust::plot(x = clResults, 
@@ -49,43 +49,72 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
   }
   
-  list(clResults = clResults, collapsing = collapsing)
+  clResults$classification
 }
 
 
-#' Estimate PCA from gmatrix without missing values and make 3dplot
+#' Estimate PCA from gmatrix without missing values 
 #' 
 #' PCA is estimated using SVD of the mean centered genotype matrix
 #' PCA coordinates will be needed to perform clustering of the 
 #' case samples to ensure relatively homogenious matching.
 #' @param gmatrix Genotype matrix wihout missing values
+#' @export
+gmatrixPCA <- function(gmatrix, components = 30){
+  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
+                        k = min(components, ncol(gmatrix)))$v
+  
+  colnames(pca) <- c(paste("PC", c(1:min(components, ncol(gmatrix))), sep = ""))
+  rownames(pca) <- colnames(gmatrix)
+  pca
+}
+
+#' Filter gmatrix by minimal sample call rate and minimal variant call rate
+#' @export
+filterGmatrix <- function(gmatrix, imputationResults) {
+  nSamples <- ncol(gmatrix)
+  nVariants <- nrow(gmatrix)
+  sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
+    length(x[! x]) / length(x)
+  })
+  gmatrix <- gmatrix[, which(sampleCallRate > minSampleCallRate)]
+  
+  variantCallRate <- apply(imputationResults, MARGIN = 1, function(x) {
+    length(x[!x]) / length(x) 
+  })
+  
+  gmatrix <- gmatrix[which(variantCallRate > minVariantCallRate), ]
+  imputationResults <- imputationResults[variantCallRate > minVariantCallRate, 
+                                         sampleCallRate > minSampleCallRate]
+  
+  message("Kept ", ncol(gmatrix), " out of ", nSamples, " individuals")
+  message("Kept ", nrow(gmatrix), " out of ", nVariants, " variants")
+  list(gmatrix = gmatrix, imputationResults = imputationResults)
+}
+
+#' Plot 3d PCA plot 
+#' @param PCA
 #' @param clusters character vector of cluster assignment for every
 #' sample in gmatrix
-#' @import plotly
-#' @export
-gmatrixPCA <- function(gmatrix, clusters = NULL){
-  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
-                        k = min(30, ncol(gmatrix)))$v
-  
-  colnames(pca) <- c(paste("PC", c(1:min(30, ncol(gmatrix))), sep = ""))
+#' @inheritParams estimateCaseClusters
+#' @export 
+plotPCA <- function(PCA, clusters = NULL) {
   colors <- if (is.null(clusters)) 1 else clusters 
-  texts <- paste("Sample:", colnames(gmatrix))
-  p <- plotly::add_markers(plotly::plot_ly(x = pca[, "PC1"], 
-                                           y = pca[, "PC2"],
-                                           z = pca[, "PC3"], 
-                                           text = texts, 
-                                           color = colors, 
-                                           marker = list(size = 2)))
-  
-  list(PCA = pca, plot = p)  
+  texts <- paste("Sample:", rownames(PCA))
+  if (!is.null(clusters)) {
+    texts <- paste0(texts, "\nCluster: ", clusters)
+  }
+  plotly::add_markers(plotly::plot_ly(x = PCA[, "PC1"], 
+                                      y = PCA[, "PC2"],
+                                      z = PCA[, "PC3"], 
+                                      text = texts, 
+                                      color = colors, 
+                                      marker = list(size = 2)))
+ 
 }
 
 spaces <- function(depth) {
   strrep("  ", depth)
-}
-
-cats <- function(file, depth, ...) {
-  cat(spaces(depth), ..., file = file, sep = "")
 }
 
 writeMatrix <- function(fd, depth, m, title) {
@@ -121,23 +150,7 @@ collapsingToTree <- function(collapsing) {
   nodes[[length(nodes)]]
 }
 
-writePopulationStructure <- function(tree, fd, depth, titles) {
-  if (length(tree) == 1) {
-    cats(fd, 0, "cluster:\n")
-    id <- tree[[1]]
-    cats(fd, depth + 1, "id: ", id, "\n")
-    cats(fd, depth + 1, "name: ", titles[id], "\n")
-  } else {
-    cats(fd, 0, "split:\n")
-    for (i in 1:length(tree)) {
-      cats(fd, depth + 1, "- ")
-      writePopulationStructure(tree[[i]], fd, depth + 2, titles)
-    }
-  }
-}
-
-writeYaml <- function(clusterResults, variants, outputFileName, collapsing, 
-                      title) {
+writeYaml <- function(clustering, variants, outputFileName, title) {
   if (length(clusterResults) > 1 && is.null(collapsing) ){
     stop("More than 1 cluster detected, but no collapsing scheme supplied")
   }
@@ -175,77 +188,52 @@ writeYaml <- function(clusterResults, variants, outputFileName, collapsing,
 #' @param title title to put as a first line in yaml file
 #' @import mclust
 #' @export
-prepareInstance <- function(gmatrix, imputationResults, outputFileName, 
+prepareInstance <- function(gmatrix, imputationResults, 
+                            outputFileName, 
+                            clusters = NULL, 
                             maxVectors = 50, 
-                            minVariantCallRate = 0.95,
-                            minSampleCallRate = 0.95,
                             title = "DNAScoreInput"){
-  nSamples <- ncol(gmatrix)
-  nVariants <- nrow(gmatrix)
-  sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
-    length(x[! x]) / length(x)
-  })
-  gmatrix <- gmatrix[, which(sampleCallRate > minSampleCallRate)]
-  
-  variantCallRate <- apply(imputationResults, MARGIN = 1, function(x) {
-    length(x[!x]) / length(x) 
-  })
-  
-  gmatrix <- gmatrix[which(variantCallRate > minVariantCallRate), ]
-  imputationResults <- imputationResults[variantCallRate > minVariantCallRate, 
-                                         sampleCallRate > minSampleCallRate]
-  
-  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
-                        k = min(30, ncol(gmatrix), nrow(gmatrix)))$v
-  
-  clResults <- mclust::Mclust(data = pca, G = 1:20, modelNames = "VVV")
-  numberOfClusters <- length(unique(clResults$classification))
+  if (is.null(clusters)) {
+    classes <- rep("Main", nrow(gmatrix))
+    clusters <- clustering(setNames(classes, rownames(gmatrix)), "Main")
+  }
+  stopifnot("clsutering" %in% class(clusters))
+  numberOfClusters <- length(clusters$classes)
 
   gmatrixForCounts <- gmatrix
   gmatrixForCounts[which(imputationResults, arr.ind = TRUE)] <- NA
-  if (numberOfClusters > 1){
-    clCombi <- mclust::clustCombi(clResults)
-    collapsing <- dendrogramEstimate(clCombi$combiM)
-    
-    case_counts <- vector("list", numberOfClusters)
-    for (i in 1:numberOfClusters){
-      cluster <- which(clResults$classification == i)
-      case_counts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
-    }
-    
-    pass_variants <- lapply(case_counts, checkAlleleCounts)
-    pass_variants <- lapply(pass_variants, which)
-    pass_variants <- Reduce(intersect, pass_variants)
-  } else{
-    case_counts <- genotypesToCounts(gmatrixForCounts) 
-    pass_variants <- which(checkAlleleCounts(case_counts))
+  
+  caseCounts <- list()
+  for (i in 1:numberOfClusters){
+    cluster <- which(clusters$classification == i)
+    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
   }
   
-  if(length(pass_variants) < 2){
+  passVariants <- lapply(caseCounts, checkAlleleCounts)
+  passVariants <- lapply(passVariants, which)
+  passVariants <- Reduce(intersect, passVariants)
+    
+  if(length(passVariants) < 2){
     stop("Less than 2 good variants were selected")
   }
-  gmatrix <- gmatrix[pass_variants, ]
+  
+  gmatrix <- gmatrix[passVariants, ]
   clusterResults <- vector("list", numberOfClusters)
   for (i in 1:numberOfClusters){
-    cluster <- which(clResults$classification == i) 
+    cluster <- which(clusters$classification == i) 
+    clusterGenotypes <- gmatrix[, cluster]
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
-    svdResult <- suppressWarnings(RSpectra::svds(A = gmatrix[, cluster], 
+    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, 
                                                  k = k))
     US <- svdResult$u %*% diag(svdResult$d)
-    counts <- genotypesToCounts(gmatrix[, cluster])
+    counts <- genotypesToCounts(clusterGenotypes)
     clusterResults[[i]] <- list(US = US[, -1], counts = counts, 
                                 title = paste0("cluster", i))
   }
-  names(clusterResults) <- c(1:numberOfClusters)
   
-  if(numberOfClusters == 1){
-    collapsing <- NULL
-  }
   writeYaml(clusterResults = clusterResults, 
             variants = rownames(gmatrix),
             outputFileName = outputFileName, 
-            collapsing = collapsing, title = title)
+            clusters = clusters, title = title)
   
-  message("Kept ", ncol(gmatrix), " out of ", nSamples, " individuals")
-  message("Kept ", nrow(gmatrix), " out of ", nVariants, " variants")
 }
