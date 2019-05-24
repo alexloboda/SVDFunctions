@@ -19,6 +19,25 @@ dendrogramEstimate <- function(combiM){
   merge
 }
 
+collapsingToTree <- function(collapsing) {
+  nodes <- list()
+  if (is.null(collapsing)) {
+    return(1)
+  }
+  
+  numToNode <- function(x) {
+    if(x < 0) {
+      -x
+    } else {
+      nodes[[x]]
+    }
+  }
+  
+  for(i in 1:nrow(collapsing)) {
+    nodes[[i]] <- list(numToNode(collapsing[i, 1]), numToNode(collapsing[i, 2]))
+  } 
+  nodes[[length(nodes)]]
+}
 
 #' Estimate clusters within case data
 #' Clusters are estimated from PC loadings using
@@ -29,17 +48,19 @@ dendrogramEstimate <- function(combiM){
 #' @param plotBIC logical whether a plot of Bayesian Information 
 #' Criterion vs cluster number should be returned
 #' @param plotDendrogram whether dendrogram should be plotted
+#' @param clusters maximum number of clusters
 #' @export
-estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
+estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
+                                 clusters = 20){
   stopifnot(class(PCA) %in% c("matrix", "data.frame"))
   
-  clResults <- mclust::Mclust(data = PCA, G = 1:6, modelNames = "VVV")
+  clResults <- mclust::Mclust(data = PCA, G = 1:clusters, modelNames = "VVV")
   
   if (plotBIC){
-    mclust::plot(x = clResults, 
-                 what = "BIC", 
-                 xlab = "Number of Components", 
-                 ylab = "Bayesian Information Criterion")
+    mclust::plot.Mclust(x = clResults, 
+                        what = "BIC", 
+                        xlab = "Number of Components", 
+                        ylab = "Bayesian Information Criterion")
   }
   
   clCombi <- mclust::clustCombi(clResults)
@@ -49,7 +70,7 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE){
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
   }
   
-  clResults$classification
+  clustering(clResults$classification, collapsingToTree(collapsing))
 }
 
 
@@ -71,7 +92,8 @@ gmatrixPCA <- function(gmatrix, components = 30){
 
 #' Filter gmatrix by minimal sample call rate and minimal variant call rate
 #' @export
-filterGmatrix <- function(gmatrix, imputationResults) {
+filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
+                          minSampleCallRate = 0.95) {
   nSamples <- ncol(gmatrix)
   nVariants <- nrow(gmatrix)
   sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
@@ -99,10 +121,10 @@ filterGmatrix <- function(gmatrix, imputationResults) {
 #' @inheritParams estimateCaseClusters
 #' @export 
 plotPCA <- function(PCA, clusters = NULL) {
-  colors <- if (is.null(clusters)) 1 else clusters 
+  colors <- if (is.null(clusters)) 1 else clusters$samples
   texts <- paste("Sample:", rownames(PCA))
   if (!is.null(clusters)) {
-    texts <- paste0(texts, "\nCluster: ", clusters)
+    texts <- paste0(texts, "\nCluster: ", clusters$samples)
   }
   plotly::add_markers(plotly::plot_ly(x = PCA[, "PC1"], 
                                       y = PCA[, "PC2"],
@@ -128,26 +150,6 @@ writeCluster <- function(fd, cluster) {
   cat("  - cluster: ", cluster$title, "\n", file = fd)
   writeMatrix(fd, 2, cluster$US, "US")
   writeMatrix(fd, 2, cluster$counts, "counts")
-}
-
-collapsingToTree <- function(collapsing) {
-  nodes <- list()
-  if (is.null(collapsing)) {
-    return(1)
-  }
-  
-  numToNode <- function(x) {
-    if(x < 0) {
-      -x
-    } else {
-      nodes[[x]]
-    }
-  }
-  
-  for(i in 1:nrow(collapsing)) {
-    nodes[[i]] <- list(numToNode(collapsing[i, 1]), numToNode(collapsing[i, 2]))
-  } 
-  nodes[[length(nodes)]]
 }
 
 writeYaml <- function(clustering, variants, outputFileName, title) {
