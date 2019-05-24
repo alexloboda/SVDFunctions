@@ -80,6 +80,7 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE,
 #' PCA coordinates will be needed to perform clustering of the 
 #' case samples to ensure relatively homogenious matching.
 #' @param gmatrix Genotype matrix wihout missing values
+#' @param components Number of principal components to be computed
 #' @export
 gmatrixPCA <- function(gmatrix, components = 30){
   pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 

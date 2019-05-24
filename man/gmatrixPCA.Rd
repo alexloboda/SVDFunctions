@@ -8,6 +8,8 @@ gmatrixPCA(gmatrix, components = 30)
 }
 \arguments{
 \item{gmatrix}{Genotype matrix wihout missing values}
+
+\item{components}{Number of principal components to be computed}
 }
 \description{
 PCA is estimated using SVD of the mean centered genotype matrix
