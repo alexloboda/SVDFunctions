@@ -15,14 +15,12 @@ were imputed}
 
 \item{outputFileName}{name of the YAML file to output}
 
+\item{clusters}{clustering object}
+
 \item{maxVectors}{maximum number of principal directions for each cluster
 to be computed and written to a file}
 
 \item{title}{title to put as a first line in yaml file}
-
-\item{minVariantCallRate}{minimal variant call rate}
-
-\item{minSampleCallRate}{minimal sample call rate}
 }
 \description{
 prepare instance and write yaml file from QC-ed gmatrix

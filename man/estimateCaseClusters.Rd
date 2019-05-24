@@ -8,7 +8,8 @@ Gaussian mixed model fitting from Mclust package
 using ellipsoidal, varying volume, shape, and orientation
 model ("VVV")}
 \usage{
-estimateCaseClusters(PCA, plotBIC = FALSE, plotDendrogram = FALSE)
+estimateCaseClusters(PCA, plotBIC = FALSE, plotDendrogram = FALSE,
+  clusters = 20)
 }
 \arguments{
 \item{PCA}{results of gmatrix principal component analysis}
@@ -17,6 +18,8 @@ estimateCaseClusters(PCA, plotBIC = FALSE, plotDendrogram = FALSE)
 Criterion vs cluster number should be returned}
 
 \item{plotDendrogram}{whether dendrogram should be plotted}
+
+\item{clusters}{maximum number of clusters}
 }
 \description{
 Estimate clusters within case data

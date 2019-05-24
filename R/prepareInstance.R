@@ -91,6 +91,9 @@ gmatrixPCA <- function(gmatrix, components = 30){
 }
 
 #' Filter gmatrix by minimal sample call rate and minimal variant call rate
+#' @param minVariantCallRate minimal variant call rate
+#' @param minSampleCallRate minimal sample call rate
+#' @inheritParams prepareInstance
 #' @export
 filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
                           minSampleCallRate = 0.95) {
@@ -115,9 +118,8 @@ filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
 }
 
 #' Plot 3d PCA plot 
-#' @param PCA
-#' @param clusters character vector of cluster assignment for every
-#' sample in gmatrix
+#' @param PCA pca of genotype matrix returned by function gmatrixPCA
+#' @inheritParams prepareInstance
 #' @inheritParams estimateCaseClusters
 #' @export 
 plotPCA <- function(PCA, clusters = NULL) {
@@ -152,27 +154,28 @@ writeCluster <- function(fd, cluster) {
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
 
-writeYaml <- function(clustering, variants, outputFileName, title) {
-  if (length(clusterResults) > 1 && is.null(collapsing) ){
-    stop("More than 1 cluster detected, but no collapsing scheme supplied")
-  }
-  
+writeYaml <- function(clusterResults, clustering, variants, 
+                      outputFileName, title) {
   if(missing(outputFileName)){
     stop("Output file name missing")
   }
   
-  tree <- collapsingToTree(collapsing)
   fd <- file(outputFileName, open = "w")
   on.exit(close(fd))
-  cat("title: ", title, "\n", file = fd, sep = "")
-  cat("hierarchy:\n  ")
-  titleF <- function(x) x[["title"]]
-  writePopulationStructure(tree, fd, 1, sapply(clusterResults, titleF))
-  cat("\nvariants:\n", file = fd)
-  for (v in variants) {
-    cat("  - ", v, "\n", sep = "", file = fd)
+  
+  write <- function(...) {
+    cat(..., file = fd, sep = "")
   }
-  cat("population:\n", file = fd, sep = "")
+  
+  write("title: ", title, "\n")
+  write("hierarchy:\n  ")
+  titleF <- function(x) x[["title"]]
+  writePopulationStructure(clustering$hier, clustering$classes, fd, 1)
+  write("\nvariants:\n")
+  for (v in variants) {
+    write("  - ", v, "\n")
+  }
+  write("population:\n")
   for (i in 1:length(clusterResults)) {
     writeCluster(fd, clusterResults[[i]])
   }
@@ -182,12 +185,11 @@ writeYaml <- function(clustering, variants, outputFileName, title) {
 #' @param gmatrix gmatrix with imputed missing values
 #' @param imputationResults matrix indicating which genotypes
 #' were imputed
-#' @param minVariantCallRate minimal variant call rate
 #' @param maxVectors maximum number of principal directions for each cluster
 #' to be computed and written to a file
-#' @param minSampleCallRate minimal sample call rate
 #' @param outputFileName name of the YAML file to output
 #' @param title title to put as a first line in yaml file
+#' @param clusters clustering object
 #' @import mclust
 #' @export
 prepareInstance <- function(gmatrix, imputationResults, 
@@ -199,7 +201,7 @@ prepareInstance <- function(gmatrix, imputationResults,
     classes <- rep("Main", nrow(gmatrix))
     clusters <- clustering(setNames(classes, rownames(gmatrix)), "Main")
   }
-  stopifnot("clsutering" %in% class(clusters))
+  stopifnot("clustering" %in% class(clusters))
   numberOfClusters <- length(clusters$classes)
 
   gmatrixForCounts <- gmatrix
@@ -207,7 +209,7 @@ prepareInstance <- function(gmatrix, imputationResults,
   
   caseCounts <- list()
   for (i in 1:numberOfClusters){
-    cluster <- which(clusters$classification == i)
+    cluster <- which(clusters$samples == i)
     caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
   }
   
@@ -222,7 +224,7 @@ prepareInstance <- function(gmatrix, imputationResults,
   gmatrix <- gmatrix[passVariants, ]
   clusterResults <- vector("list", numberOfClusters)
   for (i in 1:numberOfClusters){
-    cluster <- which(clusters$classification == i) 
+    cluster <- which(clusters$samples == i) 
     clusterGenotypes <- gmatrix[, cluster]
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
     svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, 
@@ -230,12 +232,12 @@ prepareInstance <- function(gmatrix, imputationResults,
     US <- svdResult$u %*% diag(svdResult$d)
     counts <- genotypesToCounts(clusterGenotypes)
     clusterResults[[i]] <- list(US = US[, -1], counts = counts, 
-                                title = paste0("cluster", i))
+                                title = i)
   }
   
-  writeYaml(clusterResults = clusterResults, 
+  writeYaml(clusterResults, clusters, 
             variants = rownames(gmatrix),
             outputFileName = outputFileName, 
-            clusters = clusters, title = title)
+            title = title)
   
 }
