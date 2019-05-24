@@ -55,8 +55,8 @@ plainTree <- function(tree, classes) {
 #' @export
 clustering <- function(classification, hierarchy) {
   classes <- as.character(unique(classification))
-  map <- setNames(1:length(classes), classes)
-  classification <- setNames(map[classification], names(classification))
+  map <- stats::setNames(1:length(classes), classes)
+  classification <- stats::setNames(map[classification], names(classification))
   left <- checkTree(hierarchy, classes)
   hierarchy <- plainTree(hierarchy, classes)
   if(length(left) != 0) {
@@ -67,7 +67,7 @@ clustering <- function(classification, hierarchy) {
 }
 
 #' @export
-print.clustering <- function(x) {
+print.clustering <- function(x, ...) {
   cat("Classes: ", paste(x$classes, collapse = ", "), "\n\n")
   writePopulationStructure(x$hier, x$classes, stdout(), 0)
 }

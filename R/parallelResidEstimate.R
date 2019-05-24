@@ -1,19 +1,3 @@
-samplingReplaceMissing <- function(genotypeMatrix) {
-  pb <- txtProgressBar(min = 0,
-                       max = nrow(genotypeMatrix),
-                       style = 3)
-  for (i in 1:nrow(genotypeMatrix)) {
-    nas <- which(is.na(genotypeMatrix[i, ]) == TRUE)
-    if (length(nas) > 0) {
-      genotypeMatrix[i, nas] <-
-        sample(genotypeMatrix[i,-nas], length(nas), replace = TRUE)
-    }
-    setTxtProgressBar(pb, i)
-  }
-  return(genotypeMatrix)
-}
-
-
 #' Estimation of residual vector norms for all controls
 #' 
 #' @param genotypeMatrix Genotype matrix
