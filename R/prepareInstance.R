@@ -133,7 +133,7 @@ plotPCA <- function(PCA, clusters = NULL) {
                                       y = PCA[, "PC2"],
                                       z = PCA[, "PC3"], 
                                       text = texts, 
-                                      color = colors, 
+                                      color = as.character(colors), 
                                       marker = list(size = 2)))
  
 }
