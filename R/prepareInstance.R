@@ -63,8 +63,13 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE,
                         ylab = "Bayesian Information Criterion")
   }
   
-  clCombi <- mclust::clustCombi(clResults)
-  collapsing <- dendrogramEstimate(clCombi$combiM)
+  clusters <- clResults$G
+  if (clusters > 1) {
+    clCombi <- mclust::clustCombi(clResults)
+    collapsing <- dendrogramEstimate(clCombi$combiM)
+  } else {
+    collapsing <- NULL
+  }
   
   if (plotDendrogram){
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
@@ -82,7 +87,7 @@ estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE,
 #' @param gmatrix Genotype matrix wihout missing values
 #' @param components Number of principal components to be computed
 #' @export
-gmatrixPCA <- function(gmatrix, components = 30){
+gmatrixPCA <- function(gmatrix, components = 10){
   pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
                         k = min(components, ncol(gmatrix)))$v
   
@@ -202,6 +207,7 @@ prepareInstance <- function(gmatrix, imputationResults,
     classes <- rep("Main", nrow(gmatrix))
     clusters <- clustering(setNames(classes, rownames(gmatrix)), "Main")
   }
+  
   stopifnot("clustering" %in% class(clusters))
   numberOfClusters <- length(clusters$classes)
 

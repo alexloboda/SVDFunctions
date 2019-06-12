@@ -27,6 +27,7 @@ checkAlleleCounts <- function(countsMatrix) {
 #' Otherwise no results will be returned. Minimal size of control set 
 #' is \code{min} samples for privacy preservation reasons.
 #' @param genotypeMatrix Genotype matrix
+#' @param originalGenotypeMatrix Genotype matrix with no imputation applied 
 #' @param SVDReference Reference basis of the left singular vectors
 #' @param caseCounts Matrix with summary genotype counts from cases
 #' @param minLambda Minimum possible lambda
@@ -37,28 +38,37 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param min Minimal size of a control set that is permitted for return
 #' @param binSize sliding window size for optimal lambda search
 #' @export
-selectControls <- function(genotypeMatrix, SVDReference, caseCounts, 
+selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
+                           SVDReference, caseCounts, 
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
                            min = 500, nSV = 5, binSize = 1) {
-  gmatrix <- genotypeMatrix
-  stopifnot(is.matrix(gmatrix))
-  mode(gmatrix) <- "integer"
-  residuals <- parallelResidEstimate(gmatrix, SVDReference, nSV)
-  new_order <- order(residuals)
-  control_names <- names(residuals)[new_order] 
-  if (dim(gmatrix)[1] != dim(caseCounts)[1] | length(residuals) != dim(gmatrix)[2]) {
+  stopifnot(is.matrix(genotypeMatrix))
+  stopifnot(is.matrix(originalGenotypeMatrix))
+  stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
+  mode(genotypeMatrix) <- "numeric"
+  mode(originalGenotypeMatrix) <- "numeric"
+  stopifnot(any(is.na(genotypeMatrix)))
+  
+  if (nrow(genotypeMatrix) != nrow(caseCounts) || 
+      nrow(genotypeMatrix) != nrow(SVDReference)) {
     stop("Check dimensions of the matrices")
   }
+  
+  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference, nSV)
+  new_order <- order(residuals)
+  control_names <- names(residuals)[new_order] 
+  
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
+  gmatrix <- originalGenotypeMatrix
   result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
                       stats::qchisq(stats::ppoints(100000), df = 1), 
                       minLambda, softMinLambda, maxLambda, softMaxLambda, 
                       min, binSize)
   result$residuals <- setNames(residuals, colnames(gmatrix))
   result$residuals <- result$residuals[new_order]
-  if (result$controls >= 1) {
+  if (result$controls > 0) {
     result$controls <- control_names[1:result$controls]
   } else {
     result$controls <- c()
