@@ -7,10 +7,7 @@
 #' @export
 parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
 {
-    gmatrix <- samplingReplaceMissing(genotypeMatrix)
-    gc()
     preprocessed.ref <- computeResidual.preproc(SVDReference, seq(1, nSV, 1))
     resiudals <- preprocessed.ref %*% gmatrix
-    gc()
     apply(resiudals, MARGIN = 2, function(x) norm(x, type = "2"))
 }
