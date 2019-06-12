@@ -48,7 +48,7 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
   mode(originalGenotypeMatrix) <- "numeric"
-  stopifnot(any(is.na(genotypeMatrix)))
+  stopifnot(all(!is.na(genotypeMatrix)))
   
   if (nrow(genotypeMatrix) != nrow(caseCounts) || 
       nrow(genotypeMatrix) != nrow(SVDReference)) {
