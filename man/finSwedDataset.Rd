@@ -4,7 +4,7 @@
 \name{finSwedDataset}
 \alias{finSwedDataset}
 \title{Finnish & Swedish exome collection dataset preparation pack}
-\format{An object of class \code{list} of length 2.}
+\format{An object of class \code{list} of length 1.}
 \usage{
 finSwedDataset
 }

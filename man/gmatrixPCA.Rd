@@ -4,7 +4,7 @@
 \alias{gmatrixPCA}
 \title{Estimate PCA from gmatrix without missing values}
 \usage{
-gmatrixPCA(gmatrix, components = 30)
+gmatrixPCA(gmatrix, components = 10)
 }
 \arguments{
 \item{gmatrix}{Genotype matrix wihout missing values}

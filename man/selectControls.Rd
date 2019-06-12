@@ -4,12 +4,15 @@
 \alias{selectControls}
 \title{Selection of the optimal set of controls}
 \usage{
-selectControls(genotypeMatrix, SVDReference, caseCounts,
-  minLambda = 0.75, softMinLambda = 0.9, softMaxLambda = 1.05,
-  maxLambda = 1.3, min = 500, nSV = 5, binSize = 1)
+selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
+  caseCounts, minLambda = 0.75, softMinLambda = 0.9,
+  softMaxLambda = 1.05, maxLambda = 1.3, min = 500, nSV = 5,
+  binSize = 1)
 }
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}
+
+\item{originalGenotypeMatrix}{Genotype matrix with no imputation applied}
 
 \item{SVDReference}{Reference basis of the left singular vectors}
 
