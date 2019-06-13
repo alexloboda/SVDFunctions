@@ -105,13 +105,13 @@ filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
                           minSampleCallRate = 0.95) {
   nSamples <- ncol(gmatrix)
   nVariants <- nrow(gmatrix)
-  sampleCallRate <- apply(imputationResults, MARGIN = 2, function(x){
-    length(x[! x]) / length(x)
+  sampleCallRate <- apply(imputationResults, 2, function(x){
+    sum(!x) / length(x)
   })
   gmatrix <- gmatrix[, which(sampleCallRate > minSampleCallRate)]
   
-  variantCallRate <- apply(imputationResults, MARGIN = 1, function(x) {
-    length(x[!x]) / length(x) 
+  variantCallRate <- apply(imputationResults, 1, function(x) {
+    sum(!x) / length(x) 
   })
   
   gmatrix <- gmatrix[which(variantCallRate > minVariantCallRate), ]
@@ -238,7 +238,7 @@ prepareInstance <- function(gmatrix, imputationResults,
                                                  k = k))
     US <- svdResult$u %*% diag(svdResult$d)
     counts <- genotypesToCounts(clusterGenotypes)
-    clusterResults[[i]] <- list(US = US[, -1], counts = counts, 
+    clusterResults[[i]] <- list(US = US, counts = counts, 
                                 title = i)
   }
   

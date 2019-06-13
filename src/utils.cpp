@@ -53,6 +53,11 @@ matching_results::matching_results(int opt_prefix, double opt_lmd, std::vector<d
         :optimal_prefix(opt_prefix), optimal_lambda(opt_lmd), pvals(std::move(p_values)),
         lambdas(std::move(lmbds)), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)) {}
 
+double lambda_1000(double lambda_observed, long cases, long controls) {
+    double coefficient = 1.0 / cases + 1.0 / controls;
+    return 1.0 + ((lambda_observed - 1) * coefficient) / (2 * 0.001);
+}
+
 bool check_counts(unsigned hom_ref, unsigned het, unsigned hom) {
     if (hom < hom_ref) {
         std::swap(hom, hom_ref);
@@ -131,7 +136,12 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
                 pvals_lm.set(j, chi2(j, n_pvals, qchisq), qchisq(pvals[j]), 1, false);
             }
             pvals_lm.solve();
+
             double cur_lambda = pvals_lm.get_lambda();
+            long cases = std::accumulate(case_counts[0].begin(), case_counts[0].end(), 0);
+            long controls = std::accumulate(counts[0].begin(), counts[0].end(), 0);
+            cur_lambda = lambda_1000(cur_lambda, cases, controls);
+
             lambdas.push_back(cur_lambda);
             lambda_i.push_back(i + 1);
             pvals_num.push_back(pvals.size());
