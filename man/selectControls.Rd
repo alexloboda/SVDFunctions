@@ -2,7 +2,7 @@
 % Please edit documentation in R/selectControls.R
 \name{selectControls}
 \alias{selectControls}
-\title{Selection of the optimal set of controls}
+\title{Select a set of controls that matches to a set of cases}
 \usage{
 selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
   caseCounts, minLambda = 0.75, softMinLambda = 0.9,

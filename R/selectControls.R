@@ -17,7 +17,7 @@ checkAlleleCounts <- function(countsMatrix) {
   quality_control_impl(countsMatrix)
 }
 
-#' Selection of the optimal set of controls
+#' Select a set of controls that matches to a set of cases
 #' 
 #' Finds an optimal set of controls satisfying 
 #' \eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}

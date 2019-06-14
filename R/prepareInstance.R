@@ -248,3 +248,29 @@ prepareInstance <- function(gmatrix, imputationResults,
             title = title)
   
 }
+
+processHierarchy <- function(hier) {
+  if (names(hier) == "split") {
+    list(left = processHierarchy(hier$split[[1]]), 
+         right = processHierarchy(hier$split[[2]]), 
+         type = "split")
+  } else {
+    c(hier$cluster, list(type = "leaf"))
+  }
+}
+
+#' Read instance from YML file 
+#' @param filename YML file
+#' @return a list of four: title of dataset, list of variants, hierarchy and
+#' population description
+#' @export
+readInstanceFromYml <- function(filename) {
+  inst <- yaml::read_yaml(filename)
+  inst$population <- lapply(inst$population, function(x) {
+    x$counts <- do.call(rbind, x$counts)
+    x$US <- do.call(rbind, x$US)
+    x
+  })
+  inst$hierarchy <- processHierarchy(inst$hierarchy)
+  inst
+}
