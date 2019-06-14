@@ -46,6 +46,27 @@ matchControlsCluster <- function(cases, gmatrix, original, variants,
   }
 }
 
+distributeControls <- function(residuals, threshold = 100) {
+  if (nrow(residuals) == 0) {
+    return(NULL)
+  }
+  residuals <- residuals[order(residuals$value), ]
+  while (TRUE) {
+    if (nrow(residuals) == 0) {
+      return(residuals)
+    }
+    top <- residuals[!duplicated(residuals$sample), ]
+    clusterCounts <- table(top$cluster)
+    outsider <- which.min(clusterCounts)
+    if (clusterCounts[outsider] >= threshold) {
+      return(top)
+    } else {
+      residuals <- residuals[residuals$cluster != outsider, ]
+    }
+  }
+  residuals
+}
+
 mergeCases <- function(left, right) {
   ret <- list()
   ret$cluster <- paste(left$cluster, " & ", right$cluster)
@@ -57,17 +78,15 @@ mergeCases <- function(left, right) {
 }
 
 recSelect <- function(gmatrix, original, variants, cases, 
-                      hierNode, separate, threshold, ...) {
+                      hierNode, threshold, separate, ...) {
   if (hierNode$type == "leaf") {
-    curr <- cases$population[[hierNode$id]]
+    curr <- cases[[hierNode$id]]
     curr$variants <- cases$variants
     controls <- matchControlsCluster(curr, gmatrix, original, variants, ...)
     list(cases = curr, controls = unique(controls$sample), table = controls)
   } else {
-    left <- recSelect(gmatrix, original, variants, cases, hierNode$left, 
-                      separate, ...)
-    right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
-                      separate, ...)
+    left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  ...)
+    right <- recSelect(gmatrix, original, variants, cases, hierNode$right, ...)
     mergedCases <- mergeCases(left$cases, right$cases)
     merged <- matchControlsCluster(mergeCases(left$cases, righ$cases), gmatrix, 
                                   original, variants, threshold, ...)
@@ -76,6 +95,10 @@ recSelect <- function(gmatrix, original, variants, cases,
       list(cases = mergedCases, controls = merged$controls, table = merged)
     } else {
       table <- rbind(left$table, right$table)
+      if (separate) {
+        table <- distributeControls(table)
+        jointControls <- unique(table$sample)
+      }
       list(cases = mergedCases, controls = jointControls, table = table)
     }
   }
@@ -98,7 +121,7 @@ recSelect <- function(gmatrix, original, variants, cases,
 selectControlsHier <- function(controlGMatrix, controlVariants, cases, 
                                imputationMatrix = NULL, 
                                originalControlGMatrix = NULL, 
-                               separate = FALSE, ...) {
+                               separate = FALSE, minControls, ...) {
   stopifnot(all(!is.na(controlGMatrix)))
   if (is.null(originalControlGMatrix)) {
     originalControlGMatrix <- controlGMatrix
@@ -109,5 +132,7 @@ selectControlsHier <- function(controlGMatrix, controlVariants, cases,
   }
   
   checkCaseInfo(cases$variants, variants)
-  recSelect()
+  selection <- recSelect(controlGMatrix, originalControlGMatrix, 
+                         cases$population, cases$hierarchy, minControls, 
+                         separate, ...)
 }
