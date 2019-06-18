@@ -140,7 +140,7 @@ recSelect <- function(gmatrix, original, variants, cases,
 #' Missing values are allowed.
 #' @param minControls integer minimum number of controls selected for 
 #' each cluster
-#' @param  numeric coefficient of preference of merging clusters.
+#' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
 #' @inheritParams selectControls
 #' @export

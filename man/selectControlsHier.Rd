@@ -27,13 +27,13 @@ Missing values are allowed.}
 \item{minControls}{integer minimum number of controls selected for 
 each cluster}
 
+\item{clusterMergeCoef}{numeric coefficient of preference of merging clusters.}
+
 \item{softMinLambda}{Desirable minimum for lambda}
 
 \item{softMaxLambda}{Desirable maximum for lambda}
 
 \item{...}{parameters to be passed to selectControls function.}
-
-\item{numeric}{coefficient of preference of merging clusters.}
 }
 \description{
 Select a set of controls that matches a set of cases
