@@ -1,4 +1,4 @@
-checkCaseInfo <- function(cases, variants, min_controls) {
+checkCaseInfo <- function(cases, variants) {
   if (nrow(cases$counts) != nrow(cases$US)) {
     stop("Case counts table does not correspond to U matrix")
   }
@@ -17,14 +17,11 @@ checkCaseInfo <- function(cases, variants, min_controls) {
                paste(cases$variants[extra_variants][1:num], 
                      collapse = ", ")))
   }
-  
-  if (length(cases$variants) < min_controls) {
-    stop("Too little variants available for analysis.")
-  }
 }
 
 matchControlsCluster <- function(cases, gmatrix, original, variants,
                                  controlsThreshold, ...) {
+  checkCaseInfo(cases, variants)
   sharedSites <- intersect(cases$variants, variants)
   selector <- which(variants %in% sharedSites)
   gmatrix <- gmatrix[selector, ]
@@ -38,9 +35,12 @@ matchControlsCluster <- function(cases, gmatrix, original, variants,
   results <- selectControls(gmatrix, original, U, cases$counts, ...)
   
   if (length(results$controls) > controlsThreshold) {
-    resid <- results$residuals
-    data.frame(sample = names(resid), value = resid, cluster = cases$cluster, 
-               stringsAsFactors = FALSE, row.names = NULL)
+    resid <- results$residuals[results$controls]
+    df <- data.frame(sample = names(resid), value = resid, 
+                     cluster = cases$cluster, stringsAsFactors = FALSE, 
+                     row.names = NULL)
+    list(resid = df, pvals = results$pvals, cl = cases$cluster, 
+         lambda = results$optimal_lambda)
   } else {
     NULL
   }
@@ -69,37 +69,61 @@ distributeControls <- function(residuals, threshold = 100) {
 
 mergeCases <- function(left, right) {
   ret <- list()
-  ret$cluster <- paste(left$cluster, " & ", right$cluster)
+  ret$cluster <- paste0(left$cluster, ", ", right$cluster)
   ret$counts <- left$counts + right$counts
   svd <- RSpectra::svds(cbind(left$US, right$US), k = max(ncol(left$US), 
                                                           ncol(right$US)))
   ret$US <- svd$u %*% diag(svd$d)
+  ret$variants <- left$variants
   ret
 }
 
 recSelect <- function(gmatrix, original, variants, cases, 
-                      hierNode, threshold, separate, ...) {
+                      hierNode, threshold, clusterMergeCoef, 
+                      softMinLambda, softMaxLambda, 
+                      ...) {
+  filterSamples <- function(l, samples) {
+    if(l >= softMinLambda && l <= softMaxLambda) {
+      samples
+    } else {
+      c()
+    }
+  }
   if (hierNode$type == "leaf") {
-    curr <- cases[[hierNode$id]]
+    curr <- cases$population[[hierNode$id]]
     curr$variants <- cases$variants
-    controls <- matchControlsCluster(curr, gmatrix, original, variants, ...)
-    list(cases = curr, controls = unique(controls$sample), table = controls)
+    matching <- matchControlsCluster(curr, gmatrix, original, variants, 
+                                     threshold, ...)
+    controls <- matching$resid
+    pvals <- list()
+    pvals[[matching$cl]] <- matching$pvals
+    samples <- filterSamples(matching$lambda, controls$sample)
+    
+    list(cases = curr, controls = samples, table = controls, pvals = pvals)
   } else {
-    left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  ...)
-    right <- recSelect(gmatrix, original, variants, cases, hierNode$right, ...)
+    left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  
+                      threshold, clusterMergeCoef,  softMinLambda,
+                      softMaxLambda, ...)
+    right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
+                       threshold, clusterMergeCoef, softMinLambda, 
+                       softMaxLambda, ...)
     mergedCases <- mergeCases(left$cases, right$cases)
-    merged <- matchControlsCluster(mergeCases(left$cases, righ$cases), gmatrix, 
-                                  original, variants, threshold, ...)
+    mergedMatching <- matchControlsCluster(mergeCases(left$cases, right$cases), 
+                                           gmatrix, original, variants, 
+                                           threshold, ...)
+    mergedSample <- filterSamples(mergedMatching$lambda, mergedMatching$resid$sample)
+    merged <- mergedMatching$resid
     jointControls <- union(left$controls, right$controls)
-    if (length(merged$controls) >= length(jointControls)) {
-      list(cases = mergedCases, controls = merged$controls, table = merged)
+    if (length(mergedSample) >= (1.0 / clusterMergeCoef) * length(jointControls)) {
+      pvals <- list()
+      pvals[[mergedMatching$cl]] <- mergedMatching$pvals
+      list(cases = mergedCases, controls = merged$sample, table = merged, 
+           pvals = pvals)
     } else {
       table <- rbind(left$table, right$table)
-      if (separate) {
-        table <- distributeControls(table)
-        jointControls <- unique(table$sample)
-      }
-      list(cases = mergedCases, controls = jointControls, table = table)
+      pvals <- c(left$pvals, right$pvals)
+      list(cases = mergedCases, controls = jointControls, table = table, 
+           pvals = pvals)
     }
   }
 }
@@ -108,20 +132,24 @@ recSelect <- function(gmatrix, original, variants, cases,
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt). 
 #' Intermediate values are allowed, NAs are not.
 #' @param controlVariants character vector of variants(format: "chrN:POS\\tREF\\tALT") 
-#' @param  cases result of calling function readInstanceFromYml.
-#' @param  imputationMatrix logical matrix of the same dimentions as 
+#' @param cases result of calling function readInstanceFromYml.
+#' @param imputationMatrix logical matrix of the same dimentions as 
 #' controlGMatrix. Element is set to TRUE if the corresponding value has been
 #' imputed in controlGMatrix.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt).
 #' Missing values are allowed.
-#' @param separate logical if TRUE results will not contain overlapping 
-#' sets of controls.
+#' @param minControls integer minimum number of controls selected for 
+#' each cluster
+#' @param  numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
+#' @inheritParams selectControls
 #' @export
 selectControlsHier <- function(controlGMatrix, controlVariants, cases, 
                                imputationMatrix = NULL, 
                                originalControlGMatrix = NULL, 
-                               separate = FALSE, minControls, ...) {
+                               minControls = 50, clusterMergeCoef = 1.1, 
+                               softMinLambda = 0.9, softMaxLambda = 1.05, 
+                               ...) {
   stopifnot(all(!is.na(controlGMatrix)))
   if (is.null(originalControlGMatrix)) {
     originalControlGMatrix <- controlGMatrix
@@ -131,8 +159,7 @@ selectControlsHier <- function(controlGMatrix, controlVariants, cases,
     }
   }
   
-  checkCaseInfo(cases$variants, variants)
-  selection <- recSelect(controlGMatrix, originalControlGMatrix, 
-                         cases$population, cases$hierarchy, minControls, 
-                         separate, ...)
+  recSelect(controlGMatrix, originalControlGMatrix, controlVariants, 
+            cases, cases$hierarchy, minControls, clusterMergeCoef, 
+            softMinLambda, softMaxLambda, ...)
 }
