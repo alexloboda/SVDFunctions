@@ -36,13 +36,13 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param maxLambda Maximum possible lambda
 #' @param nSV Number of singular vectors to be used for reconstruction of the 
 #' @param min Minimal size of a control set that is permitted for return
-#' @param binSize sliding window size for optimal lambda search
 #' @export
 selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
                            SVDReference, caseCounts, 
+                           controlsClustering = NULL,
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
-                           min = 500, nSV = 5, binSize = 1) {
+                           min = 500, nSV = 5) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -55,21 +55,27 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
     stop("Check dimensions of the matrices")
   }
   
+  cl <- controlsClustering
+  if (is.null(cl)) {
+    cl <- 0:(ncol(genotypeMatrix) - 1)
+  } else {
+    cl <- as.integer(as.factor(cl)) - 1
+  }
+  
   residuals <- parallelResidEstimate(genotypeMatrix, SVDReference, nSV)
-  new_order <- order(residuals)
-  control_names <- names(residuals)[new_order] 
   
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
-  result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
+  result <- select_controls_cpp(gmatrix, residuals, caseCounts, cl, 
                       stats::qchisq(stats::ppoints(100000), df = 1), 
-                      minLambda, softMinLambda, maxLambda, softMaxLambda, 
-                      min, binSize)
+                      minLambda, softMinLambda, maxLambda, softMaxLambda, min)
+  permutation <- results$permutation
   result$residuals <- setNames(residuals, colnames(gmatrix))
-  result$residuals <- result$residuals[new_order]
+  results$residuals <- result$residuals[permutation]
+  
   if (result$controls > 0) {
-    result$controls <- control_names[1:result$controls]
+    result$controls <- colnames(gmatrix)[head(permutation, results$controls)]
   } else {
     result$controls <- c()
   }

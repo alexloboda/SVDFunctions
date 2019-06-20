@@ -2,27 +2,59 @@
 #include <Rcpp.h>
 #include <algorithm>
 
-namespace {
-
 using std::vector;
 using std::tuple;
 
 const double chi2_bdry = 10.82757;
 
-void sort_controls(vector<vector<int>>& gmatrix, vector<double>& residuals) {
-    vector<int> perm(residuals.size());
-    std::iota(perm.begin(), perm.end(), 0);
-    std::sort(perm.begin(), perm.end(), [&residuals](int pos_a, int pos_b){
-        return residuals[pos_a] < residuals[pos_b];
-    });
-    vector<vector<int>> gm;
-    vector<double> sorted_residuals;
-    for (size_t i = 0; i < residuals.size(); i++) {
-        gm.push_back(std::move(gmatrix[perm[i]]));
-        sorted_residuals.push_back(residuals[perm[i]]);
+Clustering::Iterator::Iterator(const Clustering& object) :obj(object) {}
+
+Control Clustering::Iterator::next() {
+    int curr_size = obj.cluster_sizes[cluster];
+    Control ret;
+    ret.number = obj.clusters[obj.permutation[cluster]][shift];
+    if (shift == curr_size) {
+        ret.last = true;
+        cluster++;
+        shift = 0;
     }
-    gmatrix = std::move(gm);
-    residuals = std::move(sorted_residuals);
+    return ret;
+}
+
+
+Clustering::Clustering(const vector<double>& residuals, const vector<int>& clustering) {
+    n = residuals.size();
+    if (clustering.empty()) {
+        throw std::invalid_argument("Clustering must not be empty");
+    }
+
+    int n_clsuters = *std::max(clustering.begin(), clustering.end());
+    cluster_sizes.resize(n_clsuters);
+    res.resize(n_clsuters);
+    clusters.resize(n_clsuters);
+    for (int i = 0; i < clustering.size(); i++) {
+        int cl = clustering[i];
+        ++cluster_sizes[cl];
+        res[cl] += residuals[i];
+        clusters[cl].push_back(i);
+    }
+    for (int i = 0; i < residuals.size(); i++) {
+        res[i] /= cluster_sizes[i];
+    }
+
+    permutation.resize(n_clsuters);
+    std::iota(permutation.begin(), permutation.end(), 0);
+    std::sort(permutation.begin(), permutation.end(), [this](int pos_a, int pos_b) {
+        return res[pos_a] < res[pos_b];
+    });
+}
+
+Clustering::Iterator Clustering::iterator() const {
+    return Clustering::Iterator(*this);
+}
+
+size_t Clustering::size() const {
+    return n;
 }
 
 std::vector<bool> check_user_counts(std::vector<std::vector<int>>& case_counts) {
@@ -44,8 +76,6 @@ double chi2_aux(double obs, double exp) {
 double chi2(int k, int n, std::function<double(double)>& qchisq) {
     double a = n <= 10 ? 3.0 / 8.0 : 0.5;
     return qchisq((k + 1 - a) / (n + 1 - 2 * a));
-}
-
 }
 
 matching_results::matching_results(int opt_prefix, double opt_lmd, std::vector<double>&& p_values,
@@ -70,17 +100,17 @@ bool check_counts(unsigned hom_ref, unsigned het, unsigned hom) {
     return p > 0.05 &&  AC > 10 && chi2 < chi2_bdry;
 }
 
-matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<double>& residuals,
-                                                  vector<vector<int>>& case_counts, std::function<double(double)>& qchisq,
+matching_results select_controls_impl(vector<vector<int>>& gmatrix, const Clustering& clustering,
+                                                  vector<vector<int>>& case_counts,
+                                                  std::function<double(double)>& qchisq,
                                                   double min_lambda, double lb_lambda,
                                                   double max_lambda, double ub_lambda,
-                                                  size_t min_controls, int bin) {
-    bin = std::max(bin, 1);
+                                                  size_t min_controls) {
     min_controls = std::max(min_controls, 1UL);
     std::vector<bool> snp_mask = check_user_counts(case_counts);
 
-    sort_controls(gmatrix, residuals);
-    unsigned long n = residuals.size();
+    auto it = clustering.iterator();
+    unsigned long n = clustering.size();
     unsigned long m = case_counts.size();
     std::vector<std::vector<int>> counts(m, vector<int>(3));
     std::vector<lm> lms;
@@ -103,7 +133,9 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
     std::vector<int> pvals_num;
     int optimal_prefix = -1;
 
-    for (size_t i = 0; i < n; i++) {
+    for (size_t k = 0; k < n; k++) {
+        auto instance = it.next();
+        int i = instance.number;
         if (i % 100 == 0) {
             Rcpp::checkUserInterrupt();
         }
@@ -120,7 +152,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
                 ++cts[cur];
                 lms[j].set(cur, cur, 0, cts[cur]);
             }
-            if (i >= min_controls - 1 && (i + 1) % bin == 0) {
+            if (k >= min_controls - 1 && instance.last) {
                 if (!check_counts(cts[0], cts[1], cts[2])) {
                     continue;
                 }
@@ -129,7 +161,7 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             }
         }
         unsigned long n_pvals = pvals.size();
-        if (i >= min_controls - 1 && pvals.size() > 1 && (i + 1) % bin == 0) {
+        if (k >= min_controls - 1 && pvals.size() > 1 && instance.last) {
             lm pvals_lm(n_pvals);
             std::sort(pvals.begin(), pvals.end());
             for (size_t j = 0; j < n_pvals; j++) {
@@ -143,13 +175,13 @@ matching_results select_controls_impl(vector<vector<int>>& gmatrix, vector<doubl
             cur_lambda = lambda_1000(cur_lambda, cases, controls);
 
             lambdas.push_back(cur_lambda);
-            lambda_i.push_back(i + 1);
+            lambda_i.push_back(k + 1);
             pvals_num.push_back(pvals.size());
             double lambda_dist = std::max(lambda - ub_lambda, lb_lambda - lambda);
             double cur_lambda_dist = std::max(cur_lambda - ub_lambda, lb_lambda - cur_lambda);
             if (cur_lambda < max_lambda && cur_lambda > min_lambda) {
                 if ((cur_lambda < ub_lambda && cur_lambda > lb_lambda) || cur_lambda_dist < lambda_dist) {
-                    optimal_prefix = i + 1;
+                    optimal_prefix = k + 1;
                     lambda = cur_lambda;
                     optimal_pvals = pvals;
                 }

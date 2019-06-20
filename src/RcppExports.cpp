@@ -17,22 +17,22 @@ BEGIN_RCPP
 END_RCPP
 }
 // select_controls_cpp
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals, IntegerMatrix& cc, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min, IntegerVector bin_size);
-RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP residualsSEXP, SEXP ccSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP bin_sizeSEXP) {
+List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min);
+RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP residualsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerMatrix& >::type gmatrix(gmatrixSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type residuals(residualsSEXP);
     Rcpp::traits::input_parameter< IntegerMatrix& >::type cc(ccSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type clustering(clusteringSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type chi2fn(chi2fnSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type min_lambda(min_lambdaSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type lb_lambda(lb_lambdaSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type max_lambda(max_lambdaSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type ub_lambda(ub_lambdaSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type min(minSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type bin_size(bin_sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, residuals, cc, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, bin_size));
+    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, residuals, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min));
     return rcpp_result_gen;
 END_RCPP
 }
