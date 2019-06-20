@@ -47,7 +47,7 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
-  mode(originalGenotypeMatrix) <- "numeric"
+  mode(originalGenotypeMatrix) <- "integer"
   stopifnot(all(!is.na(genotypeMatrix)))
   
   if (nrow(genotypeMatrix) != nrow(caseCounts) || 
@@ -70,12 +70,12 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
   result <- select_controls_cpp(gmatrix, residuals, caseCounts, cl, 
                       stats::qchisq(stats::ppoints(100000), df = 1), 
                       minLambda, softMinLambda, maxLambda, softMaxLambda, min)
-  permutation <- results$permutation
+  permutation <- result$permutation + 1
   result$residuals <- setNames(residuals, colnames(gmatrix))
-  results$residuals <- result$residuals[permutation]
+  result$residuals <- result$residuals[permutation]
   
   if (result$controls > 0) {
-    result$controls <- colnames(gmatrix)[head(permutation, results$controls)]
+    result$controls <- colnames(gmatrix)[head(permutation, result$controls)]
   } else {
     result$controls <- c()
   }

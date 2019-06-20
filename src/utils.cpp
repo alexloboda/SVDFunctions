@@ -13,6 +13,7 @@ Control Clustering::Iterator::next() {
     int curr_size = obj.cluster_sizes[cluster];
     Control ret;
     ret.number = obj.clusters[obj.permutation[cluster]][shift];
+    ++shift;
     if (shift == curr_size) {
         ret.last = true;
         cluster++;
@@ -28,7 +29,7 @@ Clustering::Clustering(const vector<double>& residuals, const vector<int>& clust
         throw std::invalid_argument("Clustering must not be empty");
     }
 
-    int n_clsuters = *std::max(clustering.begin(), clustering.end());
+    int n_clsuters = *std::max_element(clustering.begin(), clustering.end()) + 1;
     cluster_sizes.resize(n_clsuters);
     res.resize(n_clsuters);
     clusters.resize(n_clsuters);
