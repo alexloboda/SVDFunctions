@@ -303,7 +303,10 @@ namespace {
         assert(k <= n);
         std::vector<int> arr(n);
         std::iota(arr.begin(), arr.end(), 0);
-        std::shuffle(arr.begin(), arr.end(), random);
+        for (size_t i = 0; i < k; i++) {
+            std::uniform_int_distribution<int> positions(0, arr.size() - i - 1);
+            std::swap(arr[i], arr[positions(random)]);
+        }
         return {arr.begin(), arr.begin() + k};
     }
 
