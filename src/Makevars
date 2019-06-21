@@ -1,5 +1,5 @@
-PKG_LIBS = -lz -lprofiler
+PKG_LIBS = -lz
 
 CXX_STD = CXX11
 PKG_CPPFLAGS = -pthread
-PKG_LIBS = -pthread -lprofiler
+PKG_LIBS = -pthread
