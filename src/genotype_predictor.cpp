@@ -177,53 +177,42 @@ namespace {
     }
 
     class Counts {
-        double homref_counts = 0.0;
-        double het_counts = 0.0;
-        double alt_counts = 0.0;
+        double counts[3] = {0, 0, 0};
     public:
         Counts() = default;
+
+        Counts(double ref, double het, double alt) :counts{ref, het, alt} {}
+
         void add(AlleleType type, double weight) {
-            switch (type) {
-                case HOMREF:
-                    homref_counts += weight;
-                    break;
-                case HET:
-                    het_counts += weight;
-                    break;
-                case HOM:
-                    alt_counts += weight;
-                    break;
-                case MISSING:
-                    throw std::logic_error("Unreachable statement int class Counts");
-            }
+            counts[type] += weight;
         }
 
         double ref() const {
-            return homref_counts;
+            return counts[0];
         }
 
         double het() const {
-            return het_counts;
+            return counts[1];
         }
 
         double alt() const {
-            return alt_counts;
+            return counts[2];
         }
 
         double hom_ratio() const {
-            return homref_counts / sum();
+            return ref() / sum();
         }
 
         double het_ratio() const {
-            return het_counts / sum();
+            return het() / sum();
         }
 
         double alt_ratio() const {
-            return alt_counts / sum();
+            return alt() / sum();
         }
 
         double entropy() const {
-            std::vector<double> ratios{hom_ratio(), het_ratio(), alt_ratio()};
+            double ratios[3] = {hom_ratio(), het_ratio(), alt_ratio()};
             double ret = 0.0;
             for (double r: ratios) {
                 if (r > vcf::DecisionTree::EPS) {
@@ -234,9 +223,13 @@ namespace {
         }
 
         double sum() const {
-            return homref_counts + het_counts + alt_counts;
+            return ref() + het() + alt();
         }
     };
+
+    Counts operator+(const Counts& one, const Counts& another) {
+        return {one.ref() + another.ref(), one.het() + another.het(), one.alt() + another.alt()};
+    }
 
     class Split {
         Bags l;
@@ -257,7 +250,6 @@ namespace {
         }
     };
 
-
     Counts counts(const Bags& bags, const Labels& labels) {
         Counts ret{};
         for (auto s: bags.list()) {
@@ -267,9 +259,9 @@ namespace {
     }
 
     Split split(const Bags& curr, AlleleType splitBy, const std::vector<AlleleType>& features,
-                                const Labels& labels) {
+                                const Labels& labels, bool mock = true) {
         Bags left, right;
-        Counts left_nm, right_nm, all_nm;
+        Counts left_nm, right_nm;
         Counts cnts = counts(curr, labels);
 
         auto list = curr.list();
@@ -281,19 +273,25 @@ namespace {
         for (auto& el: list) {
             auto allele = features.at(el.sample());
             if (allele == MISSING) {
-                left.add(el.sample(), el.weight() * left_ratio);
-                right.add(el.sample(), el.weight() * (1.0 - left_ratio));
+                if (!mock) {
+                    left.add(el.sample(), el.weight() * left_ratio);
+                    right.add(el.sample(), el.weight() * (1.0 - left_ratio));
+                }
             } else {
-                all_nm.add(labels[el.sample()], el.weight());
-                if (to_int(allele) <= to_int(splitBy)) {
-                    left.add(el.sample(), el.weight());
+                if (allele <= splitBy) {
+                    if (!mock) {
+                        left.add(el.sample(), el.weight());
+                    }
                     left_nm.add(labels[el.sample()], el.weight());
                 } else {
-                    right.add(el.sample(), el.weight());
+                    if (!mock) {
+                        right.add(el.sample(), el.weight());
+                    }
                     right_nm.add(labels[el.sample()], el.weight());
                 }
             }
         }
+        Counts all_nm = left_nm + right_nm;
         double nm_ratio = all_nm.sum() / cnts.sum();
         double left_ratio_nm = left_nm.sum() / all_nm.sum();
         double split_entropy = left_ratio_nm * left_nm.entropy() + (1.0 - left_ratio_nm) * right_nm.entropy();
@@ -375,20 +373,20 @@ namespace vcf {
         for (size_t i = 0; i < values.size(); i++) {
                 switch(values[i]) {
                     case HOMREF:
-                        bags.add(i, (1.0 / 3) / tmp_cts.hom_ratio());
+                        bags.add(i, 1.0);
                         break;
                     case HET:
-                        bags.add(i, (1.0 / 3) / tmp_cts.het_ratio());
+                        bags.add(i, 1.0);
                         break;
                     case HOM:
-                        bags.add(i, (1.0 / 3) / tmp_cts.alt_ratio());
+                        bags.add(i, 1.0);
                         break;
                     default:
                         continue;
                 }
         }
 
-        if (features.size() == 0) {
+        if (features.empty()) {
             auto cts = counts(tmp, values);
             std::vector<double> weights{cts.ref(), cts.het(), cts.alt()};
             return DecisionTree(std::make_shared<LeafNode>(std::move(weights)));
@@ -426,7 +424,7 @@ namespace vcf {
         if (best_split == MISSING) {
             return std::make_shared<LeafNode>(std::move(cs));
         } else {
-            auto the_best_split_ever = split(bags, best_split, features[var_best], values);
+            auto the_best_split_ever = split(bags, best_split, features[var_best], values, false);
             auto& left = the_best_split_ever.left();
             auto& right = the_best_split_ever.right();
             auto left_subtree = buildSubtree(left, random);

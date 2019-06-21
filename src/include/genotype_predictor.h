@@ -67,7 +67,7 @@ namespace vcf {
     class RandomForest {
         std::vector<DecisionTree> predictors;
     public:
-        RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, std::size_t trees = 10);
+        RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, std::size_t trees = 12);
         double predict(std::vector<AlleleType>& features);
     };
 }

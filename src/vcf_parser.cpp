@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <sstream>
 #include <Rcpp.h>
+#include <gperftools/profiler.h>
 
 namespace {
     using namespace vcf;
@@ -301,6 +302,7 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
+        ProfilerStart("a.prof");
         string line;
         std::shared_ptr<std::vector<size_t>> sample_indices = std::make_shared<std::vector<size_t>>(filtered_samples);
         std::shared_ptr<VCFFilter> vcf_filter = std::make_shared<VCFFilter>(filter);
@@ -348,5 +350,6 @@ namespace vcf {
                 handle_error(exception);
             }
         }
+        ProfilerStop();
     }
 }
