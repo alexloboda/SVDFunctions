@@ -8,6 +8,6 @@
 parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
 {
     preprocessed.ref <- computeResidual.preproc(SVDReference, seq(1, nSV, 1))
-    resiudals <- preprocessed.ref %*% gmatrix
+    resiudals <- preprocessed.ref %*% genotypeMatrix
     apply(resiudals, MARGIN = 2, function(x) norm(x, type = "2"))
 }
