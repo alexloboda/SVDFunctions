@@ -18,6 +18,8 @@ selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
 
 \item{caseCounts}{Matrix with summary genotype counts from cases}
 
+\item{controlsClustering}{cluster names for controls}
+
 \item{minLambda}{Minimum possible lambda}
 
 \item{softMinLambda}{Desirable minimum for lambda}

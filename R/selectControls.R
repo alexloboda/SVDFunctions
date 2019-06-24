@@ -30,6 +30,7 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param originalGenotypeMatrix Genotype matrix with no imputation applied 
 #' @param SVDReference Reference basis of the left singular vectors
 #' @param caseCounts Matrix with summary genotype counts from cases
+#' @param controlsClustering cluster names for controls
 #' @param minLambda Minimum possible lambda
 #' @param softMinLambda Desirable minimum for lambda
 #' @param softMaxLambda Desirable maximum for lambda
