@@ -7,7 +7,14 @@
 #' @export
 parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
 {
-    preprocessed.ref <- computeResidual.preproc(SVDReference, seq(1, nSV, 1))
-    resiudals <- preprocessed.ref %*% genotypeMatrix
-    apply(resiudals, MARGIN = 2, function(x) norm(x, type = "2"))
+  SVDReference <- SVDReference[, 1:nSV]
+  inter <- crossprod(SVDReference, genotypeMatrix) 
+  rhs <- SVDReference %*% inter
+  residuals <- genotypeMatrix - rhs
+  ret <- c()
+  for (i in 1:ncol(residuals)) {
+    ret <- c(ret, norm(residuals[, i], type = "2"))
+  }
+  names(ret) <- colnames(residuals)
+  ret
 }
