@@ -134,10 +134,10 @@ plotPCA <- function(PCA, clusters = NULL) {
   if (!is.null(clusters)) {
     texts <- paste0(texts, "\nCluster: ", clusters$samples)
   }
-  plotly::add_markers(plotly::plot_ly(data = PCA, 
-                                      x = PC1, 
-                                      y = PC2, 
-                                      z = PC3, 
+  plotly::add_markers(plotly::plot_ly(data = as.data.frame(PCA[, 1:3]), 
+                                      x = ~PC1, 
+                                      y = ~PC2, 
+                                      z = ~PC3, 
                                       text = texts, 
                                       color = as.character(colors), 
                                       marker = list(size = 2)))
