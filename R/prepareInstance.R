@@ -129,14 +129,15 @@ filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
 #' @inheritParams estimateCaseClusters
 #' @export 
 plotPCA <- function(PCA, clusters = NULL) {
-  colors <- if (is.null(clusters)) 1 else clusters$samples
+  colors <- if (is.null(clusters)) 1 else clusters$classes[clusters$samples]
   texts <- paste("Sample:", rownames(PCA))
   if (!is.null(clusters)) {
     texts <- paste0(texts, "\nCluster: ", clusters$samples)
   }
-  plotly::add_markers(plotly::plot_ly(x = PCA[, "PC1"], 
-                                      y = PCA[, "PC2"],
-                                      z = PCA[, "PC3"], 
+  plotly::add_markers(plotly::plot_ly(data = PCA, 
+                                      x = PC1, 
+                                      y = PC2, 
+                                      z = PC3, 
                                       text = texts, 
                                       color = as.character(colors), 
                                       marker = list(size = 2)))
