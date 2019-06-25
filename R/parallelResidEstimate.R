@@ -10,13 +10,12 @@ parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV)
   SVDReference <- SVDReference[, 1:nSV]
   inter <- crossprod(SVDReference, genotypeMatrix) 
   rhs <- SVDReference %*% inter
-  residuals <- genotypeMatrix - rhs
   ret <- c()
-  for (i in 1:ncol(residuals)) {
-    v <- residuals[, i]
+  for (i in 1:ncol(genotypeMatrix)) {
+    v <- genotypeMatrix[, i] - rhs[, i]
     ret <- c(ret, norm(v, type = "2"))
     rm(v)
   }
-  names(ret) <- colnames(residuals)
+  names(ret) <- colnames(genotypeMatrix)
   ret
 }
