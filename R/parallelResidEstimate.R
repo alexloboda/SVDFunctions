@@ -13,7 +13,9 @@ parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV)
   residuals <- genotypeMatrix - rhs
   ret <- c()
   for (i in 1:ncol(residuals)) {
-    ret <- c(ret, norm(residuals[, i], type = "2"))
+    v <- residuals[, i]
+    ret <- c(ret, norm(v, type = "2"))
+    rm(v)
   }
   names(ret) <- colnames(residuals)
   ret
