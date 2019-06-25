@@ -9,12 +9,18 @@ parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV)
 {
   SVDReference <- SVDReference[, 1:nSV]
   inter <- crossprod(SVDReference, genotypeMatrix) 
-  rhs <- SVDReference %*% inter
   ret <- c()
-  for (i in 1:ncol(genotypeMatrix)) {
-    v <- genotypeMatrix[, i] - rhs[, i]
-    ret <- c(ret, sqrt(sum(v * v)))
-    rm(v)
+  idx <- 1:ncol(genotypeMatrix)
+  groups <- split(idx, ceiling(seq_along(idx) / 256))
+  for (group in groups) {
+    start <- group[1] - 1
+    rhs <- SVDReference %*% inter[, group]
+    for (i in group) {
+      v <- genotypeMatrix[, i] - rhs[, i - start]
+      ret <- c(ret, sqrt(sum(v * v)))
+      rm(v)
+    }
+    rm(rhs)
   }
   names(ret) <- colnames(genotypeMatrix)
   ret
