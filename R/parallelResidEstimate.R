@@ -13,7 +13,7 @@ parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV)
   ret <- c()
   for (i in 1:ncol(genotypeMatrix)) {
     v <- genotypeMatrix[, i] - rhs[, i]
-    ret <- c(ret, norm(v, type = "2"))
+    ret <- c(ret, sqrt(sum(v * v)))
     rm(v)
   }
   names(ret) <- colnames(genotypeMatrix)
