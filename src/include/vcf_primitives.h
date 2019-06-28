@@ -101,7 +101,7 @@ namespace vcf {
         static Range parseRange(const std::string& s);
     };
 
-    enum AlleleType {HOMREF, HET, HOM, MISSING};
+    enum AlleleType {HOMREF = 0, HET = 1, HOM = 2, MISSING = 3};
     int to_int(AlleleType allele);
 
     class Allele {
