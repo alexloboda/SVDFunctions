@@ -143,30 +143,30 @@ namespace vcf {
             }
             Allele ret{parse_gt(gt, allele), (unsigned)dp, (unsigned)gq};
             if (ret.alleleType() == HET) {
-                if (ad_pos != -1 && dp != 0) {
-                    std::istringstream adstream(parts[ad_pos]);
-                    int ref, alt;
-                    char ch;
-                    adstream >> ref;
-                    for (int i = 0; i < allele; i++) {
-                        while(!std::isdigit(adstream.peek())) {
-                            adstream >> ch;
-                        }
-                        adstream  >> alt;
-                    }
-                    if (!adstream.fail()) {
-                        double ref_ratio = ref / (double)dp;
-                        double alt_ratio = alt / (double)dp;
-                        if (ref_ratio < 0.3 || ref_ratio > 0.7) {
-                            stats.add(Stat::ALLELE_BALANCE, 1);
-                            return {MISSING, 0, 0};
-                        }
-                        if (alt_ratio < 0.3 || alt_ratio > 0.7) {
-                            stats.add(Stat::ALLELE_BALANCE, 1);
-                            return {MISSING, 0, 0};
-                        }
-                    }
-                }
+               // if (ad_pos != -1 && dp != 0) {
+               //     std::istringstream adstream(parts[ad_pos]);
+               //     int ref, alt;
+               //     char ch;
+               //     adstream >> ref;
+               //     for (int i = 0; i < allele; i++) {
+               //         while(!std::isdigit(adstream.peek())) {
+               //             adstream >> ch;
+               //         }
+               //         adstream  >> alt;
+               //     }
+               //     if (!adstream.fail()) {
+               //         double ref_ratio = ref / (double)dp;
+               //         double alt_ratio = alt / (double)dp;
+               //         if (ref_ratio < 0.3 || ref_ratio > 0.7) {
+               //             stats.add(Stat::ALLELE_BALANCE, 1);
+               //             return {MISSING, 0, 0};
+               //         }
+               //         if (alt_ratio < 0.3 || alt_ratio > 0.7) {
+               //             stats.add(Stat::ALLELE_BALANCE, 1);
+               //             return {MISSING, 0, 0};
+               //         }
+               //     }
+               // }
             }
             return ret;
         } catch (...) {
