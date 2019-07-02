@@ -10,7 +10,7 @@ const double chi2_bdry = 10.82757;
 Clustering::Iterator::Iterator(const Clustering& object) :obj(object) {}
 
 Control Clustering::Iterator::next() {
-    int curr_size = obj.cluster_sizes[cluster];
+    int curr_size = obj.cluster_sizes[obj.permutation[cluster]];
     Control ret;
     ret.number = obj.clusters[obj.permutation[cluster]][shift];
     ++shift;
@@ -39,7 +39,7 @@ Clustering::Clustering(const vector<double>& residuals, const vector<int>& clust
         res[cl] += residuals[i];
         clusters[cl].push_back(i);
     }
-    for (int i = 0; i < residuals.size(); i++) {
+    for (int i = 0; i < n_clsuters; i++) {
         res[i] /= cluster_sizes[i];
     }
 
