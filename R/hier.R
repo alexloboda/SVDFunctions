@@ -34,15 +34,19 @@ matchControlsCluster <- function(cases, gmatrix, original, variants,
   U <- apply(cases$US, 2, function(x) x / sqrt(sum(x ^ 2))) 
   results <- selectControls(gmatrix, original, U, cases$counts, ...)
   
-  if (length(results$controls) > controlsThreshold) {
-    resid <- results$residuals[results$controls]
-    df <- data.frame(sample = names(resid), value = resid, 
-                     cluster = cases$cluster, stringsAsFactors = FALSE, 
-                     row.names = NULL)
+  resid <- results$residuals[results$controls]
+  df <- data.frame(sample = names(resid), value = resid, 
+                   cluster = cases$cluster, stringsAsFactors = FALSE, 
+                   row.names = NULL)
+  if (length(results$controls) >= controlsThreshold) {
     list(resid = df, pvals = results$pvals, cl = cases$cluster, 
-         lambda = results$optimal_lambda)
+         lambda = results$optimal_lambda, success = TRUE)
   } else {
-    NULL
+    header <- colnames(df)
+    df[] <- c()
+    colnames(df) <- header
+    list(resid = df, pvals = c(), cl = cases$cluster, lambda = Inf, 
+         success = FALSE)
   }
 }
 
@@ -107,7 +111,20 @@ recSelect <- function(gmatrix, original, variants, cases,
     right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
                        threshold, clusterMergeCoef, softMinLambda, 
                        softMaxLambda, ...)
+    
+    if (!left$success) {
+      if (!right$success) {
+        right$cases <- mergeCases(left$cases, right$cases)
+      }
+      return(right)
+    }
+    
+    if (!right$success) {
+      return(left)
+    }
+    
     mergedCases <- mergeCases(left$cases, right$cases)
+    
     mergedMatching <- matchControlsCluster(mergeCases(left$cases, right$cases), 
                                            gmatrix, original, variants, 
                                            threshold, ...)
