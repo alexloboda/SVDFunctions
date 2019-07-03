@@ -135,12 +135,12 @@ recSelect <- function(gmatrix, original, variants, cases,
       pvals <- list()
       pvals[[mergedMatching$cl]] <- mergedMatching$pvals
       list(cases = mergedCases, controls = merged$sample, table = merged, 
-           pvals = pvals)
+           pvals = pvals, success = length(merged$sample) > 0)
     } else {
       table <- rbind(left$table, right$table)
       pvals <- c(left$pvals, right$pvals)
       list(cases = mergedCases, controls = jointControls, table = table, 
-           pvals = pvals)
+           pvals = pvals, success = length(jointControls) > 0)
     }
   }
 }
