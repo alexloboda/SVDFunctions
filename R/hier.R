@@ -20,7 +20,8 @@ checkCaseInfo <- function(cases, variants) {
 }
 
 matchControlsCluster <- function(cases, gmatrix, original, variants,
-                                 controlsThreshold, ...) {
+                                 controlsThreshold, softMinLambda, 
+                                 softMaxLambda, ...) {
   checkCaseInfo(cases, variants)
   sharedSites <- intersect(cases$variants, variants)
   selector <- which(variants %in% sharedSites)
@@ -38,15 +39,17 @@ matchControlsCluster <- function(cases, gmatrix, original, variants,
   df <- data.frame(sample = names(resid), value = resid, 
                    cluster = cases$cluster, stringsAsFactors = FALSE, 
                    row.names = NULL)
+  pvals <- list()
+  pvals[[cases$cluster]] <- results$pvals
   if (length(results$controls) >= controlsThreshold) {
-    list(resid = df, pvals = results$pvals, cl = cases$cluster, 
-         lambda = results$optimal_lambda, success = TRUE)
+    lam <- results$optimalLambda
+    good <- lam > softMinLambda && lam < softMaxLambda
+    list(table = df, pvals = pvals, minL = results$optimalLambda, cases = cases, 
+         clusters = setNames(good, cases$cluster), 
+         ncontrols = if(good) length(results$controls) else 0)
   } else {
-    header <- colnames(df)
-    df[] <- c()
-    colnames(df) <- header
-    list(resid = df, pvals = c(), cl = cases$cluster, lambda = Inf, 
-         success = FALSE)
+    list(table = data.frame(), pvals = c(), minL = Inf, cases = cases,
+         clusters = c(), ncontrols = 0)
   }
 }
 
@@ -82,66 +85,68 @@ mergeCases <- function(left, right) {
   ret
 }
 
-recSelect <- function(gmatrix, original, variants, cases, 
-                      hierNode, threshold, clusterMergeCoef, 
-                      softMinLambda, softMaxLambda, 
-                      ...) {
-  filterSamples <- function(l, samples) {
-    if(l >= softMinLambda && l <= softMaxLambda) {
-      samples
-    } else {
-      c()
-    }
+goodClusters <- function(l, r) {
+  c(l$clusters[l$clusters], r$clusters[r$clusters])
+}
+
+countGoodControls <- function(l, r) {
+  length(unique(table$sample[table$cluster %in% goodClusters]))
+}
+
+jointResult <- function(l, r) {
+  ret <- list()
+  table <- rbind(l$table, r$table)
+  ret$table <- table
+  ret$pvals <- c(l$pvals, r$pvals)
+  goodClusters <- goodClusters(l, r)
+  ret$ncontrols <- countGoodControls(l, r)
+  ret$clusters <- c(left$clusters, right$clusters)
+  if (l$ncontrols == 0 && r$ncontrols > 0) {
+    ret$cases <- r$cases
+  } else if (r$ncontrols == 0 && l$ncontrols > 0) {
+    ret$cases <- l$cases
+  } else {
+    ret$cases <- mergeCases(l$cases, r$cases)
   }
+  ret
+}
+
+mergeCondition <- function(l, r, merged, mergeCoef) {
+  if (l$ncontrols == 0 && r$ncontrols == 0) {
+    merged$minL < l$minL && merged$minL < r$minL
+  } else {
+    jointCount <- countGoodControls(l, r)
+    mergeCoef * merged$ncontrols >  jointCount
+  }
+}
+
+mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef, 
+                          ...) {
+  cases <- mergeCases(left, right)
+  res <- matchControlsCluster(cases$cluster, gmatrix, original, variants, ...)
+  if (mergeCondition(l, r, res, mergeCoef)) {  
+    cls <- goodClusters(l, r)
+    table <- rbind(l$table, r$table)
+    table <- table[, !(table$cluster %in% cls)]
+    res$table <- rbind(table, res$table)
+    res
+  } else {
+    jointResult(left, right)
+  }
+}
+
+recSelect <- function(gmatrix, original, variants, cases, 
+                      hierNode, clusterMergeCoef, ...) {
   if (hierNode$type == "leaf") {
-    curr <- cases$population[[hierNode$id]]
-    curr$variants <- cases$variants
-    matching <- matchControlsCluster(curr, gmatrix, original, variants, 
-                                     threshold, ...)
-    controls <- matching$resid
-    pvals <- list()
-    pvals[[matching$cl]] <- matching$pvals
-    samples <- filterSamples(matching$lambda, controls$sample)
-    
-    list(cases = curr, controls = samples, table = controls, pvals = pvals)
+    cluster <- cases$population[[hierNode$id]]
+    cluster$variants <- cases$variants
+    matchControlsCluster(cluster, gmatrix, original, variants, ...)
   } else {
     left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  
-                      threshold, clusterMergeCoef,  softMinLambda,
-                      softMaxLambda, ...)
+                      clusterMergeCoef)
     right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
-                       threshold, clusterMergeCoef, softMinLambda, 
-                       softMaxLambda, ...)
-    
-    if (!left$success) {
-      if (!right$success) {
-        right$cases <- mergeCases(left$cases, right$cases)
-      }
-      return(right)
-    }
-    
-    if (!right$success) {
-      return(left)
-    }
-    
-    mergedCases <- mergeCases(left$cases, right$cases)
-    
-    mergedMatching <- matchControlsCluster(mergeCases(left$cases, right$cases), 
-                                           gmatrix, original, variants, 
-                                           threshold, ...)
-    mergedSample <- filterSamples(mergedMatching$lambda, mergedMatching$resid$sample)
-    merged <- mergedMatching$resid
-    jointControls <- union(left$controls, right$controls)
-    if (length(mergedSample) >= (1.0 / clusterMergeCoef) * length(jointControls)) {
-      pvals <- list()
-      pvals[[mergedMatching$cl]] <- mergedMatching$pvals
-      list(cases = mergedCases, controls = merged$sample, table = merged, 
-           pvals = pvals, success = length(merged$sample) > 0)
-    } else {
-      table <- rbind(left$table, right$table)
-      pvals <- c(left$pvals, right$pvals)
-      list(cases = mergedCases, controls = jointControls, table = table, 
-           pvals = pvals, success = length(jointControls) > 0)
-    }
+                       clusterMergeCoef)
+    mergedOrJoint(left, right)
   }
 }
 
