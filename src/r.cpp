@@ -22,10 +22,10 @@ LogicalVector quality_control_impl(const IntegerMatrix& case_counts) {
 
 // [[Rcpp::export]]
 List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
-                     IntegerMatrix& cc, NumericVector& chi2fn,
+                     IntegerMatrix& cc, IntegerVector& clustering,
+                     NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,
-                     NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min,
-                     IntegerVector bin_size) {
+                     NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min) {
     int n_c = gmatrix.ncol();
     int n_snps = gmatrix.nrow();
     vector<double> precomputed_chi(chi2fn.length());
@@ -37,6 +37,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
     vector<vector<int>> gmatrix_c(n_c, vector<int>(n_snps));
     vector<vector<int>> case_counts(n_snps, vector<int>(3));
     vector<double> resid(n_c);
+
+    vector<int> clust_vec(clustering.begin(), clustering.end());
 
     for (int i = 0; i < n_c; i++) {
         resid[i] = residuals[i];
@@ -50,11 +52,19 @@ List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
             case_counts[i][j] = cc(i, j);
         }
     }
+
     int min_controls = min[0];
-    int bin = bin_size[0];
     std::function<double(double)> qchi = q.function();
-    auto result = select_controls_impl(gmatrix_c, resid, case_counts, qchi, min_lambda[0], lb_lambda[0],
-            max_lambda[0], ub_lambda[0], min_controls, bin);
+    Clustering cl(resid, clust_vec);
+    auto result = select_controls_impl(gmatrix_c, cl, case_counts, qchi, min_lambda[0], lb_lambda[0],
+            max_lambda[0], ub_lambda[0], min_controls);
+
+    std::vector<int> permutation;
+    auto it = cl.iterator();
+    for (int i = 0; i < cl.size(); i++) {
+        permutation.push_back(it.next().number);
+    }
+
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());
     IntegerVector n_controls(1, result.optimal_prefix);
@@ -62,6 +72,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
     NumericVector optimal_lambda(1, result.optimal_lambda);
     IntegerVector names(result.lambda_i.begin(), result.lambda_i.end());
     IntegerVector pvals_num(result.pvals_num.begin(), result.pvals_num.end());
+    IntegerVector permutationR(permutation.begin(), permutation.end());
+
     lambda.attr("names") = names;
     pvals_num.attr("names") = names;
     ret["lambda"] = lambda;
@@ -69,5 +81,6 @@ List select_controls_cpp(IntegerMatrix& gmatrix, NumericVector& residuals,
     ret["pvals"] = pvals;
     ret["optimal_lambda"] = optimal_lambda;
     ret["snps"] = pvals_num;
+    ret["permutation"] = permutationR;
     return ret;
 }

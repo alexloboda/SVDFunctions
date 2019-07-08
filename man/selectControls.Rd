@@ -2,12 +2,12 @@
 % Please edit documentation in R/selectControls.R
 \name{selectControls}
 \alias{selectControls}
-\title{Selection of the optimal set of controls}
+\title{Select a set of controls that matches to a set of cases}
 \usage{
 selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
-  caseCounts, minLambda = 0.75, softMinLambda = 0.9,
-  softMaxLambda = 1.05, maxLambda = 1.3, min = 500, nSV = 5,
-  binSize = 1)
+  caseCounts, controlsClustering = NULL, minLambda = 0.75,
+  softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3,
+  min = 500)
 }
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}
@@ -18,6 +18,8 @@ selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
 
 \item{caseCounts}{Matrix with summary genotype counts from cases}
 
+\item{controlsClustering}{cluster names for controls}
+
 \item{minLambda}{Minimum possible lambda}
 
 \item{softMinLambda}{Desirable minimum for lambda}
@@ -27,10 +29,6 @@ selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
 \item{maxLambda}{Maximum possible lambda}
 
 \item{min}{Minimal size of a control set that is permitted for return}
-
-\item{nSV}{Number of singular vectors to be used for reconstruction of the}
-
-\item{binSize}{sliding window size for optimal lambda search}
 }
 \description{
 Finds an optimal set of controls satisfying 

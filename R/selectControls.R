@@ -17,7 +17,7 @@ checkAlleleCounts <- function(countsMatrix) {
   quality_control_impl(countsMatrix)
 }
 
-#' Selection of the optimal set of controls
+#' Select a set of controls that matches to a set of cases
 #' 
 #' Finds an optimal set of controls satisfying 
 #' \eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}
@@ -30,24 +30,24 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param originalGenotypeMatrix Genotype matrix with no imputation applied 
 #' @param SVDReference Reference basis of the left singular vectors
 #' @param caseCounts Matrix with summary genotype counts from cases
+#' @param controlsClustering cluster names for controls
 #' @param minLambda Minimum possible lambda
 #' @param softMinLambda Desirable minimum for lambda
 #' @param softMaxLambda Desirable maximum for lambda
 #' @param maxLambda Maximum possible lambda
-#' @param nSV Number of singular vectors to be used for reconstruction of the 
 #' @param min Minimal size of a control set that is permitted for return
-#' @param binSize sliding window size for optimal lambda search
 #' @export
 selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
                            SVDReference, caseCounts, 
+                           controlsClustering = NULL,
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
-                           min = 500, nSV = 5, binSize = 1) {
+                           min = 500) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
-  mode(originalGenotypeMatrix) <- "numeric"
+  mode(originalGenotypeMatrix) <- "integer"
   stopifnot(all(!is.na(genotypeMatrix)))
   
   if (nrow(genotypeMatrix) != nrow(caseCounts) || 
@@ -55,21 +55,27 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
     stop("Check dimensions of the matrices")
   }
   
-  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference, nSV)
-  new_order <- order(residuals)
-  control_names <- names(residuals)[new_order] 
+  cl <- controlsClustering
+  if (is.null(cl)) {
+    cl <- 0:(ncol(genotypeMatrix) - 1)
+  } else {
+    cl <- as.integer(as.factor(cl)) - 1
+  }
+  
+  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference)
   
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
-  result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
+  result <- select_controls_cpp(gmatrix, residuals, caseCounts, cl, 
                       stats::qchisq(stats::ppoints(100000), df = 1), 
-                      minLambda, softMinLambda, maxLambda, softMaxLambda, 
-                      min, binSize)
+                      minLambda, softMinLambda, maxLambda, softMaxLambda, min)
+  permutation <- result$permutation + 1
   result$residuals <- setNames(residuals, colnames(gmatrix))
-  result$residuals <- result$residuals[new_order]
+  result$residuals <- result$residuals[permutation]
+  
   if (result$controls > 0) {
-    result$controls <- control_names[1:result$controls]
+    result$controls <- colnames(gmatrix)[head(permutation, result$controls)]
   } else {
     result$controls <- c()
   }

@@ -2,12 +2,9 @@
 #' 
 #' @param genotypeMatrix Genotype matrix
 #' @param SVDReference Reference basis of the left singular vectors
-#' @param nSV Number of singular vectors to be used for reconstruction of the 
-#' original vector
 #' @export
-parallelResidEstimate <- function (genotypeMatrix, SVDReference, nSV) 
+parallelResidEstimate <- function (genotypeMatrix, SVDReference) 
 {
-  SVDReference <- SVDReference[, 1:nSV]
   inter <- crossprod(SVDReference, genotypeMatrix) 
   ret <- c()
   idx <- 1:ncol(genotypeMatrix)

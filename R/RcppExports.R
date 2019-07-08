@@ -5,8 +5,8 @@ quality_control_impl <- function(case_counts) {
     .Call('_SVDFunctions_quality_control_impl', PACKAGE = 'SVDFunctions', case_counts)
 }
 
-select_controls_cpp <- function(gmatrix, residuals, cc, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, bin_size) {
-    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, residuals, cc, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, bin_size)
+select_controls_cpp <- function(gmatrix, residuals, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min) {
+    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, residuals, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min)
 }
 
 parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold) {
