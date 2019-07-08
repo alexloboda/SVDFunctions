@@ -1,9 +1,23 @@
+userErrorCls <- "userError"
+userError <- function(msg) {
+  e <- condition(c(userErrorCls), msg)
+  stop(e)
+}
+
+condition <- function(subclass, message, call = sys.call(-1), ...) {
+  structure(
+    class = c(subclass, "condition"),
+    list(message = message, call = call),
+    ...
+  )
+}
+
 checkCaseInfo <- function(cases, variants) {
   if (nrow(cases$counts) != nrow(cases$US)) {
-    stop("Case counts table does not correspond to U matrix")
+    userError("Case counts table does not correspond to U matrix")
   }
   if (!is.numeric(cases$US) | any(is.na(cases$US))) {
-    stop("Matrix U contains missing data or non-numeric values")
+    userError("Matrix U contains missing data or non-numeric values")
   }
   
   ##check if all sites from cases are found in controls
@@ -11,7 +25,7 @@ checkCaseInfo <- function(cases, variants) {
   extra_variants <- which(!(cases$variants %in% variants))
   if (length(extra_variants) != 0) {
     num <- min(5, length(extra_variants))
-    stop(paste("Not all case sites are found in controls. Please use",
+    userError(paste("Not all case sites are found in controls. Please use",
                "list of available sites to create your case genotype",
                "matrix. These variants must not be present: ", 
                paste(cases$variants[extra_variants][1:num], 
@@ -30,7 +44,7 @@ matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
   original <- original[selector, ]
   
   if (nrow(cases$counts) != nrow(gmatrix)){
-    stop("Something is wrong with SNP selection")
+    userError("Something is wrong with SNP selection")
   }
   
   U <- apply(cases$US, 2, function(x) x / sqrt(sum(x ^ 2))) 
