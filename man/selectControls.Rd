@@ -7,7 +7,7 @@
 selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
   caseCounts, controlsClustering = NULL, minLambda = 0.75,
   softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3,
-  min = 500, nSV = 5)
+  min = 500)
 }
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}
@@ -29,8 +29,6 @@ selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
 \item{maxLambda}{Maximum possible lambda}
 
 \item{min}{Minimal size of a control set that is permitted for return}
-
-\item{nSV}{Number of singular vectors to be used for reconstruction of the}
 }
 \description{
 Finds an optimal set of controls satisfying 

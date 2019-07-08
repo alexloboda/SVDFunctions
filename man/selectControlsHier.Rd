@@ -6,8 +6,8 @@
 \usage{
 selectControlsHier(controlGMatrix, controlVariants, cases,
   imputationMatrix = NULL, originalControlGMatrix = NULL,
-  minControls = 50, clusterMergeCoef = 1.1, softMinLambda = 0.9,
-  softMaxLambda = 1.05, ...)
+  clusterMergeCoef = 1.1, softMinLambda = 0.9, softMaxLambda = 1.05,
+  ...)
 }
 \arguments{
 \item{controlGMatrix}{numeric matrix(0 - ref, 1 - het, 2 - both alt). 
@@ -24,9 +24,6 @@ imputed in controlGMatrix.}
 \item{originalControlGMatrix}{integer matrix(0 - ref, 1 - het, 2 - both alt).
 Missing values are allowed.}
 
-\item{minControls}{integer minimum number of controls selected for 
-each cluster}
-
 \item{clusterMergeCoef}{numeric coefficient of preference of merging clusters.}
 
 \item{softMinLambda}{Desirable minimum for lambda}
@@ -34,6 +31,9 @@ each cluster}
 \item{softMaxLambda}{Desirable maximum for lambda}
 
 \item{...}{parameters to be passed to selectControls function.}
+
+\item{minControls}{integer minimum number of controls selected for 
+each cluster}
 }
 \description{
 Select a set of controls that matches a set of cases

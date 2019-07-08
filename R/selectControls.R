@@ -35,7 +35,6 @@ checkAlleleCounts <- function(countsMatrix) {
 #' @param softMinLambda Desirable minimum for lambda
 #' @param softMaxLambda Desirable maximum for lambda
 #' @param maxLambda Maximum possible lambda
-#' @param nSV Number of singular vectors to be used for reconstruction of the 
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
 selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
@@ -43,7 +42,7 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
                            controlsClustering = NULL,
                            minLambda = 0.75, softMinLambda = 0.9, 
                            softMaxLambda = 1.05, maxLambda = 1.3, 
-                           min = 500, nSV = 5) {
+                           min = 500) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -63,7 +62,7 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
     cl <- as.integer(as.factor(cl)) - 1
   }
   
-  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference, nSV)
+  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference)
   
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)

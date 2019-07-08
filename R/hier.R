@@ -19,9 +19,10 @@ checkCaseInfo <- function(cases, variants) {
   }
 }
 
-matchControlsCluster <- function(cases, gmatrix, original, variants,
-                                 controlsThreshold, softMinLambda, 
-                                 softMaxLambda, ...) {
+matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
+  softMinLambda <- list(...)$softMinLambda
+  softMaxLambda <- list(...)$softMaxLambda
+  
   checkCaseInfo(cases, variants)
   sharedSites <- intersect(cases$variants, variants)
   selector <- which(variants %in% sharedSites)
@@ -34,17 +35,16 @@ matchControlsCluster <- function(cases, gmatrix, original, variants,
   
   U <- apply(cases$US, 2, function(x) x / sqrt(sum(x ^ 2))) 
   results <- selectControls(gmatrix, original, U, cases$counts, ...)
-  
   resid <- results$residuals[results$controls]
   df <- data.frame(sample = names(resid), value = resid, 
-                   cluster = cases$cluster, stringsAsFactors = FALSE, 
-                   row.names = NULL)
+                   cluster = if (length(resid) == 0) c() else cases$cluster,
+                   stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
   pvals[[cases$cluster]] <- results$pvals
-  if (length(results$controls) >= controlsThreshold) {
-    lam <- results$optimalLambda
+  if (length(results$controls) > 0) {
+    lam <- results$optimal_lambda
     good <- lam > softMinLambda && lam < softMaxLambda
-    list(table = df, pvals = pvals, minL = results$optimalLambda, cases = cases, 
+    list(table = df, pvals = pvals, minL = results$optimal_lambda, cases = cases, 
          clusters = setNames(good, cases$cluster), 
          ncontrols = if(good) length(results$controls) else 0)
   } else {
@@ -78,19 +78,21 @@ mergeCases <- function(left, right) {
   ret <- list()
   ret$cluster <- paste0(left$cluster, ", ", right$cluster)
   ret$counts <- left$counts + right$counts
-  svd <- RSpectra::svds(cbind(left$US, right$US), k = max(ncol(left$US), 
-                                                          ncol(right$US)))
+  lUS <- left$US
+  rUS <- right$US
+  svd <- RSpectra::svds(cbind(lUS, rUS), k = max(ncol(lUS), ncol(rUS)))
   ret$US <- svd$u %*% diag(svd$d)
   ret$variants <- left$variants
   ret
 }
 
 goodClusters <- function(l, r) {
-  c(l$clusters[l$clusters], r$clusters[r$clusters])
+  names(c(l$clusters[l$clusters], r$clusters[r$clusters]))
 }
 
 countGoodControls <- function(l, r) {
-  length(unique(table$sample[table$cluster %in% goodClusters]))
+  table <- rbind(l$table, r$table)
+  length(unique(table$sample[table$cluster %in% goodClusters(l, r)]))
 }
 
 jointResult <- function(l, r) {
@@ -100,7 +102,8 @@ jointResult <- function(l, r) {
   ret$pvals <- c(l$pvals, r$pvals)
   goodClusters <- goodClusters(l, r)
   ret$ncontrols <- countGoodControls(l, r)
-  ret$clusters <- c(left$clusters, right$clusters)
+  ret$clusters <- c(l$clusters, r$clusters)
+  ret$minL <- min(l$minL, r$minL)
   if (l$ncontrols == 0 && r$ncontrols > 0) {
     ret$cases <- r$cases
   } else if (r$ncontrols == 0 && l$ncontrols > 0) {
@@ -122,11 +125,11 @@ mergeCondition <- function(l, r, merged, mergeCoef) {
 
 mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef, 
                           ...) {
-  cases <- mergeCases(left, right)
-  res <- matchControlsCluster(cases$cluster, gmatrix, original, variants, ...)
-  if (mergeCondition(l, r, res, mergeCoef)) {  
-    cls <- goodClusters(l, r)
-    table <- rbind(l$table, r$table)
+  cases <- mergeCases(left$cases, right$cases)
+  res <- matchControlsCluster(cases, gmatrix, original, variants, ...)
+  if (mergeCondition(left, right, res, mergeCoef)) {  
+    cls <- goodClusters(left, right)
+    table <- rbind(left$table, right$table)
     table <- table[, !(table$cluster %in% cls)]
     res$table <- rbind(table, res$table)
     res
@@ -143,10 +146,10 @@ recSelect <- function(gmatrix, original, variants, cases,
     matchControlsCluster(cluster, gmatrix, original, variants, ...)
   } else {
     left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  
-                      clusterMergeCoef)
+                      clusterMergeCoef, ...)
     right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
-                       clusterMergeCoef)
-    mergedOrJoint(left, right)
+                       clusterMergeCoef, ...)
+    mergedOrJoint(gmatrix, original, variants, left, right, clusterMergeCoef, ...)
   }
 }
 
@@ -169,7 +172,7 @@ recSelect <- function(gmatrix, original, variants, cases,
 selectControlsHier <- function(controlGMatrix, controlVariants, cases, 
                                imputationMatrix = NULL, 
                                originalControlGMatrix = NULL, 
-                               minControls = 50, clusterMergeCoef = 1.1, 
+                               clusterMergeCoef = 1.1, 
                                softMinLambda = 0.9, softMaxLambda = 1.05, 
                                ...) {
   stopifnot(all(!is.na(controlGMatrix)))
@@ -182,6 +185,6 @@ selectControlsHier <- function(controlGMatrix, controlVariants, cases,
   }
   
   recSelect(controlGMatrix, originalControlGMatrix, controlVariants, 
-            cases, cases$hierarchy, minControls, clusterMergeCoef, 
-            softMinLambda, softMaxLambda, ...)
+            cases, cases$hierarchy, clusterMergeCoef, 
+            softMinLambda = softMinLambda, softMaxLambda = softMaxLambda, ...)
 }
