@@ -54,7 +54,7 @@ matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
                    cluster = if (length(resid) == 0) c() else cases$cluster,
                    stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
-  pvals[[cases$cluster]] <- results$pvals
+  pvals[[as.character(cases$cluster)]] <- results$pvals
   if (length(results$controls) > 0) {
     lam <- results$optimal_lambda
     good <- lam > softMinLambda && lam < softMaxLambda

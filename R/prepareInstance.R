@@ -240,7 +240,7 @@ prepareInstance <- function(gmatrix, imputationResults,
     US <- svdResult$u %*% diag(svdResult$d)
     counts <- genotypesToCounts(clusterGenotypes)
     clusterResults[[i]] <- list(US = US, counts = counts, 
-                                title = i)
+                                title = clusters$classes[i])
   }
   
   writeYaml(clusterResults, clusters, 
