@@ -196,7 +196,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         unordered_map<string, int> sample_positions;
         unordered_map<Variant, int> variant_positions;
         string sample;
-        int n = 0;
+        size_t n = 0;
         for (; iss >> sample; n++) {
             sample_positions.insert({sample, n});
         }
@@ -217,8 +217,8 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         vector<int> homrefs, hets, homs;
         for (const char *var: variants) {
             int homref = 0, het = 0, hom = 0;
-            int pos = variant_positions.at(Variant::parseVariants(string(var))[0]);
-            for (int sample_position: positions) {
+            size_t pos = variant_positions.at(Variant::parseVariants(string(var))[0]);
+            for (size_t sample_position: positions) {
                 Allele allele = BinaryAllele::toAllele(scanner.scan(pos * n + sample_position));
                 if (allele.DP() >= DP && allele.GQ() >= GQ) {
                     switch (allele.alleleType()) {
