@@ -10,21 +10,21 @@
 namespace vcf {
     class BinaryVCFScanner {
     public:
-        virtual BinaryAllele scan(int pos) = 0;
+        virtual BinaryAllele scan(size_t pos) = 0;
     };
 
     class MemoryMappedScanner : public BinaryVCFScanner {
         mio::mmap_source mmap;
     public:
         explicit MemoryMappedScanner(const std::string& filename);
-        BinaryAllele scan(int pos) override;
+        BinaryAllele scan(size_t pos) override;
     };
 
     class IOScanner : public BinaryVCFScanner {
         std::ifstream in;
     public:
         explicit IOScanner(const std::string& filename);
-        BinaryAllele scan(int pos) override;
+        BinaryAllele scan(size_t pos) override;
     };
 }
 

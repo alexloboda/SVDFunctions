@@ -10,9 +10,9 @@ vcf::MemoryMappedScanner::MemoryMappedScanner(const std::string& filename) {
     }
 }
 
-vcf::BinaryAllele vcf::MemoryMappedScanner::scan(int pos) {
+vcf::BinaryAllele vcf::MemoryMappedScanner::scan(size_t pos) {
     char* bytes = new char[sizeof(BinaryAllele)];
-    int offset = pos * sizeof(BinaryAllele);
+    size_t offset = pos * sizeof(BinaryAllele);
     for (size_t i = 0; i < sizeof(BinaryAllele); i++) {
         bytes[i] = mmap[offset + i];
     }
@@ -22,7 +22,7 @@ vcf::BinaryAllele vcf::MemoryMappedScanner::scan(int pos) {
 
 vcf::IOScanner::IOScanner(const std::string& filename) :in(filename, std::ios_base::binary) {}
 
-vcf::BinaryAllele vcf::IOScanner::scan(int pos) {
+vcf::BinaryAllele vcf::IOScanner::scan(size_t pos) {
     in.seekg(pos * sizeof(BinaryAllele));
     BinaryAllele allele{};
     in >> allele;
