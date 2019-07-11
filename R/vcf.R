@@ -223,11 +223,14 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @return data.frame with counts statistics 
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
-  df <- matrix(ncol = 0, nrow = 0)
+  df <- NULL
   for (i in 0:2) {
     df <- cbind(df, apply(genotypeMatrix, 1, function(x) {
       sum(x[!is.na(x)] == i)
     }))
+  }
+  if (nrow(genotypeMatrix) == 0 || ncol(genotypeMatrix) == 0) {
+    df <- matrix(ncol = 3, nrow = 0)
   }
   colnames(df) <- c("HOM_REF", "HET", "HOM_ALT")
   if (!is.null(rownames(genotypeMatrix))) {

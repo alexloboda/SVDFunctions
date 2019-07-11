@@ -2,6 +2,7 @@
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <fstream>
+#include <iostream>
 
 #include "include/vcf_binary.h"
 #include "include/third-party/zstr/zstr.hpp"
@@ -269,6 +270,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         const CharacterVector& binary_file, const CharacterVector& metafile,
         IntegerVector& requiredDP, IntegerVector requiredGQ) {
     try {
+        std::cerr << std::endl << sizeof(vcf::BinaryAllele) << std::endl;
         int DP = requiredDP[0];
         int GQ = requiredGQ[0];
 
