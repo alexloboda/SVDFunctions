@@ -27,8 +27,7 @@ predictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
   resid<-vector("list",length(referenceUList))
   for(i in 1:length(referenceUList)){
     resid[[i]] <- parallelResidEstimate(genotypeMatrix = gmatrix, 
-                                      SVDReference = referenceUList[[i]], 
-                                      nSV = SV)
+                                      SVDReference = referenceUList[[i]])
   }
   resid<-do.call(rbind,resid)
   rownames(resid)<-ancestryList
