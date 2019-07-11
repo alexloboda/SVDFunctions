@@ -223,7 +223,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
 #' @return data.frame with counts statistics 
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
-  df <- NULL
+  df <- matrix(ncol = 0, nrow = 0)
   for (i in 0:2) {
     df <- cbind(df, apply(genotypeMatrix, 1, function(x) {
       sum(x[!is.na(x)] == i)

@@ -258,8 +258,10 @@ namespace vcf {
 
     BinaryAllele BinaryAllele::fromAllele(const Allele& allele) {
         BinaryAllele binary{};
-        binary.DP = (uint16_t)allele.DP();
-        binary.GQ = (uint16_t)allele.GQ();
+        unsigned DP = std::min(allele.DP(), 65535U);
+        unsigned GQ = std::min(allele.GQ(), 255U);
+        binary.DP = (uint16_t)DP;
+        binary.GQ = (uint8_t)GQ;
         binary.allele = allele.alleleType();
         return binary;
     }
