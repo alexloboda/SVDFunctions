@@ -221,7 +221,7 @@ namespace {
                     }
                 }
             }
-            return {homref, het, hom};
+            return std::tuple<int, int, int>{homref, het, hom};
         }
     };
 
