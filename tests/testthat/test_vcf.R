@@ -74,6 +74,7 @@ test_that("storing/extracting data to/from binary file works ", {
   vcf <- scanVCF(file, DP = DP, GQ = 0, binaryPath = prefix)
   samples <- vcf$samples
   variants <- rownames(vcf$genotype)
+  variants <- c(variants, "chr1:1\nT\nC")
   samples <- sample(samples, as.integer(length(samples) / 2))
   variants <- sample(variants, as.integer(length(variants) / 2))
   localDP <- 30

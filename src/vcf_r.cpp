@@ -297,10 +297,12 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
             }
         }
 
+        Rcpp::LogicalVector present_variants;
         vector<size_t> variant_pos;
         for (const char* var: variants) {
             auto variant = Variant::parseVariants(string(var))[0];
             auto it = variant_positions.find(variant);
+            present_variants.push_back(it != variant_positions.end());
             if (it != variant_positions.end()) {
                variant_pos.push_back(it->second);
             }
@@ -310,7 +312,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         Counts counts = parallel_read(variant_pos, reader);
 
         List ret;
-        ret["variant"] = variants;
+        ret["variant"] = variants[present_variants];
         ret["HOM_REF"] = NumericVector(counts.hom.begin(), counts.hom.end());
         ret["HET"] = NumericVector(counts.het.begin(), counts.het.end());
         ret["HOM_ALT"] = NumericVector(counts.alt.begin(), counts.alt.end());
