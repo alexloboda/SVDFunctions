@@ -101,7 +101,11 @@ mergeCases <- function(left, right) {
 }
 
 goodClusters <- function(l, r) {
-  names(c(l$clusters[l$clusters], r$clusters[r$clusters]))
+  ret <- names(c(l$clusters[l$clusters], r$clusters[r$clusters]))
+  if (is.null(ret)) {
+    ret <- character(0)
+  }
+  ret
 }
 
 countGoodControls <- function(l, r) {
@@ -144,7 +148,7 @@ mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef,
   if (mergeCondition(left, right, res, mergeCoef)) {  
     cls <- goodClusters(left, right)
     table <- rbind(left$table, right$table)
-    table <- table[, !(table$cluster %in% cls)]
+    table <- table[!(table$cluster %in% cls), ]
     res$table <- rbind(table, res$table)
     res
   } else {
