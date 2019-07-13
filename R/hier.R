@@ -132,8 +132,12 @@ jointResult <- function(l, r) {
   ret
 }
 
+subtreesFailed <- function(l, r) {
+  return(l$ncontrols == 0 && r$ncontrols == 0)
+}
+
 mergeCondition <- function(l, r, merged, mergeCoef) {
-  if (l$ncontrols == 0 && r$ncontrols == 0) {
+  if (subtreesFailed(l, r)) {
     merged$minL < l$minL && merged$minL < r$minL
   } else {
     jointCount <- countGoodControls(l, r)
@@ -146,9 +150,13 @@ mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef,
   cases <- mergeCases(left$cases, right$cases)
   res <- matchControlsCluster(cases, gmatrix, original, variants, ...)
   if (mergeCondition(left, right, res, mergeCoef)) {  
-    cls <- goodClusters(left, right)
-    table <- rbind(left$table, right$table)
-    table <- table[!(table$cluster %in% cls), ]
+    if (!subtreesFailed(left, right)) {
+      cls <- goodClusters(left, right)
+      table <- rbind(left$table, right$table)
+      table <- table[!(table$cluster %in% cls), ]
+    } else {
+      table <- NULL
+    }
     res$table <- rbind(table, res$table)
     res
   } else {
