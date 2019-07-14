@@ -80,13 +80,14 @@ test_that("storing/extracting data to/from binary file works ", {
   samples <- sample(samples, as.integer(length(samples) / 2))
   sample_size <- length(variants) %/% 2
   sel <- c(rep(TRUE, sample_size), rep(FALSE, length(variants) - sample_size))
-  variants <- variants[sample(sel)][-1]
-  regions <- "chr1 35975170 35975173"
+  variants <- variants[sample(sel)]
+  bin_variants <- variants[variants != "chr1:158588123\tC\tT"]
+  regions <- c("chr1 158588121 158588125")
   
   localDP <- 30
   vcf <- scanVCF(file, DP = localDP, GQ = 0, samples = samples, variants = variants)
   actual <- scanBinaryFile(paste0(prefix, "_bin"), paste0(prefix, "_meta"), 
-                           samples, variants, DP = localDP, GQ = 0, 
+                           samples, bin_variants, DP = localDP, GQ = 0, 
                            regions = regions)
   expected <- genotypesToCounts(vcf$genotype)
   expect_equal(actual, expected)
