@@ -4,8 +4,8 @@
 \alias{scanBinaryFile}
 \title{Scan binary variant file}
 \usage{
-scanBinaryFile(binaryFile, metafile, samples, variants, DP = 10,
-  GQ = 20, MAC = 1, MAF = 0)
+scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
+  regions = NULL, DP = 10, GQ = 20, MAC = 1, MAF = 0)
 }
 \arguments{
 \item{binaryFile}{the name of binary file}
@@ -17,6 +17,9 @@ scanBinaryFile(binaryFile, metafile, samples, variants, DP = 10,
 \item{variants}{the set of variants in format "chr#:# REF ALT"
 (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
 applied only for genotype matrix.}
+
+\item{regions}{the set of regions in format "chr# startPos endPos". For each
+region call rate will be calculated and corresponding matrix will be returned.}
 
 \item{DP}{integer: minimum required read depth for position to be considered,
 otherwise assumed as missing.}

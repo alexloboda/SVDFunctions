@@ -265,46 +265,50 @@ namespace {
 }
 
 // [[Rcpp::export]]
-List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples,
-        const CharacterVector& binary_file, const CharacterVector& metafile,
-        IntegerVector& requiredDP, IntegerVector requiredGQ) {
+List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& regions,
+        const CharacterVector& binary_file, const CharacterVector& metafile, IntegerVector& requiredDP,
+        IntegerVector requiredGQ) {
     try {
         int DP = requiredDP[0];
         int GQ = requiredGQ[0];
 
+        RangeSet rangeSet;
+        for (const char* s: regions) {
+            auto r = vcf::Range::parseRange(std::string(s));
+            rangeSet.insert(r);
+        }
+
         MemoryMappedScanner scanner((string) binary_file[0]);
         ifstream fin(metafile[0]);
+
         string line;
         getline(fin, line);
         istringstream iss(line);
         unordered_map<string, int> sample_positions;
-        unordered_map<Variant, int> variant_positions;
         string sample;
         size_t n = 0;
         for (; iss >> sample; n++) {
             sample_positions.insert({sample, n});
         }
+
         vector<size_t> positions;
         for (const char *s: samples) {
             positions.push_back(sample_positions[string(s)]);
         }
 
-        int i = 0;
-        while (getline(fin, line)) {
-            auto vars = Variant::parseVariants(line);
-            for (Variant v: vars) {
-                variant_positions.insert({v, i++});
-            }
-        }
-
-        Rcpp::LogicalVector present_variants;
-        vector<size_t> variant_pos;
+        unordered_set<Variant> requested_variants;
         for (const char* var: variants) {
             auto variant = Variant::parseVariants(string(var))[0];
-            auto it = variant_positions.find(variant);
-            present_variants.push_back(it != variant_positions.end());
-            if (it != variant_positions.end()) {
-               variant_pos.push_back(it->second);
+            requested_variants.insert(variant);
+        }
+
+        vector<size_t> variant_pos;
+        vector<string> variant_strings;
+        for (int i = 0; getline(fin, line); i++) {
+            auto var = Variant::parseVariants(line)[0];
+            if (rangeSet.includes(var.position()) || requested_variants.find(var) != requested_variants.end()) {
+                variant_strings.emplace_back(var);
+                variant_pos.push_back(i);
             }
         }
 
@@ -312,7 +316,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         Counts counts = parallel_read(variant_pos, reader);
 
         List ret;
-        ret["variant"] = variants[present_variants];
+        ret["variant"] = CharacterVector(variant_strings.begin(), variant_strings.end());
         ret["HOM_REF"] = NumericVector(counts.hom.begin(), counts.hom.end());
         ret["HET"] = NumericVector(counts.het.begin(), counts.het.end());
         ret["HOM_ALT"] = NumericVector(counts.alt.begin(), counts.alt.end());
