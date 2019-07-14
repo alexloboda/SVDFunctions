@@ -273,4 +273,27 @@ namespace vcf {
         auto type = (AlleleType)allele.allele;
         return {type, allele.DP, allele.GQ};
     }
+
+    bool RangeSet::includes(const Position& pos) {
+        auto& set = rs[pos.chromosome().num()];
+        // Workaround, c++11
+        auto it = set.lower_bound(Range(pos.chromosome(), -1, pos.position()));
+        return it != set.end() && it->includes(pos);
+    }
+
+    void RangeSet::insert(Range r) {
+        auto& ranges = rs[r.begin().chromosome().num()];
+        auto pos = ranges.lower_bound(r);
+        if (pos != ranges.end() && pos->includes(r.end() + (-1))) {
+            int from = std::min(r.begin().position(), pos->begin().position());
+            int to = std::max(r.end().position(), pos->end().position());
+            r = Range(r.begin().chromosome(), from, to);
+            ranges.erase(*pos);
+        }
+        ranges.insert(r);
+    }
+
+    bool RangeSet::empty() const {
+        return rs.empty();
+    }
 }

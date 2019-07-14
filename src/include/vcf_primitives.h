@@ -101,6 +101,15 @@ namespace vcf {
         static Range parseRange(const std::string& s);
     };
 
+    class RangeSet {
+        std::unordered_map<int, std::set<Range>> rs;
+    public:
+        RangeSet() = default;
+        bool includes(const Position& position);
+        void insert(Range r);
+        bool empty() const;
+    };
+
     enum AlleleType {HOMREF = 0, HET = 1, HOM = 2, MISSING = 3};
     int to_int(AlleleType allele);
 

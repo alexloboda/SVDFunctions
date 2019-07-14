@@ -22,7 +22,7 @@ namespace vcf {
 
     class PredictingHandler : public VariantsHandler {
         Chromosome curr_chr;
-        std::unordered_map<int, std::set<Range>> ranges;
+        RangeSet ranges;
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;

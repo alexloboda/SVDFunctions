@@ -251,8 +251,8 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' both reference alleles, with  one reference allele and one alternative allele,
 #' and with both alternative ones respectively.
 #' @export
-scanBinaryFile <- function(binaryFile, metafile, samples, variants, DP = 10, GQ = 20,
-                           MAC = 1, MAF = 0.00) {
+scanBinaryFile <- function(binaryFile, metafile, samples, variants, 
+                           DP = 10, GQ = 20, MAC = 1, MAF = 0.00) {
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   res <- parse_binary_file(variants, samples, binaryFile, metafile, DP, GQ);
