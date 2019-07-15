@@ -36,6 +36,7 @@ checkCaseInfo <- function(cases, variants) {
 matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
   softMinLambda <- list(...)$softMinLambda
   softMaxLambda <- list(...)$softMaxLambda
+  print(cases$id)
   
   checkCaseInfo(cases, variants)
   sharedSites <- intersect(cases$variants, variants)
@@ -51,15 +52,15 @@ matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
   results <- selectControls(gmatrix, original, U, cases$counts, ...)
   resid <- results$residuals[results$controls]
   df <- data.frame(sample = names(resid), value = resid, 
-                   cluster = if (length(resid) == 0) c() else cases$cluster,
+                   cluster = if (length(resid) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
-  pvals[[as.character(cases$cluster)]] <- results$pvals
+  pvals[[as.character(cases$id)]] <- results$pvals
   if (length(results$controls) > 0) {
     lam <- results$optimal_lambda
     good <- lam > softMinLambda && lam < softMaxLambda
     list(table = df, pvals = pvals, minL = results$optimal_lambda, cases = cases, 
-         clusters = setNames(good, cases$cluster), 
+         clusters = setNames(good, cases$id), 
          ncontrols = if(good) length(results$controls) else 0)
   } else {
     list(table = data.frame(), pvals = c(), minL = Inf, cases = cases,
@@ -90,7 +91,7 @@ distributeControls <- function(residuals, threshold = 100) {
 
 mergeCases <- function(left, right) {
   ret <- list()
-  ret$cluster <- paste0(left$cluster, ", ", right$cluster)
+  ret$id <- paste0(left$id, ", ", right$id)
   ret$counts <- left$counts + right$counts
   lUS <- left$US
   rUS <- right$US

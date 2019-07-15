@@ -267,9 +267,12 @@ processHierarchy <- function(hier) {
 #' @export
 readInstanceFromYml <- function(filename) {
   inst <- yaml::read_yaml(filename)
+  i <- 1
   inst$population <- lapply(inst$population, function(x) {
     x$counts <- do.call(rbind, x$counts)
     x$US <- do.call(rbind, x$US)
+    x$id <- i
+    i <<- i + 1
     x
   })
   inst$hierarchy <- processHierarchy(inst$hierarchy)
