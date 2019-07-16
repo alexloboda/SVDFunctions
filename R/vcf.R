@@ -244,8 +244,6 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @param binaryFile the name of binary file
 #' @param metafile the name of metadata file
 #' @param samples the set of samples to be analyzed
-#' @param MAC minimum minor allele count
-#' @param MAF minimum minor allele frequency
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,
@@ -253,7 +251,7 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @export
 scanBinaryFile <- function(binaryFile, metafile, samples, 
                            variants = NULL, regions = NULL, 
-                           DP = 10, GQ = 20, MAC = 1, MAF = 0.00) {
+                           DP = 10, GQ = 20) {
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   variants <- if (is.null(variants)) character(0) else variants  
@@ -266,8 +264,6 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   res[["total"]] <- NULL
   res <- matrix(do.call(c, res), ncol = 3, dimnames = list(NULL, names(res)))
   rownames(res) <- names
-  actualMAC <- apply(res, 1, function(x) 2 * min(x[1], x[3]) + x[2])
-  res <- res[actualMAC >= MAC & actualMAC / 2 * nrow(res) >= MAF, ]
   res <- res[res[, 'HOM_REF'] + res[, 'HET'] + res[, 'HOM_ALT'] >= 0.9 * total, ]
   res
 }

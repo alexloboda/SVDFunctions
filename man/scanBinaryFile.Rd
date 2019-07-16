@@ -5,7 +5,7 @@
 \title{Scan binary variant file}
 \usage{
 scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
-  regions = NULL, DP = 10, GQ = 20, MAC = 1, MAF = 0)
+  regions = NULL, DP = 10, GQ = 20)
 }
 \arguments{
 \item{binaryFile}{the name of binary file}
@@ -26,10 +26,6 @@ otherwise assumed as missing.}
 
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
-
-\item{MAC}{minimum minor allele count}
-
-\item{MAF}{minimum minor allele frequency}
 }
 \value{
 matrix with three columns:  
