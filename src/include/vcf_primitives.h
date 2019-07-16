@@ -127,7 +127,7 @@ namespace vcf {
 
     struct BinaryAllele {
         uint16_t DP;
-        uint16_t GQ;
+        uint8_t GQ;
         uint8_t allele;
         friend std::ostream& operator<<(std::ostream& os, const BinaryAllele& dt);
         friend std::istream& operator>>(std::istream& in, BinaryAllele& obj);

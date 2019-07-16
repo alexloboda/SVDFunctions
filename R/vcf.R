@@ -229,6 +229,9 @@ genotypesToCounts <- function(genotypeMatrix) {
       sum(x[!is.na(x)] == i)
     }))
   }
+  if (nrow(genotypeMatrix) == 0 || ncol(genotypeMatrix) == 0) {
+    df <- matrix(ncol = 3, nrow = 0)
+  }
   colnames(df) <- c("HOM_REF", "HET", "HOM_ALT")
   if (!is.null(rownames(genotypeMatrix))) {
     rownames(df) <- rownames(genotypeMatrix)
