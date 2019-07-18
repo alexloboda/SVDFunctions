@@ -267,7 +267,7 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   res[["total"]] <- NULL
   res <- matrix(do.call(c, res), ncol = 3, dimnames = list(NULL, names(res)))
   rownames(res) <- names
-  res <- res[res[, 'HOM_REF'] + res[, 'HET'] + res[, 'HOM_ALT'] >= 0.9 * total, ]
-  res <- res[res[, 'HET'] != 0 | (res[, 'HOM_REF'] != 0 & res[, 'HOM_ALT'] != 0), ]
+  res <- res[res[, 'HOM_REF'] + res[, 'HET'] + res[, 'HOM_ALT'] >= 0.9 * total, , drop = FALSE]
+  res <- res[res[, 'HET'] != 0 | (res[, 'HOM_REF'] != 0 & res[, 'HOM_ALT'] != 0), , drop = FALSE]
   res
 }
