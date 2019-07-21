@@ -89,17 +89,18 @@ namespace {
     double variance(const std::vector<double>& weights) {
         // uniform prior (beta(1, 1, 1))
         assert(weights.size() == 3);
-        double sum_alpha = std::accumulate(weights.begin(), weights.end(), 0.0) + weights.size();
+        double sum_alpha = std::accumulate(weights.begin(), weights.end(), 0.0) + weights.size() * 0.5;
         std::vector<double> alpha(weights.size());
         std::transform(weights.begin(), weights.end(), alpha.begin(), [&sum_alpha](double x) {
-            return (x + 1) / sum_alpha;
+            return (x + 0.5) / sum_alpha;
         });
         // linear model
         double mean = 0.0;
-        for (size_t i = 0; i < weights.size(); i++) {
-            mean += i * alpha[i];
-        }
         double error = 0.0;
+        double sum = std::accumulate(weights.begin(), weights.end(), 0.0);
+        for (size_t i = 0; i < weights.size(); i++) {
+            mean += i * (weights[i] / sum);
+        }
         for (size_t i = 0; i < weights.size(); i++) {
             error += alpha[i] * (i - mean) * (i - mean);
         }
@@ -348,11 +349,11 @@ namespace vcf {
     }
 
     double Node::prediction(const std::vector<double>& alpha) {
-        // Beta(1,1,1) prior
-        double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0) + alpha.size();
+        // Dir(0,0,0) prior
+        double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0);
         std::vector<double> rel_alpha;
         std::for_each(alpha.begin(), alpha.end(), [&sum, &rel_alpha](double x){
-            rel_alpha.push_back((x + 1) / sum);
+            rel_alpha.push_back(x / sum);
         });
         return rel_alpha[1] + 2 * rel_alpha[2];
     }
