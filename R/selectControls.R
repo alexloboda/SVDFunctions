@@ -5,16 +5,24 @@ NULL
 #' Perform quality control on a set of allele counts
 #' 
 #' The methods checks which sets of allele counts pass standard quality 
-#' control filters(minor allele frequency > 0.05, AC > 10, HWE)
+#' control filters(minor allele frequency, minor allele count, HWE)
 #' @param countsMatrix matrix 3-column integer matrix
+#' @param maf numeric minor allele frequency
+#' @param mac integer minor allele count
+#' @param significance numeric significance level for HWE
 #' @return logical vector(each value - whether or not the corresponding set 
 #' of allele counts passed the quality control)
 #' @export
-checkAlleleCounts <- function(countsMatrix) {
+checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10, 
+                              significance = 1e-4) {
+  maf <- as.numeric(maf)
+  mac <- as.integer(mac)
+  significance <- as.numeric(significance)
+  
   stopifnot(ncol(countsMatrix) == 3) 
   countsMatrix <- matrix(as.integer(countsMatrix), ncol = 3)
   stopifnot(all(!is.na(countsMatrix)))
-  quality_control_impl(countsMatrix)
+  quality_control_impl(countsMatrix, maf, mac, qchisq(significance, 1))
 }
 
 #' Select a set of controls that matches to a set of cases

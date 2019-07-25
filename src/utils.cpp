@@ -5,7 +5,9 @@
 using std::vector;
 using std::tuple;
 
-const double chi2_bdry = 10.82757;
+namespace {
+    const double QCHISQ0999 =  10.82;
+}
 
 Clustering::Iterator::Iterator(const Clustering& object) :obj(object) {}
 
@@ -89,7 +91,8 @@ double lambda_1000(double lambda_observed, long cases, long controls) {
     return 1.0 + ((lambda_observed - 1) * coefficient) / (2 * 0.001);
 }
 
-bool check_counts(unsigned hom_ref, unsigned het, unsigned hom) {
+bool check_counts(unsigned hom_ref, unsigned het, unsigned hom, double maf, int mac,
+                  double chi2_bdry) {
     if (hom < hom_ref) {
         std::swap(hom, hom_ref);
     }
@@ -98,7 +101,7 @@ bool check_counts(unsigned hom_ref, unsigned het, unsigned hom) {
     double p = AC / (2 * n);
     double q = 1 - p;
     double chi2 = chi2_aux(hom_ref, n * p * p) + chi2_aux(het, 2 * n * p * q) + chi2_aux(hom, n * q * q);
-    return p > 0.05 &&  AC > 10 && chi2 < chi2_bdry;
+    return p > maf &&  AC > mac && chi2 < chi2_bdry;
 }
 
 matching_results select_controls_impl(vector<vector<int>>& gmatrix, const Clustering& clustering,

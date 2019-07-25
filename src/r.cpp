@@ -8,14 +8,18 @@ using namespace Rcpp;
 using std::vector;
 
 // [[Rcpp::export]]
-LogicalVector quality_control_impl(const IntegerMatrix& case_counts) {
+LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const NumericVector& maf,
+                                   const IntegerVector& mac, const NumericVector& chi2boundary) {
     int n = case_counts.nrow();
+    double af = maf[0];
+    int ac = mac[0];
+    double boundary = chi2boundary[0];
     LogicalVector ret(n);
     for (int i = 0; i < n; i++) {
         int homref = case_counts(i, 0);
         int het = case_counts(i, 1);
         int hom = case_counts(i, 2);
-        ret[i] = check_counts(homref, het, hom);
+        ret[i] = check_counts(homref, het, hom, af, ac, boundary);
     }
     return ret;
 }

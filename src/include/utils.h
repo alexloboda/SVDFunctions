@@ -11,7 +11,8 @@
 
 #include "lm.h"
 
-bool check_counts(unsigned hom_ref, unsigned het, unsigned hom);
+bool check_counts(unsigned hom_ref, unsigned het, unsigned hom, double maf = 0.05, int mac = 10,
+                  double chi2boundary = 10.82757);
 
 struct matching_results {
     int optimal_prefix;
