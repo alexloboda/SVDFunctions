@@ -4,10 +4,17 @@
 \alias{checkAlleleCounts}
 \title{Perform quality control on a set of allele counts}
 \usage{
-checkAlleleCounts(countsMatrix)
+checkAlleleCounts(countsMatrix, maf = 0.05, mac = 10,
+  significance = 1e-04)
 }
 \arguments{
 \item{countsMatrix}{matrix 3-column integer matrix}
+
+\item{maf}{numeric minor allele frequency}
+
+\item{mac}{integer minor allele count}
+
+\item{significance}{numeric significance level for HWE}
 }
 \value{
 logical vector(each value - whether or not the corresponding set 
@@ -15,5 +22,5 @@ of allele counts passed the quality control)
 }
 \description{
 The methods checks which sets of allele counts pass standard quality 
-control filters(minor allele frequency > 0.05, AC > 10, HWE)
+control filters(minor allele frequency, minor allele count, HWE)
 }

@@ -6,13 +6,16 @@
 using namespace Rcpp;
 
 // quality_control_impl
-LogicalVector quality_control_impl(const IntegerMatrix& case_counts);
-RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP) {
+LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const NumericVector& maf, const IntegerVector& mac, const NumericVector& chi2boundary);
+RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP, SEXP mafSEXP, SEXP macSEXP, SEXP chi2boundarySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const IntegerMatrix& >::type case_counts(case_countsSEXP);
-    rcpp_result_gen = Rcpp::wrap(quality_control_impl(case_counts));
+    Rcpp::traits::input_parameter< const NumericVector& >::type maf(mafSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type mac(macSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type chi2boundary(chi2boundarySEXP);
+    rcpp_result_gen = Rcpp::wrap(quality_control_impl(case_counts, maf, mac, chi2boundary));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -76,7 +79,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 1},
+    {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 11},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 7},
