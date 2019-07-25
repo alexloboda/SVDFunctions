@@ -22,7 +22,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   stopifnot(ncol(countsMatrix) == 3) 
   countsMatrix <- matrix(as.integer(countsMatrix), ncol = 3)
   stopifnot(all(!is.na(countsMatrix)))
-  quality_control_impl(countsMatrix, maf, mac, qchisq(significance, 1))
+  quality_control_impl(countsMatrix, maf, mac, qchisq(1 - significance, 1))
 }
 
 #' Select a set of controls that matches to a set of cases
