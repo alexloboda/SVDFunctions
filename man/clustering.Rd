@@ -17,7 +17,8 @@ two lists with the same structure. See examples}
 Constructor for clustering object
 }
 \examples{
-samples <- setNames(c("C1", "C1", "C2", "C2", "C3", "C4"), paste0("sample", 1:6))
+samples <- c("C1", "C1", "C2", "C2", "C3", "C4")
+names(samples) <- paste0("sample", 1:6))
 hier <- list("C1", list(list("C2", "C4"), "C3"))
 clustering(samples, hier)
 }

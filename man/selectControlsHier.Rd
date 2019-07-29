@@ -31,9 +31,6 @@ Missing values are allowed.}
 \item{softMaxLambda}{Desirable maximum for lambda}
 
 \item{...}{parameters to be passed to selectControls function.}
-
-\item{minControls}{integer minimum number of controls selected for 
-each cluster}
 }
 \description{
 Select a set of controls that matches a set of cases

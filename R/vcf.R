@@ -250,7 +250,7 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' "chr# startPos endPos". Regions must be non-overlapping.
 #' @param minMAF numeric minimum minor allele frequency
 #' @param maxMAF numeric maximum minor allele frequency
-#' @param minCallRate 
+#' @param minCallRate numeric minimum call rate
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,

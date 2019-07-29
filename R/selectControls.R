@@ -22,7 +22,8 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   stopifnot(ncol(countsMatrix) == 3) 
   countsMatrix <- matrix(as.integer(countsMatrix), ncol = 3)
   stopifnot(all(!is.na(countsMatrix)))
-  quality_control_impl(countsMatrix, maf, mac, qchisq(1 - significance, 1))
+  chisq_threshold <- stats::qchisq(1 - significance, 1)
+  quality_control_impl(countsMatrix, maf, mac, chisq_threshold)
 }
 
 #' Select a set of controls that matches to a set of cases
@@ -83,7 +84,8 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
   result$residuals <- result$residuals[permutation]
   
   if (result$controls > 0) {
-    result$controls <- colnames(gmatrix)[head(permutation, result$controls)]
+    sel <- utils::head(permutation, result$controls)
+    result$controls <- colnames(gmatrix)[sel]
   } else {
     result$controls <- c()
   }

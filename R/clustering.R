@@ -49,14 +49,15 @@ plainTree <- function(tree, classes) {
 #' @param hierarchy tree-like structure, a list containing cluster name(leafs) or
 #' two lists with the same structure. See examples
 #' @examples
-#' samples <- setNames(c("C1", "C1", "C2", "C2", "C3", "C4"), paste0("sample", 1:6))
+#' samples <- c("C1", "C1", "C2", "C2", "C3", "C4")
+#' names(samples) <- paste0("sample", 1:6))
 #' hier <- list("C1", list(list("C2", "C4"), "C3"))
 #' clustering(samples, hier)
 #' @export
 clustering <- function(classification, hierarchy) {
   classes <- as.character(unique(classification))
-  map <- stats::setNames(1:length(classes), classes)
-  classification <- stats::setNames(map[classification], names(classification))
+  map <- setNames(1:length(classes), classes)
+  classification <- setNames(map[classification], names(classification))
   left <- checkTree(hierarchy, classes)
   hierarchy <- plainTree(hierarchy, classes)
   if(length(left) != 0) {

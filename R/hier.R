@@ -190,8 +190,6 @@ recSelect <- function(gmatrix, original, variants, cases,
 #' imputed in controlGMatrix.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt).
 #' Missing values are allowed.
-#' @param minControls integer minimum number of controls selected for 
-#' each cluster
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
 #' @inheritParams selectControls

@@ -31,7 +31,7 @@ considered, otherwise assumed as missing.}
 
 \item{maxMAF}{numeric maximum minor allele frequency}
 
-\item{minCallRate}{}
+\item{minCallRate}{numeric minimum call rate}
 }
 \value{
 matrix with three columns:  
