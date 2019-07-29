@@ -72,6 +72,8 @@ test_that("callrates are calculated correctly", {
 test_that("storing/extracting data to/from binary file works ", {
   set.seed(42)
   prefix <- paste0(tempdir(), "/db")
+  bin <- paste0(prefix, "_bin")
+  meta <- paste0(prefix, "_meta")
   vcf <- scanVCF(file, DP = DP, GQ = 0, binaryPath = prefix)
   
   samples <- vcf$samples
@@ -81,16 +83,52 @@ test_that("storing/extracting data to/from binary file works ", {
   sample_size <- length(variants) %/% 2
   sel <- c(rep(TRUE, sample_size), rep(FALSE, length(variants) - sample_size))
   variants <- variants[sample(sel)]
-  bin_variants <- variants[variants != "chr1:158588123\tC\tT"]
-  regions <- c("chr1 158588121 158588125")
   
   localDP <- 30
   vcf <- scanVCF(file, DP = localDP, GQ = 0, samples = samples, variants = variants)
-  actual <- scanBinaryFile(paste0(prefix, "_bin"), paste0(prefix, "_meta"), 
-                           samples, bin_variants, DP = localDP, GQ = 0, 
-                           regions = regions)
+  actual <- scanBinaryFile(bin, meta, samples, variants, DP = localDP, GQ = 0)
   expected <- genotypesToCounts(vcf$genotype)
   expect_equal(actual, expected)
+  
+  regions <- c("chr2 148943492 234267016",
+               "chr7 102949810 149848267",
+               "chr10 46506985 46507378")
+  
+  actualReg <- list()
+  actualReg[["complete"]] <- t(matrix(c(c(96, 42, 27), 
+                                        c(84, 35, 4), 
+                                        c(38, 45, 0)), nrow = 3))
+  
+  actualReg[["maf"]] <- t(matrix(c(c(17, 39, 27), 
+                                   c(44, 34, 4), 
+                                   c(38, 45, 0)), nrow = 3))
+  
+  actualReg[["rare"]] <- t(matrix(c(c(79, 3, 0),
+                                    c(40, 1, 0),
+                                    c(0, 0, 0)), nrow = 3))
+  
+  actualReg[["cr"]] <- t(matrix(c(c(17, 22, 3), 
+                                  c(0, 0, 0),
+                                  c(18, 24, 0)), nrow = 3))
+  
+  actualReg <- lapply(actualReg, function(x) {
+    rownames(x) <- regions
+    colnames(x) <- c("hom_ref", "het", "hom_alt")
+    x <- x[apply(x, 1, function(x) sum(x) > 0), ]
+    x
+  })
+  
+  reg <- list()
+  reg[["complete"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
+                        DP = localDP, GQ = 0)
+  reg[["maf"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
+                        DP = localDP, GQ = 0, minMAF = 0.04)
+  reg[["rare"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
+                        DP = localDP, GQ = 0, maxMAF = 0.04)
+  reg[["cr"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
+                        DP = localDP, GQ = 0, minCallRate = 41.5 / 45)
+  
+  expect_equal(actualReg, reg)
 })
 
 test_that("parsing multivariant lines works", {

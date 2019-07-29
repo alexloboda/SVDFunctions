@@ -19,8 +19,7 @@ otherwise assumed as missing.}
 considered, otherwise assumed as missing.}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
-applied only for genotype matrix.}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
 
 \item{samples}{the set of samples to be scanned and returned}
 

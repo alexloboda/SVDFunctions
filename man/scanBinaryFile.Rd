@@ -5,7 +5,8 @@
 \title{Scan binary variant file}
 \usage{
 scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
-  regions = NULL, DP = 10, GQ = 20)
+  regions = NULL, DP = 10, GQ = 20, minMAF = 0, maxMAF = 1,
+  minCallRate = 0.9)
 }
 \arguments{
 \item{binaryFile}{the name of binary file}
@@ -15,17 +16,22 @@ scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
 \item{samples}{the set of samples to be analyzed}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
-(i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
-applied only for genotype matrix.}
+(i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
 
-\item{regions}{the set of regions in format "chr# startPos endPos". For each
-region call rate will be calculated and corresponding matrix will be returned.}
+\item{regions}{the set of regions [startPos, endPos] in format 
+"chr# startPos endPos". Regions must be non-overlapping.}
 
 \item{DP}{integer: minimum required read depth for position to be considered,
 otherwise assumed as missing.}
 
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
+
+\item{minMAF}{numeric minimum minor allele frequency}
+
+\item{maxMAF}{numeric maximum minor allele frequency}
+
+\item{minCallRate}{}
 }
 \value{
 matrix with three columns:  

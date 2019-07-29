@@ -217,7 +217,7 @@ namespace vcf {
                 throw ParserException("Malformed range: " + s);
             }
             startpos = stoi(start);
-            endpos = stoi(end);
+            endpos = stoi(end) + 1;
         } catch(...) {
             throw ParserException("Malformed range: " + s);
         }
@@ -234,7 +234,7 @@ namespace vcf {
     }
 
     Range::operator std::string() const {
-        return "chr" + std::to_string(chr.num()) + " " + std::to_string(from) + " " + std::to_string(to);
+        return "chr" + std::to_string(chr.num()) + " " + std::to_string(from) + " " + std::to_string(to - 1);
     }
 
     Allele::Allele(AlleleType type, unsigned DP, unsigned GQ) :depth(DP), quality(GQ), type(type) {}

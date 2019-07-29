@@ -181,10 +181,65 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 }
 
 namespace {
-    struct Counts {
+    class Counts {
         vector<int> hom;
         vector<int> het;
         vector<int> alt;
+    public:
+        void push(int homc, int hetc, int altc) {
+            hom.push_back(homc);
+            het.push_back(hetc);
+            alt.push_back(altc);
+        }
+
+        void add(int entry, int homc, int hetc, int altc) {
+            hom[entry] += homc;
+            het[entry] += hetc;
+            alt[entry] += altc;
+        }
+
+        void append(const Counts& counts) {
+            hom.insert(hom.end(), counts.hom.begin(), counts.hom.end());
+            het.insert(het.end(), counts.het.begin(), counts.het.end());
+            alt.insert(alt.end(), counts.alt.begin(), counts.alt.end());
+        }
+
+        List get_table() {
+            List ret;
+            ret["hom_ref"] = NumericVector(hom.begin(), hom.end());
+            ret["het"] = NumericVector(het.begin(), het.end());
+            ret["hom_alt"] = NumericVector(alt.begin(), alt.end());
+            return ret;
+        }
+
+        bool pass(int i, double min_maf, double max_maf, double min_cr, int m) const {
+            const double EPS = 1e-6;
+            int left = 2 * hom[i] + het[i];
+            int right = 2 * alt[i] + het[i];
+            int sum = hom[i] + het[i] + alt[i];
+            if (left < right) {
+                std::swap(left, right);
+            }
+            double maf = (double)right / (left + right);
+            double cr = (double)sum / m;
+            return cr > min_cr && maf + EPS > min_maf && maf - EPS < max_maf && left > 0 && right > 0;
+        }
+
+        int size() {
+            return hom.size();
+        }
+
+        int get_hom(int i) const {
+            return hom[i];
+        }
+
+        int get_het(int i) const {
+            return het[i];
+        }
+
+        int get_alt(int i) const {
+            return alt[i];
+        }
     };
 
     int ceiling_devision(size_t x, size_t y) {
@@ -196,6 +251,7 @@ namespace {
         const MemoryMappedScanner& scanner;
         int DP;
         int GQ;
+
         int total_samples;
     public:
         CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, int DP, int GQ, int tot_samples)
@@ -241,9 +297,7 @@ namespace {
                     Counts counts = {};
                     for (size_t pos: thread_jobs) {
                         auto cts = reader.read(pos);
-                        counts.hom.push_back(std::get<0>(cts));
-                        counts.het.push_back(std::get<1>(cts));
-                        counts.alt.push_back(std::get<2>(cts));
+                        counts.push(std::get<0>(cts), std::get<1>(cts), std::get<2>(cts));
                     }
                     return counts;
                 }));
@@ -256,25 +310,68 @@ namespace {
 
         for (auto& future: futures) {
             Counts done = future.get();
-            ret.hom.insert(ret.hom.end(), done.hom.begin(), done.hom.end());
-            ret.het.insert(ret.het.end(), done.het.begin(), done.het.end());
-            ret.alt.insert(ret.alt.end(), done.alt.begin(), done.alt.end());
+            ret.append(done);
         }
+        return ret;
+    }
+}
+
+namespace {
+    List binaryScanResults(const vector<Variant>& variants, const unordered_set<Variant>& requested,
+            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr, int n) {
+        Counts cumulative;
+        vector<string> names;
+        int curr_range = 0;
+        int range_entry = -1;
+        for (size_t i = 0; i < variants.size(); i++) {
+            const Variant& var = variants[i];
+
+            if (!counts.pass(i, min_maf, max_maf, cr, n)) {
+                continue;
+            }
+
+            bool in_range = curr_range < ranges.size();
+            while (in_range && ranges[curr_range] < var.position()) {
+                ++curr_range;
+                range_entry = -1;
+            }
+
+            if (requested.find(var) != requested.end()) {
+                cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
+                names.push_back((string)var);
+            }
+            if (in_range && ranges[curr_range].includes(var.position())) {
+                if (range_entry == -1) {
+                    cumulative.push(0, 0, 0);
+                    range_entry = cumulative.size() - 1;
+                    names.push_back((string)ranges[curr_range]);
+                }
+                cumulative.add(range_entry, counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
+            }
+        }
+        List ret = cumulative.get_table();
+        ret["names"] = CharacterVector(names.begin(), names.end());
         return ret;
     }
 }
 
 // [[Rcpp::export]]
 List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& regions,
-        const CharacterVector& binary_file, const CharacterVector& metafile, IntegerVector& requiredDP,
-        IntegerVector requiredGQ) {
+        const CharacterVector& binary_file, const CharacterVector& metafile,
+        const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
+        const IntegerVector& requiredDP, const IntegerVector requiredGQ) {
     try {
         int DP = requiredDP[0];
         int GQ = requiredGQ[0];
+        double min_maf = r_min_maf[0];
+        double max_maf = r_max_maf[0];
+        double cr = r_min_cr[0];
 
         RangeSet rangeSet;
+        vector<vcf::Range> ranges;
         for (const char* s: regions) {
             auto r = vcf::Range::parseRange(std::string(s));
+            ranges.push_back(r);
             rangeSet.insert(r);
         }
 
@@ -303,11 +400,11 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         }
 
         vector<size_t> variant_pos;
-        vector<string> variant_strings;
+        vector<Variant> found_variants;
         for (int i = 0; getline(fin, line); i++) {
             auto var = Variant::parseVariants(line)[0];
             if (rangeSet.includes(var.position()) || requested_variants.find(var) != requested_variants.end()) {
-                variant_strings.emplace_back(var);
+                found_variants.push_back(var);
                 variant_pos.push_back(i);
             }
         }
@@ -315,13 +412,9 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         CountsReader reader(positions, scanner, DP, GQ, n);
         Counts counts = parallel_read(variant_pos, reader);
 
-        List ret;
-        ret["variant"] = CharacterVector(variant_strings.begin(), variant_strings.end());
-        ret["HOM_REF"] = NumericVector(counts.hom.begin(), counts.hom.end());
-        ret["HET"] = NumericVector(counts.het.begin(), counts.het.end());
-        ret["HOM_ALT"] = NumericVector(counts.alt.begin(), counts.alt.end());
+        int m = positions.size();
+        List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, min_maf, max_maf, cr, m);
         ret["total"] = positions.size();
-
         return ret;
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());

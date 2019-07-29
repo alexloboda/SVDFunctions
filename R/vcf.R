@@ -133,8 +133,7 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @param bannedPositions the set of positions in format "chr#:#" that 
 #' must be eliminated from consideration. 
 #' @param variants the set of variants in format "chr#:# REF ALT"
-#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*". This filter is 
-#' applied only for genotype matrix.
+#' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*".
 #' @param returnGenotypeMatrix logical: whether or not return genotype matrix
 #' @param predictMissing if TRUE missing values will be replaced with predicted
 #' values.
@@ -232,7 +231,7 @@ genotypesToCounts <- function(genotypeMatrix) {
   if (nrow(genotypeMatrix) == 0 || ncol(genotypeMatrix) == 0) {
     df <- matrix(ncol = 3, nrow = 0)
   }
-  colnames(df) <- c("HOM_REF", "HET", "HOM_ALT")
+  colnames(df) <- c("hom_ref", "het", "hom_alt")
   if (!is.null(rownames(genotypeMatrix))) {
     rownames(df) <- rownames(genotypeMatrix)
   }
@@ -247,6 +246,11 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @param binaryFile the name of binary file
 #' @param metafile the name of metadata file
 #' @param samples the set of samples to be analyzed
+#' @param regions the set of regions [startPos, endPos] in format 
+#' "chr# startPos endPos". Regions must be non-overlapping.
+#' @param minMAF numeric minimum minor allele frequency
+#' @param maxMAF numeric maximum minor allele frequency
+#' @param minCallRate 
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,
@@ -254,20 +258,23 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @export
 scanBinaryFile <- function(binaryFile, metafile, samples, 
                            variants = NULL, regions = NULL, 
-                           DP = 10, GQ = 20) {
+                           DP = 10, GQ = 20, 
+                           minMAF = 0.0, maxMAF = 1.0, 
+                           minCallRate = 0.9) {
+  
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   variants <- if (is.null(variants)) character(0) else variants  
   regions <- if (is.null(regions)) character(0) else regions
   
-  res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, DP, GQ);
-  names <- res[["variant"]]
+  res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, 
+                           minMAF, maxMAF, minCallRate, DP, GQ);
+  names <- res[["names"]]
   total <- as.integer(res["total"])
-  res[["variant"]] <- NULL
+  res[["names"]] <- NULL
   res[["total"]] <- NULL
   res <- matrix(do.call(c, res), ncol = 3, dimnames = list(NULL, names(res)))
   rownames(res) <- names
-  res <- res[res[, 'HOM_REF'] + res[, 'HET'] + res[, 'HOM_ALT'] >= 0.9 * total, , drop = FALSE]
-  res <- res[res[, 'HET'] != 0 | (res[, 'HOM_REF'] != 0 & res[, 'HOM_ALT'] != 0), , drop = FALSE]
+  
   res
 }
