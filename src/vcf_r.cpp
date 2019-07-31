@@ -288,11 +288,10 @@ namespace {
         std::vector<std::future<Counts>> futures;
         int jobs_per_thread = ceiling_devision(positions.size(), threads);
 
-        int curr_jobs = 0;
         vector<size_t> thread_jobs;
         for (int i = 0; i < positions.size(); i++) {
             thread_jobs.push_back(positions[i]);
-            if (curr_jobs == jobs_per_thread || i == positions.size() - 1) {
+            if (thread_jobs.size() == jobs_per_thread || i == positions.size() - 1) {
                 futures.push_back(pool.push([thread_jobs, &reader]() -> Counts {
                     Counts counts = {};
                     for (size_t pos: thread_jobs) {
@@ -301,7 +300,6 @@ namespace {
                     }
                     return counts;
                 }));
-                curr_jobs = 0;
                 thread_jobs = vector<size_t>();
             }
         }
