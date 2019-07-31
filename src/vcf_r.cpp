@@ -247,8 +247,8 @@ namespace {
     }
 
     class CountsReader {
-        const vector<size_t>& samples;
-        const MemoryMappedScanner& scanner;
+        vector<size_t> samples;
+        MemoryMappedScanner scanner;
         int DP;
         int GQ;
 
@@ -256,6 +256,8 @@ namespace {
     public:
         CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, int DP, int GQ, int tot_samples)
             :samples(samples), scanner(scanner), DP(DP), GQ(GQ), total_samples(tot_samples) {}
+
+        CountsReader(const CountsReader&) = default;
 
         std::tuple<int, int, int> read(size_t position) const {
             int homref = 0, het = 0, hom = 0;
@@ -292,7 +294,7 @@ namespace {
         for (int i = 0; i < positions.size(); i++) {
             thread_jobs.push_back(positions[i]);
             if (thread_jobs.size() == jobs_per_thread || i == positions.size() - 1) {
-                futures.push_back(pool.push([thread_jobs, &reader]() -> Counts {
+                futures.push_back(pool.push([thread_jobs, reader]() -> Counts {
                     Counts counts = {};
                     for (size_t pos: thread_jobs) {
                         auto cts = reader.read(pos);

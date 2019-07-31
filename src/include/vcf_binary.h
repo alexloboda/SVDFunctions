@@ -14,9 +14,11 @@ namespace vcf {
     };
 
     class MemoryMappedScanner : public BinaryVCFScanner {
+        std::string filename;
         mio::mmap_source mmap;
     public:
         explicit MemoryMappedScanner(const std::string& filename);
+        MemoryMappedScanner(const MemoryMappedScanner& other);
         BinaryAllele scan(size_t pos) const override;
     };
 }

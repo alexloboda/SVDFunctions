@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-vcf::MemoryMappedScanner::MemoryMappedScanner(const std::string& filename) {
+vcf::MemoryMappedScanner::MemoryMappedScanner(const std::string& filename) :filename(filename) {
     std::error_code error;
     mmap.map(filename, error);
     if (error) {
@@ -18,3 +18,6 @@ vcf::BinaryAllele vcf::MemoryMappedScanner::scan(size_t pos) const {
     }
     return *(BinaryAllele*)bytes.get();
 }
+
+vcf::MemoryMappedScanner::MemoryMappedScanner(const vcf::MemoryMappedScanner &other)
+                                :MemoryMappedScanner(other.filename) {}
