@@ -321,6 +321,7 @@ namespace {
             const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr, int n) {
         Counts cumulative;
         vector<string> names;
+        vector<int> n_variants;
         int curr_range = 0;
         int range_entry = -1;
         for (size_t i = 0; i < variants.size(); i++) {
@@ -339,18 +340,22 @@ namespace {
             if (requested.find(var) != requested.end()) {
                 cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
                 names.push_back((string)var);
+                n_variants.push_back(1);
             }
             if (in_range && ranges[curr_range].includes(var.position())) {
                 if (range_entry == -1) {
                     cumulative.push(0, 0, 0);
                     range_entry = cumulative.size() - 1;
                     names.push_back((string)ranges[curr_range]);
+                    n_variants.push_back(0);
                 }
+                ++n_variants[range_entry];
                 cumulative.add(range_entry, counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
             }
         }
         List ret = cumulative.get_table();
         ret["names"] = CharacterVector(names.begin(), names.end());
+        ret["n_variants"] = IntegerVector(n_variants.begin(), n_variants.end());
         return ret;
     }
 }

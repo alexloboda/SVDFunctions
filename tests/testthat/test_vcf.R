@@ -88,7 +88,7 @@ test_that("storing/extracting data to/from binary file works ", {
   vcf <- scanVCF(file, DP = localDP, GQ = 0, samples = samples, variants = variants)
   actual <- scanBinaryFile(bin, meta, samples, variants, DP = localDP, GQ = 0)
   expected <- genotypesToCounts(vcf$genotype)
-  expect_equal(actual, expected)
+  expect_equal(actual[, 1:3], expected)
   
   regions <- c("chr2 148943492 234267016",
                "chr7 102949810 149848267",
@@ -120,13 +120,13 @@ test_that("storing/extracting data to/from binary file works ", {
   
   reg <- list()
   reg[["complete"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
-                        DP = localDP, GQ = 0)
+                        DP = localDP, GQ = 0)[, 1:3]
   reg[["maf"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
-                        DP = localDP, GQ = 0, minMAF = 0.04)
+                        DP = localDP, GQ = 0, minMAF = 0.04)[, 1:3]
   reg[["rare"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
-                        DP = localDP, GQ = 0, maxMAF = 0.04)
+                        DP = localDP, GQ = 0, maxMAF = 0.04)[, 1:3]
   reg[["cr"]] <- scanBinaryFile(bin, meta, samples, regions = regions, 
-                        DP = localDP, GQ = 0, minCallRate = 41.5 / 45)
+                        DP = localDP, GQ = 0, minCallRate = 41.5 / 45)[, 1:3]
   
   expect_equal(actualReg, reg)
 })
