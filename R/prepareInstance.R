@@ -264,8 +264,7 @@ getNamesFromHier <- function(hier) {
   if (names(hier) == "split") {
     c(getNamesFromHier(hier$split[[1]]), getNamesFromHier(hier$split[[2]]))
   }  else {
-    ret <- list()
-    ret[[hier$cluster$id]] <- hier$cluster$name
+    stats::setNames(hier$cluster$name, hier$cluster$id)
   } 
 }
 
