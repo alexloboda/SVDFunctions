@@ -260,6 +260,15 @@ processHierarchy <- function(hier) {
   }
 }
 
+getNamesFromHier <- function(hier) {
+  if (names(hier) == "split") {
+    c(getNamesFromHier(hier$split[[1]]), getNamesFromHier(hier$split[[2]]))
+  }  else {
+    ret <- list()
+    ret[[hier$cluster$id]] <- hier$cluster$name
+  } 
+}
+
 #' Read instance from YML file 
 #' @param filename YML file
 #' @return a list of four: title of dataset, list of variants, hierarchy and
@@ -275,6 +284,7 @@ readInstanceFromYml <- function(filename) {
     i <<- i + 1
     x
   })
+  inst$names <- getNamesFromHier(inst$hierarchy)
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
