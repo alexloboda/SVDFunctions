@@ -25,7 +25,8 @@ writePopulationStructure <- function(tree, classes, fd, depth) {
     cats(fd, 0, "cluster:\n")
     id <- tree[[1]]
     cats(fd, depth + 1, "id: ", id, "\n")
-    cats(fd, depth + 1, "name: ", classes[id], "\n")
+    capture.output(name <- print(classes[id]))
+    cats(fd, depth + 1, "name: ", name, "\n")
   } else {
     cats(fd, 0, "split:\n")
     for (i in 1:length(tree)) {
