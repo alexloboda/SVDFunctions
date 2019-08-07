@@ -70,6 +70,7 @@ selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
   } else {
     cl <- as.integer(as.factor(cl)) - 1
   }
+  stopifnot(all(!is.na(cl)))
   
   residuals <- parallelResidEstimate(genotypeMatrix, SVDReference)
   
