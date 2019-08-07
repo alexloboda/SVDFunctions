@@ -261,9 +261,18 @@ processHierarchy <- function(hier) {
 }
 
 getNamesFromHier <- function(hier) {
+  if (!(names(hier) %in% c("split", "cluster"))) {
+    userError("Incorrect hierarchy section in the input YML file.")
+  }
   if (names(hier) == "split") {
+    if (length(hier$split) != 2) {
+      userError("Incorrect hierarchy section in the input YML file.")
+    }
     c(getNamesFromHier(hier$split[[1]]), getNamesFromHier(hier$split[[2]]))
   }  else {
+    if (!setequal(names(hier$cluster), c("id", "name"))) {
+      userError("Incorrect hierarchy section in the input YML file.")
+    }
     stats::setNames(hier$cluster$name, hier$cluster$id)
   } 
 }
@@ -274,16 +283,48 @@ getNamesFromHier <- function(hier) {
 #' population description
 #' @export
 readInstanceFromYml <- function(filename) {
-  inst <- yaml::read_yaml(filename)
+  tryCatch(inst <- yaml::read_yaml(filename), 
+           error = function(e) userError("File is not a correct YML file"))
+  if (!setequal(names(inst), c("title", "hierarchy", "variants", "population"))) {
+    userError("Incorrect input YML file: missing or extra sections.")
+  }
   i <- 1
   inst$population <- lapply(inst$population, function(x) {
-    x$counts <- do.call(rbind, x$counts)
-    x$US <- do.call(rbind, x$US)
+    err <- function(x) {
+      userError(paste0(x, " The error occurred while processing population #", i, "."))
+    }
+    for (obj in c("counts", "US")) {
+      raw <- x[[obj]]
+      if (length(raw) == 0) {
+        err(paste("Missing", obj, "matrix."))
+      }
+      x[[obj]] <- do.call(rbind, x[[obj]])
+      mode(x[[obj]]) <- "numeric"
+      if (any(is.na(x[[obj]]))) {
+        err("US and counts matrices in input must contain only numeric values.")
+      }
+      if (nrow(x[[obj]]) != length(inst$variants)) {
+        err("Number of rows in US and counts matrices must match number of variants 
+                   in the input YML file.")
+      }
+      if (length(unique(sapply(raw, length))) != 1) {
+        err(paste0("Malformed one of the ", obj, " matrices in the input YML file."))
+      }
+    }
+    if (ncol(x$counts) != 3) {
+      userError("Number of columns of counts matrix in the YML file must be three.")
+    }
     x$id <- i
     i <<- i + 1
     x
   })
+  if (any(sapply(inst$population, function(x) x$cluster) != 1:length(inst$population))) {
+    userError("List of populations must go in natural order by their ids")
+  }
   inst$names <- getNamesFromHier(inst$hierarchy)
+  if (!setequal(names(inst$names), 1:length(inst$population))) {
+    userError("Hierarchy section in input YML file have entries with unexpected IDs")
+  }
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }

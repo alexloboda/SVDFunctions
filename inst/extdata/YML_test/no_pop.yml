@@ -1,0 +1,14 @@
+title: some ordinary\tdataset
+
+hierarchy:
+    split:
+        - cluster:
+            id: 1
+            name: EUR&\nAFR
+        - cluster:
+            id: 2
+            name: ASIA
+
+variants:
+    - chr1:1	A	G
+    - chr2:2	A	T

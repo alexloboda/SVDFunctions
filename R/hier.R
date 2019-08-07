@@ -1,9 +1,3 @@
-userErrorCls <- "userError"
-userError <- function(msg) {
-  e <- condition(c(userErrorCls), msg)
-  stop(e)
-}
-
 condition <- function(subclass, message, call = sys.call(-1), ...) {
   structure(
     class = c(subclass, "condition"),

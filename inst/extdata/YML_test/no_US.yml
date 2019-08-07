@@ -1,0 +1,28 @@
+title: some ordinary\tdataset
+
+hierarchy:
+    split:
+        - cluster:
+            id: 1
+            name: EUR&\nAFR
+        - cluster:
+            id: 2
+            name: ASIA
+
+variants:
+    - chr1:1	A	G
+    - chr2:2	A	T
+
+population:
+    - cluster: 1
+      counts:
+          - [2, 0, 0]
+          - [1, 0, 1]
+    - cluster: 2
+      US:
+          - [12, 3, 5]
+          - [-5, 6, 0]
+      counts:
+          - [5, 7, 0]
+          - [1, 2, 10]
+
