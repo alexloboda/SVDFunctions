@@ -30,7 +30,6 @@ checkCaseInfo <- function(cases, variants) {
 matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
   softMinLambda <- list(...)$softMinLambda
   softMaxLambda <- list(...)$softMaxLambda
-  print(cases$id)
   
   checkCaseInfo(cases, variants)
   sharedSites <- intersect(cases$variants, variants)
