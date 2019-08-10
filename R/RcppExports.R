@@ -13,7 +13,7 @@ parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatri
     .Call('_SVDFunctions_parse_vcf', PACKAGE = 'SVDFunctions', filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold)
 }
 
-parse_binary_file <- function(variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, requiredDP, requiredGQ) {
-    .Call('_SVDFunctions_parse_binary_file', PACKAGE = 'SVDFunctions', variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, requiredDP, requiredGQ)
+parse_binary_file <- function(variants, samples, sample_weights, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, requiredDP, requiredGQ) {
+    .Call('_SVDFunctions_parse_binary_file', PACKAGE = 'SVDFunctions', variants, samples, sample_weights, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, requiredDP, requiredGQ)
 }
 

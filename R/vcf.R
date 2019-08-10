@@ -257,6 +257,7 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' and with both alternative ones respectively.
 #' @export
 scanBinaryFile <- function(binaryFile, metafile, samples, 
+                           sample_weights, 
                            variants = NULL, regions = NULL, 
                            DP = 10, GQ = 20, 
                            minMAF = 0.0, maxMAF = 1.0, 
@@ -267,8 +268,9 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   variants <- if (is.null(variants)) character(0) else variants  
   regions <- if (is.null(regions)) character(0) else regions
   
-  res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, 
-                           minMAF, maxMAF, minCallRate, DP, GQ);
+  res <- parse_binary_file(variants, samples, sample_weights, regions, 
+                           binaryFile, metafile, minMAF, maxMAF, minCallRate, 
+                           DP, GQ);
   names <- res[["names"]]
   total <- as.integer(res["total"])
   res[["names"]] <- NULL

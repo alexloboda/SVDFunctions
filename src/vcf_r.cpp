@@ -182,17 +182,17 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
 
 namespace {
     class Counts {
-        vector<int> hom;
-        vector<int> het;
-        vector<int> alt;
+        vector<double> hom;
+        vector<double> het;
+        vector<double> alt;
     public:
-        void push(int homc, int hetc, int altc) {
+        void push(double homc, double hetc, double altc) {
             hom.push_back(homc);
             het.push_back(hetc);
             alt.push_back(altc);
         }
 
-        void add(int entry, int homc, int hetc, int altc) {
+        void add(int entry, double homc, double hetc, double altc) {
             hom[entry] += homc;
             het[entry] += hetc;
             alt[entry] += altc;
@@ -214,14 +214,14 @@ namespace {
 
         bool pass(int i, double min_maf, double max_maf, double min_cr, int m) const {
             const double EPS = 1e-6;
-            int left = 2 * hom[i] + het[i];
-            int right = 2 * alt[i] + het[i];
-            int sum = hom[i] + het[i] + alt[i];
+            double left = 2 * hom[i] + het[i];
+            double right = 2 * alt[i] + het[i];
+            double sum = hom[i] + het[i] + alt[i];
             if (left < right) {
                 std::swap(left, right);
             }
-            double maf = (double)right / (left + right);
-            double cr = (double)sum / m;
+            double maf = right / (left + right);
+            double cr = sum / m;
             return cr > min_cr && maf + EPS > min_maf && maf - EPS < max_maf && left > 0 && right > 0;
         }
 
@@ -229,15 +229,15 @@ namespace {
             return hom.size();
         }
 
-        int get_hom(int i) const {
+        double get_hom(int i) const {
             return hom[i];
         }
 
-        int get_het(int i) const {
+        double get_het(int i) const {
             return het[i];
         }
 
-        int get_alt(int i) const {
+        double get_alt(int i) const {
             return alt[i];
         }
     };
@@ -248,38 +248,42 @@ namespace {
 
     class CountsReader {
         vector<size_t> samples;
+        vector<double> weights;
         MemoryMappedScanner scanner;
         int DP;
         int GQ;
 
         int total_samples;
     public:
-        CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, int DP, int GQ, int tot_samples)
-            :samples(samples), scanner(scanner), DP(DP), GQ(GQ), total_samples(tot_samples) {}
+        CountsReader(const vector<size_t>& samples, const vector<double>& sample_weights,
+                const MemoryMappedScanner& scanner, int DP, int GQ, int tot_samples)
+            :samples(samples), weights(sample_weights), scanner(scanner), DP(DP), GQ(GQ), total_samples(tot_samples) {}
 
         CountsReader(const CountsReader&) = default;
 
-        std::tuple<int, int, int> read(size_t position) const {
-            int homref = 0, het = 0, hom = 0;
-            for (size_t sample_position: samples) {
+        std::tuple<double, double, double> read(size_t position) const {
+            double homref = 0, het = 0, hom = 0;
+            for (int i = 0; i < samples.size(); i++) {
+                size_t sample_position = samples[i];
+                double weight = weights[i];
                 Allele allele = BinaryAllele::toAllele(scanner.scan(position * total_samples + sample_position));
                 if (allele.DP() >= DP && allele.GQ() >= GQ) {
                     switch (allele.alleleType()) {
                         case HOM:
-                            ++hom;
+                            hom += weight;
                             break;
                         case HET:
-                            ++het;
+                            het += weight;
                             break;
                         case HOMREF:
-                            ++homref;
+                            homref += weight;
                             break;
                         default:
                             break;
                     }
                 }
             }
-            return std::tuple<int, int, int>{homref, het, hom};
+            return std::tuple<double, double, double>{homref, het, hom};
         }
     };
 
@@ -361,7 +365,8 @@ namespace {
 }
 
 // [[Rcpp::export]]
-List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& regions,
+List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples,
+        const NumericVector& sample_weights, const CharacterVector& regions,
         const CharacterVector& binary_file, const CharacterVector& metafile,
         const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
         const IntegerVector& requiredDP, const IntegerVector requiredGQ) {
@@ -394,6 +399,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         }
 
         vector<size_t> positions;
+        vector<double> weights(sample_weights.begin(), sample_weights.end());
         for (const char *s: samples) {
             positions.push_back(sample_positions[string(s)]);
         }
@@ -414,7 +420,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
             }
         }
 
-        CountsReader reader(positions, scanner, DP, GQ, n);
+        CountsReader reader(positions, weights, scanner, DP, GQ, n);
         Counts counts = parallel_read(variant_pos, reader);
 
         int m = positions.size();
