@@ -212,7 +212,7 @@ namespace {
             return ret;
         }
 
-        bool pass(int i, double min_maf, double max_maf, double min_cr, int m) const {
+        bool pass(int i, double min_maf, double max_maf, double min_cr, double m) const {
             const double EPS = 1e-6;
             double left = 2 * hom[i] + het[i];
             double right = 2 * alt[i] + het[i];
@@ -322,7 +322,7 @@ namespace {
 
 namespace {
     List binaryScanResults(const vector<Variant>& variants, const unordered_set<Variant>& requested,
-            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr, int n) {
+            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr, double n) {
         Counts cumulative;
         vector<string> names;
         vector<int> n_variants;
@@ -423,7 +423,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         CountsReader reader(positions, weights, scanner, DP, GQ, n);
         Counts counts = parallel_read(variant_pos, reader);
 
-        int m = positions.size();
+        double m = positions.size();
         List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, min_maf, max_maf, cr, m);
         ret["total"] = positions.size();
         return ret;
