@@ -6,7 +6,8 @@
 \usage{
 scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
   regions = NULL, DP = 10, GQ = 20, minMAF = 0, maxMAF = 1,
-  minMAC = 1L, maxMAC = .Machine$integer.max, minCallRate = 0.9)
+  minMAC = 1L, maxMAC = .Machine$integer.max,
+  reportSingletons = TRUE, minCallRate = 0.9)
 }
 \arguments{
 \item{binaryFile}{the name of binary file}
@@ -34,6 +35,8 @@ considered, otherwise assumed as missing.}
 \item{minMAC}{integer minimum minor allele count}
 
 \item{maxMAC}{integer maximum minor allele count}
+
+\item{reportSingletons}{logical if TRUE singletons will be reported}
 
 \item{minCallRate}{numeric minimum call rate}
 }

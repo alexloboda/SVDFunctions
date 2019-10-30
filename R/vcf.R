@@ -253,6 +253,7 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' @param minMAC integer minimum minor allele count
 #' @param maxMAC integer maximum minor allele count
 #' @param minCallRate numeric minimum call rate
+#' @param reportSingletons logical if TRUE singletons will be reported
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,
@@ -263,6 +264,7 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
                            DP = 10, GQ = 20, 
                            minMAF = 0.0, maxMAF = 1.0, 
                            minMAC = 1L, maxMAC = .Machine$integer.max, 
+                           reportSingletons = TRUE, 
                            minCallRate = 0.9) {
   
   stopifnot(file.exists(binaryFile))
