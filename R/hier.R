@@ -154,7 +154,14 @@ mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef,
     table <- table[!(table$cluster %in% cls), ]
     
     allClusters <- c(left$clusters, right$clusters, res$clusters)
-    res$clusters <- allClusters[setdiff(names(allClusters), cls)]
+    res$pvals <- c(left$pvals, right$pvals, res$pvals)
+    keep <- setdiff(names(allClusters), cls)
+    res$clusters <- allClusters[keep]
+    for (cl in names(res$pvals)) {
+      if (!(cl %in% keep)) {
+        res$pvals[[cl]] <- NULL
+      }
+    }
     res$table <- rbind(table, res$table)
     res
   } else {
