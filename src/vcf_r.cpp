@@ -223,7 +223,7 @@ namespace {
             }
             double maf = (double)right / (left + right);
             double cr = (double)sum / m;
-            bool singletons = !report_singletons || (hom[i] + het[i] != 1 && het[i] + alt[i] != 1);
+            bool singletons = report_singletons || (hom[i] + het[i] != 1 && het[i] + alt[i] != 1);
             return cr > min_cr && maf + EPS > min_maf && maf - EPS < max_maf && right >= min_mac &&
                       right <= max_mac && left > 0 && right > 0 && singletons;
         }
