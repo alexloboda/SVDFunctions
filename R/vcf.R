@@ -275,7 +275,8 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   regions <- if (is.null(regions)) character(0) else regions
   
   res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, 
-                           minMAF, maxMAF, minCallRate, minMAC, maxMAC, DP, GQ);
+                           minMAF, maxMAF, minCallRate, minMAC, maxMAC, 
+                           reportSingletons,  DP, GQ);
   names <- res[["names"]]
   total <- as.integer(res["total"])
   res[["names"]] <- NULL
