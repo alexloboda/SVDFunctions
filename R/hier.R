@@ -48,16 +48,20 @@ matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
                    cluster = if (length(resid) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
-  pvals[[as.character(cases$id)]] <- results$pvals
+  lambdas <- list()
+  clust <- as.character(cases$id) 
+  pvals[[clust]] <- results$pvals
+  lambdas[[clust]] <- results$optimal_lambda
   if (length(results$controls) > 0) {
     lam <- results$optimal_lambda
     good <- lam > softMinLambda && lam < softMaxLambda
-    list(table = df, pvals = pvals, minL = results$optimal_lambda, cases = cases, 
+    list(table = df, pvals = pvals, lambdas = lambdas, 
+         minL = results$optimal_lambda, cases = cases, 
          clusters = setNames(good, cases$id), 
          ncontrols = if(good) length(results$controls) else 0)
   } else {
-    list(table = data.frame(), pvals = c(), minL = Inf, cases = cases,
-         clusters = c(), ncontrols = 0)
+    list(table = data.frame(), pvals = c(), lambdas = c(), minL = Inf, 
+         cases = cases, clusters = c(), ncontrols = 0)
   }
 }
 
@@ -112,6 +116,7 @@ jointResult <- function(l, r) {
   table <- rbind(l$table, r$table)
   ret$table <- table
   ret$pvals <- c(l$pvals, r$pvals)
+  ret$lambdas <- c(l$lambdas, r$lambdas)
   ret$ncontrols <- countGoodControls(l, r)
   ret$clusters <- c(l$clusters, r$clusters)
   ret$minL <- min(l$minL, r$minL)
@@ -155,11 +160,13 @@ mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef,
     
     allClusters <- c(left$clusters, right$clusters, res$clusters)
     res$pvals <- c(left$pvals, right$pvals, res$pvals)
+    res$lambdas <- c(left$lambdas, right$lambdas, res$lambdas)
     keep <- setdiff(names(allClusters), cls)
     res$clusters <- allClusters[keep]
     for (cl in names(res$pvals)) {
       if (!(cl %in% keep)) {
         res$pvals[[cl]] <- NULL
+        res$lambdas[[cl]] <- NULL
       }
     }
     res$table <- rbind(table, res$table)
