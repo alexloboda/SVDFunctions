@@ -284,8 +284,9 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   res[["total"]] <- NULL
   res <- matrix(do.call(c, res), ncol = 4, dimnames = list(NULL, names(res)))
   alleles <- res[, "hom_ref"] + res[, "het"] + res[, "hom_alt"]
+  meanWeight <- mean(sample_weights)
+  total <- total * mean(sample_weights)
   res <- cbind(res, call_rate = alleles / (res[, "n_variants"] * total))
   rownames(res) <- names
-  
   res
 }
