@@ -250,7 +250,10 @@ genotypesToCounts <- function(genotypeMatrix) {
 #' "chr# startPos endPos". Regions must be non-overlapping.
 #' @param minMAF numeric minimum minor allele frequency
 #' @param maxMAF numeric maximum minor allele frequency
+#' @param minMAC integer minimum minor allele count
+#' @param maxMAC integer maximum minor allele count
 #' @param minCallRate numeric minimum call rate
+#' @param reportSingletons logical if TRUE singletons will be reported
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,
@@ -261,16 +264,20 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
                            variants = NULL, regions = NULL, 
                            DP = 10, GQ = 20, 
                            minMAF = 0.0, maxMAF = 1.0, 
+                           minMAC = 1L, maxMAC = .Machine$integer.max, 
+                           reportSingletons = TRUE, 
                            minCallRate = 0.9) {
   
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
+  minMAC <- as.integer(minMAC)
+  maxMAC <- as.integer(maxMAC)
   variants <- if (is.null(variants)) character(0) else variants  
   regions <- if (is.null(regions)) character(0) else regions
   
   res <- parse_binary_file(variants, samples, sample_weights, regions, 
                            binaryFile, metafile, minMAF, maxMAF, minCallRate, 
-                           DP, GQ);
+                           minMAC, maxMAC, reportSingletons,  DP, GQ);
   names <- res[["names"]]
   total <- as.integer(res["total"])
   res[["names"]] <- NULL

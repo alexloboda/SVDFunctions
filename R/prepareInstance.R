@@ -155,8 +155,8 @@ writeMatrix <- function(fd, depth, m, title) {
   cat(paste0(apply(m, 1, rowF)), file = fd, sep = "")
 }
 
-writeCluster <- function(fd, cluster) {
-  cat("  - cluster: ", cluster$title, "\n", file = fd)
+writeCluster <- function(fd, cluster, i) {
+  cat("  - cluster: ", i, "\n", file = fd)
   writeMatrix(fd, 2, cluster$US, "US")
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
@@ -184,7 +184,7 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
   write("population:\n")
   for (i in 1:length(clusterResults)) {
-    writeCluster(fd, clusterResults[[i]])
+    writeCluster(fd, clusterResults[[i]], i)
   }
 }
 

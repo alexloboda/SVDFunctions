@@ -61,8 +61,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_binary_file
-List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const NumericVector& sample_weights, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& requiredDP, const IntegerVector requiredGQ);
-RcppExport SEXP _SVDFunctions_parse_binary_file(SEXP variantsSEXP, SEXP samplesSEXP, SEXP sample_weightsSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
+List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const NumericVector& sample_weights, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons, const IntegerVector& requiredDP, const IntegerVector requiredGQ);
+RcppExport SEXP _SVDFunctions_parse_binary_file(SEXP variantsSEXP, SEXP samplesSEXP, SEXP sample_weightsSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -75,9 +75,12 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const NumericVector& >::type r_min_maf(r_min_mafSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type r_max_maf(r_max_mafSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type r_min_cr(r_min_crSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type r_min_mac(r_min_macSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type r_max_mac(r_max_macSEXP);
+    Rcpp::traits::input_parameter< const LogicalVector& >::type report_singletons(report_singletonsSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type requiredDP(requiredDPSEXP);
     Rcpp::traits::input_parameter< const IntegerVector >::type requiredGQ(requiredGQSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_binary_file(variants, samples, sample_weights, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, requiredDP, requiredGQ));
+    rcpp_result_gen = Rcpp::wrap(parse_binary_file(variants, samples, sample_weights, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, requiredDP, requiredGQ));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -86,7 +89,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 10},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 11},
-    {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 11},
+    {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 14},
     {NULL, NULL, 0}
 };
 

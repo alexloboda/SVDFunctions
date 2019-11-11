@@ -212,7 +212,8 @@ namespace {
             return ret;
         }
 
-        bool pass(int i, double min_maf, double max_maf, double min_cr, double m) const {
+        bool pass(int i, double min_maf, double max_maf, double min_cr, int min_mac, int max_mac, int m,
+                  bool report_singletons) const {
             const double EPS = 1e-6;
             double left = 2 * hom[i] + het[i];
             double right = 2 * alt[i] + het[i];
@@ -220,9 +221,11 @@ namespace {
             if (left < right) {
                 std::swap(left, right);
             }
-            double maf = right / (left + right);
-            double cr = sum / m;
-            return cr > min_cr && maf + EPS > min_maf && maf - EPS < max_maf && left > 0 && right > 0;
+            double maf = (double)right / (left + right);
+            double cr = (double)sum / m;
+            bool singletons = report_singletons || (hom[i] + het[i] != 1 && het[i] + alt[i] != 1);
+            return cr > min_cr && maf + EPS > min_maf && maf - EPS < max_maf && right >= min_mac &&
+                      right <= max_mac && left > 0 && right > 0 && singletons;
         }
 
         int size() {
@@ -322,7 +325,8 @@ namespace {
 
 namespace {
     List binaryScanResults(const vector<Variant>& variants, const unordered_set<Variant>& requested,
-            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr, double n) {
+            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr,
+            int min_mac, int max_mac, int n, bool report_singletons) {
         Counts cumulative;
         vector<string> names;
         vector<int> n_variants;
@@ -331,7 +335,7 @@ namespace {
         for (size_t i = 0; i < variants.size(); i++) {
             const Variant& var = variants[i];
 
-            if (!counts.pass(i, min_maf, max_maf, cr, n)) {
+            if (!counts.pass(i, min_maf, max_maf, cr, min_mac, max_mac, n, report_singletons)) {
                 continue;
             }
 
@@ -369,12 +373,17 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         const NumericVector& sample_weights, const CharacterVector& regions,
         const CharacterVector& binary_file, const CharacterVector& metafile,
         const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
+        const IntegerVector& r_min_mac, const IntegerVector& r_max_mac,
+        const LogicalVector& report_singletons,
         const IntegerVector& requiredDP, const IntegerVector requiredGQ) {
     try {
         int DP = requiredDP[0];
         int GQ = requiredGQ[0];
         double min_maf = r_min_maf[0];
         double max_maf = r_max_maf[0];
+        int min_mac = r_min_mac[0];
+        int max_mac = r_max_mac[0];
+        bool singletons = report_singletons[0];
         double cr = r_min_cr[0];
 
         RangeSet rangeSet;
@@ -423,8 +432,9 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         CountsReader reader(positions, weights, scanner, DP, GQ, n);
         Counts counts = parallel_read(variant_pos, reader);
 
-        double m = positions.size();
-        List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, min_maf, max_maf, cr, m);
+        int m = positions.size();
+        List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, min_maf, max_maf, cr,
+                                     min_mac, max_mac, m, singletons);
         ret["total"] = positions.size();
         return ret;
     } catch (ParserException& e) {
