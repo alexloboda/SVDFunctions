@@ -75,6 +75,7 @@ namespace vcf {
         Position position() const;
         std::string reference() const;
         std::string alternative() const;
+        Variant reversed() const;
 
         static std::vector<Variant> parseVariants(const std::string& s);
 

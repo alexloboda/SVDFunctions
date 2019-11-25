@@ -40,6 +40,18 @@ test_that("genotype matrix are parsed correctly", {
   expect_equal(df, vcf)
 })
 
+test_that("inversed variants are read correctly", {
+  var <- "chr1:18022153\tA\tC"
+  samples <- sampleNamesVCF(file)[1:10]
+  vcf <- genotypeMatrixVCF(file, DP = DP, GQ = 0, samples = samples, 
+                           variants = var)
+  expected <- matrix(c(0, 1, 0, 2, 1, 2, NaN, 1, 0, 0),
+                     nrow = 1) 
+  rownames(expected) <- var
+  colnames(expected) <- samples
+  expect_equal(expected, vcf)
+})
+
 test_that("callrates are calculated correctly", {
   regions <- data.frame(chr = c("1", "1", "20"), 
                         from = c("1108138", "40000000", "33521213"), 
@@ -83,6 +95,12 @@ test_that("storing/extracting data to/from binary file works ", {
   sample_size <- length(variants) %/% 2
   sel <- c(rep(TRUE, sample_size), rep(FALSE, length(variants) - sample_size))
   variants <- variants[sample(sel)]
+  
+  selReverse <- sample(length(variants) %/% 3)
+  variants[selReverse] <- sapply(variants[selReverse], function(x) {
+    tokens <- unlist(strsplit(x, "\t"))
+    paste(tokens[1], tokens[3], tokens[2], sep = "\t")
+  })
   
   localDP <- 30
   vcf <- scanVCF(file, DP = localDP, GQ = 0, samples = samples, variants = variants)

@@ -320,7 +320,7 @@ namespace {
 }
 
 namespace {
-    List binaryScanResults(const vector<Variant>& variants, const unordered_set<Variant>& requested,
+    List binaryScanResults(const vector<Variant>& variants, const unordered_map<Variant, bool>& requested,
             const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr,
             int min_mac, int max_mac, int n, bool report_singletons) {
         Counts cumulative;
@@ -342,8 +342,13 @@ namespace {
             }
 
             if (requested.find(var) != requested.end()) {
-                cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
-                names.push_back((string)var);
+                bool as_is = requested.at(var);
+                if (as_is) {
+                    cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
+                } else {
+                    cumulative.push(counts.get_alt(i), counts.get_het(i), counts.get_hom(i));
+                }
+                names.push_back(as_is ? (string)var : (string)var.reversed());
                 n_variants.push_back(1);
             }
             if (in_range && ranges[curr_range].includes(var.position())) {
@@ -407,10 +412,11 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
             positions.push_back(sample_positions[string(s)]);
         }
 
-        unordered_set<Variant> requested_variants;
+        unordered_map<Variant, bool> requested_variants;
         for (const char* var: variants) {
             auto variant = Variant::parseVariants(string(var))[0];
-            requested_variants.insert(variant);
+            requested_variants[variant] = true;
+            requested_variants[variant.reversed()] = false;
         }
 
         vector<size_t> variant_pos;

@@ -116,6 +116,10 @@ namespace vcf {
         return ret;
     }
 
+    Variant Variant::reversed() const {
+        return Variant(pos, alt, ref);
+    }
+
     bool Chromosome::parse(std::string str) {
         transform(str.begin(), str.end(), str.begin(), ::tolower);
         if (str.substr(0, 3) == "chr") {

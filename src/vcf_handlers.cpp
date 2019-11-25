@@ -61,6 +61,7 @@ namespace vcf {
         if (!isOfInterest(variant)) {
             return;
         }
+        bool as_is = available_variants.empty() || available_variants[variant];
         double missing_rate = std::count_if(alleles->begin(), alleles->end(), [](const Allele& x){
             return x.alleleType() == MISSING;
         }) / (double)alleles->size();
@@ -79,9 +80,18 @@ namespace vcf {
             row.push_back(to_int(allele.alleleType()));
             missing_row.push_back(allele.alleleType() == MISSING);
         }
+        if (!as_is) {
+            std::transform(row.begin(), row.end(), row.begin(), [](int a) {
+                if (a == MISSING) {
+                    return a;
+                } else {
+                    return 2 - a;
+                }
+            });
+        }
         gmatrix.push_back(row);
         missing.push_back(missing_row);
-        variants.push_back(variant);
+        variants.push_back(as_is ? variant : variant.reversed());
     }
 
     bool GenotypeMatrixHandler::isOfInterest(const Variant& variant) {
@@ -91,7 +101,10 @@ namespace vcf {
     GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs,
                                                  VCFFilterStats& stats, double missing_rate_threshold)
         : VariantsHandler(ss), stats(stats), missing_rate_threshold(missing_rate_threshold) {
-        available_variants.insert(vs.begin(), vs.end());
+        for (const Variant& v: vs) {
+            available_variants[v] = true;
+            available_variants[v.reversed()] = false;
+        }
     }
 
     GenotypeMatrixIterator GenotypeMatrixHandler::iterator() {
@@ -99,7 +112,10 @@ namespace vcf {
     }
 
     std::vector<Variant> GenotypeMatrixHandler::desired_variants() {
-        return {available_variants.begin(), available_variants.end()};
+        std::vector<Variant> ret;
+        std::transform(available_variants.begin(), available_variants.end(), std::back_inserter(ret),
+                       [](decltype(available_variants)::value_type const& kv) { return kv.first; });
+        return ret;
     }
 
     BinaryFileHandler::BinaryFileHandler(const std::vector<std::string>& samples, std::string main_filename,

@@ -52,7 +52,7 @@ namespace vcf {
         std::vector<std::vector<float>> gmatrix;
         std::vector<std::vector<bool>> missing;
         std::vector<Variant> variants;
-        std::unordered_set<Variant> available_variants;
+        std::unordered_map<Variant, bool> available_variants;
         VCFFilterStats& stats;
         double missing_rate_threshold;
     public:
