@@ -15,6 +15,7 @@ License: MIT
 Encoding: UTF-8
 biocViews: 
 Imports:
+    data.tree, 
     plotly,
     mclust,
     yaml,

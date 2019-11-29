@@ -224,9 +224,13 @@ prepareInstance <- function(gmatrix, imputationResults,
   passVariants <- lapply(caseCounts, checkAlleleCounts)
   passVariants <- lapply(passVariants, which)
   passVariants <- Reduce(intersect, passVariants)
-    
-  if(length(passVariants) < 2){
-    stop("Less than 2 good variants were selected")
+  
+  if(length(passVariants) < 100){
+    stop("Less than 100 variants left after QC.")
+  }
+  
+  if (length(passVariants) < 500) {
+    warning("Less than 500 variants left after QC.")
   }
   
   gmatrix <- gmatrix[passVariants, ]
