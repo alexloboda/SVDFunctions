@@ -111,7 +111,7 @@ findNode <- function(tree, id) {
 
 #' Remove cluster from clusutering object with all samples in it
 #' @param clustering clustering object 
-#' @param a name of the cluster to delete or its id
+#' @param cluster a name of the cluster to delete or its id
 #' @export
 removeCluster <- function(clustering, cluster) {
   clustering$hier <- data.tree::Clone(clustering$hier)
@@ -140,7 +140,7 @@ removeCluster <- function(clustering, cluster) {
 }
 
 #' Merge a cluster with its sibling in a tree
-#' @param clsutering clustering object
+#' @param clustering clustering object
 #' @param cluster a name of the cluster or its id
 #' @export
 mergeCluster <- function(clustering, cluster) {

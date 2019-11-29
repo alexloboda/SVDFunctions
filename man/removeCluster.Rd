@@ -9,7 +9,7 @@ removeCluster(clustering, cluster)
 \arguments{
 \item{clustering}{clustering object}
 
-\item{a}{name of the cluster to delete or its id}
+\item{cluster}{a name of the cluster to delete or its id}
 }
 \description{
 Remove cluster from clusutering object with all samples in it

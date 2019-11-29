@@ -7,9 +7,9 @@
 mergeCluster(clustering, cluster)
 }
 \arguments{
-\item{cluster}{a name of the cluster or its id}
+\item{clustering}{clustering object}
 
-\item{clsutering}{clustering object}
+\item{cluster}{a name of the cluster or its id}
 }
 \description{
 Merge a cluster with its sibling in a tree
