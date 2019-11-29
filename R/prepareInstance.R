@@ -175,9 +175,8 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
   
   write("title: ", title, "\n")
-  write("hierarchy:\n  ")
   titleF <- function(x) x[["title"]]
-  writePopulationStructure(clustering$hier, clustering$classes, fd, 1)
+  writePopulationStructure(clustering$hier, clustering$classes, fd)
   write("\nvariants:\n")
   for (v in variants) {
     write("  - ", v, "\n")
@@ -205,8 +204,8 @@ prepareInstance <- function(gmatrix, imputationResults,
                             maxVectors = 50, 
                             title = "DNAScoreInput"){
   if (is.null(clusters)) {
-    classes <- rep("Main", nrow(gmatrix))
-    clusters <- clustering(setNames(classes, rownames(gmatrix)), "Main")
+    classes <- rep("Main", ncol(gmatrix))
+    clusters <- clustering(setNames(classes, colnames(gmatrix)), "Main")
   }
   
   stopifnot("clustering" %in% class(clusters))
