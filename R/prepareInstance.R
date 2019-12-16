@@ -175,9 +175,8 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
   
   write("title: ", title, "\n")
-  write("hierarchy:\n  ")
   titleF <- function(x) x[["title"]]
-  writePopulationStructure(clustering$hier, clustering$classes, fd, 1)
+  writePopulationStructure(clustering$hier, clustering$classes, fd)
   write("\nvariants:\n")
   for (v in variants) {
     write("  - ", v, "\n")
@@ -205,8 +204,8 @@ prepareInstance <- function(gmatrix, imputationResults,
                             maxVectors = 50, 
                             title = "DNAScoreInput"){
   if (is.null(clusters)) {
-    classes <- rep("Main", nrow(gmatrix))
-    clusters <- clustering(setNames(classes, rownames(gmatrix)), "Main")
+    classes <- rep("Main", ncol(gmatrix))
+    clusters <- clustering(setNames(classes, colnames(gmatrix)), "Main")
   }
   
   stopifnot("clustering" %in% class(clusters))
@@ -224,9 +223,13 @@ prepareInstance <- function(gmatrix, imputationResults,
   passVariants <- lapply(caseCounts, checkAlleleCounts)
   passVariants <- lapply(passVariants, which)
   passVariants <- Reduce(intersect, passVariants)
-    
-  if(length(passVariants) < 2){
-    stop("Less than 2 good variants were selected")
+  
+  if(length(passVariants) < 100){
+    stop("Less than 100 variants left after QC.")
+  }
+  
+  if (length(passVariants) < 500) {
+    warning("Less than 500 variants left after QC.")
   }
   
   gmatrix <- gmatrix[passVariants, ]
