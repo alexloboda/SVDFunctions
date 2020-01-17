@@ -6,9 +6,6 @@
 #include "include/lm.h"
 
 double pval_t(double t, double df) {
-    if (df > 50) {
-        return 1 + boost::math::erf(-std::abs(t) / sqrt(2));
-    }
     double x = df / (t * t + df);
     return boost::math::ibeta(df / 2, 0.5, x);
 }
