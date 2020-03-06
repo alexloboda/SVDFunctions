@@ -23,6 +23,8 @@ namespace {
             return w;
         }
     };
+
+    const double EPS = 1e-8;
 }
 
 namespace vcf {
@@ -56,7 +58,7 @@ namespace vcf {
         Bags() = default;
         Bags(const Bags&) = delete;
         Bags& operator=(const Bags&) = delete;
-        Bags(Bags&& other) :samples(std::move(other.samples)), weights_sum(other.weights_sum){}
+        Bags(Bags&& other) noexcept :samples(std::move(other.samples)), weights_sum(other.weights_sum) {}
 
         void add(int sample, double weight) {
             samples.emplace_back(sample, weight);
@@ -87,12 +89,12 @@ namespace {
     using vcf::Bags;
 
     double variance(const std::vector<double>& weights) {
-        // uniform prior (beta(1, 1, 1))
+        // Jeffrey's prior
         assert(weights.size() == 3);
-        double sum_alpha = std::accumulate(weights.begin(), weights.end(), 0.0) + weights.size();
+        double sum_alpha = std::accumulate(weights.begin(), weights.end(), 0.0) + weights.size() / 2.0;
         std::vector<double> alpha(weights.size());
         std::transform(weights.begin(), weights.end(), alpha.begin(), [&sum_alpha](double x) {
-            return (x + 1) / sum_alpha;
+            return (x + 0.5) / sum_alpha;
         });
         // linear model
         double mean = 0.0;
@@ -348,11 +350,15 @@ namespace vcf {
     }
 
     double Node::prediction(const std::vector<double>& alpha) {
-        // Beta(1,1,1) prior
-        double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0) + alpha.size();
+        // Dir(1,1,1) prior
+        double sum = std::accumulate(alpha.begin(), alpha.end(), 0.0);
+        if (sum < EPS) {
+            sum = EPS;
+        }
+
         std::vector<double> rel_alpha;
         std::for_each(alpha.begin(), alpha.end(), [&sum, &rel_alpha](double x){
-            rel_alpha.push_back((x + 1) / sum);
+            rel_alpha.push_back(x / sum);
         });
         return rel_alpha[1] + 2 * rel_alpha[2];
     }
@@ -371,17 +377,10 @@ namespace vcf {
                 tmp.add(i, 1.0);
             }
         }
-        auto tmp_cts = counts(tmp, values);
         Bags bags;
         for (size_t i = 0; i < values.size(); i++) {
                 switch(values[i]) {
-                    case HOMREF:
-                        bags.add(i, 1.0);
-                        break;
-                    case HET:
-                        bags.add(i, 1.0);
-                        break;
-                    case HOM:
+                    case HOMREF: case HET: case HOM:
                         bags.add(i, 1.0);
                         break;
                     default:
