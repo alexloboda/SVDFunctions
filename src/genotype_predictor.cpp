@@ -445,6 +445,9 @@ namespace vcf {
             }));
         }
         for (size_t i = 0; i < ntrees; i++) {
+            futures[i].wait();
+        }
+        for (size_t i = 0; i < ntrees; i++) {
             predictors.push_back(futures[i].get());
         }
     }

@@ -134,6 +134,10 @@ namespace vcf {
             chr = chrY;
             return true;
         }
+        if (str == "mt") {
+            chr = chrMT;
+            return true;
+        }
 
         try {
             chr = stoi(str);
@@ -166,6 +170,8 @@ namespace vcf {
             str_rep += "X";
         } else if ( chr == chrY) {
             str_rep += "Y";
+        } else if (chr == chrMT) {
+            str_rep += "MT";
         } else {
             str_rep += to_string(chr);
         }

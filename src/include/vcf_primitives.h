@@ -28,6 +28,7 @@ namespace vcf {
     class Chromosome {
         static const int chrX = 23;
         static const int chrY = 24;
+        static const int chrMT = 25;
 
         int chr;
 

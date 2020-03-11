@@ -54,7 +54,6 @@ namespace vcf {
                 ++iterator;
             }
         }
-
     }
 
     void PredictingHandler::cleanup() {
@@ -126,8 +125,10 @@ namespace vcf {
         lbls = features[curr_num]->vector();
         for (size_t i = 0; i < features.size(); i++) {
             if (i != curr_num) {
-                std::vector<AlleleType> row;
-                fs.push_back(features[i]->vector());
+                try {
+                    std::vector<AlleleType> row = features[i]->vector();
+                    fs.push_back(std::move(row));
+                } catch (ParserException& e) {}
             }
         }
         return {std::move(fs), std::move(lbls)};

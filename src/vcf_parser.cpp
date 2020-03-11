@@ -134,6 +134,10 @@ namespace vcf {
                 return {MISSING, 0, 0};
             }
 
+            if (depth_pos >= parts.size() && qual_pos >= parts.size()) {
+                throw ParserException("ignored");
+            }
+
             int dp = depth_pos == -1 || parts[depth_pos] == "." ? 0 : stoi(parts[depth_pos]);
             int gq = qual_pos == -1 || parts[qual_pos] == "." ? 0 : stoi(parts[qual_pos]);
 
@@ -200,6 +204,9 @@ namespace vcf {
     }
 
     void AlleleVector::resolve() {
+        if (corrupted) {
+            throw ParserException(corruption_cause);
+        }
         if (resolved) {
             return;
         }
@@ -213,10 +220,15 @@ namespace vcf {
         }
         Format format{tokens[FORMAT]};
 
-        for (int sample : *indices) {
-            alleles.push_back(format.parse(tokens.at(sample), variant + 1, *filter, stats));
+        try {
+            for (int sample : *indices) {
+                alleles.push_back(format.parse(tokens.at(sample), variant + 1, *filter, stats));
+            }
+        } catch (ParserException& e) {
+            corrupted = true;
+            corruption_cause = e.get_message();
+            throw e;
         }
-
     }
 
     std::vector<AlleleType> AlleleVector::vector() {
@@ -230,15 +242,7 @@ namespace vcf {
     }
 
     void VCFParser::register_handler(std::shared_ptr<VariantsHandler> handler, int order) {
-        int i_ins = handlers.size();
-        for (size_t i = 0; i < handlers.size(); i++) {
-            if (handlers[i].second >= order) {
-                i_ins = i;
-                break;
-            }
-        }
         handlers.emplace_back(handler, order);
-        std::swap(handlers[handlers.size() - 1], handlers[i_ins]);
     }
 
     VCFParser::VCFParser(std::istream& input, const VCFFilter& filter, VCFFilterStats& stats) :filter(filter),
@@ -301,6 +305,9 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
+        std::sort(handlers.begin(), handlers.end(), [](decltype(*handlers.begin())& l, decltype(*handlers.begin())& r){
+            return l.second < r.second;
+        });
         string line;
         std::shared_ptr<std::vector<size_t>> sample_indices = std::make_shared<std::vector<size_t>>(filtered_samples);
         std::shared_ptr<VCFFilter> vcf_filter = std::make_shared<VCFFilter>(filter);

@@ -41,6 +41,8 @@ namespace vcf {
         std::vector<Allele> alleles;
         std::size_t variant;
         bool resolved = false;
+        bool corrupted = false;
+        std::string corruption_cause;
         std::size_t expected_ncols;
 
         void resolve();
