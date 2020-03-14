@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <type_traits>
 #include <Rcpp.h>
 
 namespace {
@@ -305,7 +306,8 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
-        std::sort(handlers.begin(), handlers.end(), [](decltype(*handlers.begin()) l, decltype(*handlers.begin()) r){
+        std::sort(handlers.begin(), handlers.end(), [](decltype(handlers[0]) l,
+                                                                       decltype(handlers[0]) r){
             return l.second < r.second;
         });
         string line;
