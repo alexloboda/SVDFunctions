@@ -305,7 +305,7 @@ namespace vcf {
     }
 
     void VCFParser::parse_genotypes() {
-        std::sort(handlers.begin(), handlers.end(), [](decltype(*handlers.begin())& l, decltype(*handlers.begin())& r){
+        std::sort(handlers.begin(), handlers.end(), [](decltype(*handlers.begin()) l, decltype(*handlers.begin()) r){
             return l.second < r.second;
         });
         string line;
