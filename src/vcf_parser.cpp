@@ -135,7 +135,7 @@ namespace vcf {
                 return {MISSING, 0, 0};
             }
 
-            if (depth_pos >= parts.size() && qual_pos >= parts.size()) {
+            if (depth_pos >= (long)parts.size() || qual_pos >= (long)parts.size()) {
                 throw ParserException("ignored");
             }
 
