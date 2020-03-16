@@ -35,7 +35,7 @@ Clustering::Clustering(const vector<double>& residuals, const vector<int>& clust
     cluster_sizes.resize(n_clsuters);
     res.resize(n_clsuters);
     clusters.resize(n_clsuters);
-    for (int i = 0; i < clustering.size(); i++) {
+    for (size_t i = 0; i < clustering.size(); i++) {
         int cl = clustering[i];
         ++cluster_sizes[cl];
         res[cl] += residuals[i];

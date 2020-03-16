@@ -246,18 +246,18 @@ namespace {
     };
 
     int ceiling_devision(size_t x, size_t y) {
-        return (x + y - 1) / y;
+        return ((int)x + y - 1) / y;
     }
 
     class CountsReader {
         vector<size_t> samples;
         MemoryMappedScanner scanner;
-        int DP;
-        int GQ;
+        unsigned DP;
+        unsigned GQ;
 
         int total_samples;
     public:
-        CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, int DP, int GQ, int tot_samples)
+        CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, unsigned DP, unsigned GQ, int tot_samples)
             :samples(samples), scanner(scanner), DP(DP), GQ(GQ), total_samples(tot_samples) {}
 
         CountsReader(const CountsReader&) = default;
@@ -291,10 +291,10 @@ namespace {
 
         cxxpool::thread_pool pool{threads};
         std::vector<std::future<Counts>> futures;
-        int jobs_per_thread = ceiling_devision(positions.size(), threads);
+        unsigned jobs_per_thread = (unsigned)ceiling_devision(positions.size(), threads);
 
         vector<size_t> thread_jobs;
-        for (int i = 0; i < positions.size(); i++) {
+        for (size_t i = 0; i < positions.size(); i++) {
             thread_jobs.push_back(positions[i]);
             if (thread_jobs.size() == jobs_per_thread || i == positions.size() - 1) {
                 futures.push_back(pool.push([thread_jobs, reader]() -> Counts {
@@ -335,7 +335,7 @@ namespace {
                 continue;
             }
 
-            bool in_range = curr_range < ranges.size();
+            bool in_range = curr_range < (long)ranges.size();
             while (in_range && ranges[curr_range] < var.position()) {
                 ++curr_range;
                 range_entry = -1;
