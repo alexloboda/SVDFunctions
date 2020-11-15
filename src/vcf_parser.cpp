@@ -328,7 +328,7 @@ namespace vcf {
                 vector<Variant> variants = parse_variants(tokens, position);
                 stats.add(Stat::OVERALL, variants.size());
 
-                if (tokens[FILTER] != "PASS") {
+                if (tokens[FILTER] != "PASS" && tokens[FILTER] != ".") {
                     stats.add(Stat::NON_PASS, variants.size());
                     continue;
                 }

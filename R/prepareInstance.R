@@ -52,7 +52,7 @@ collapsingToTree <- function(collapsing) {
 #' @export
 estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
                                  clusters = 20){
-  stopifnot(class(PCA) %in% c("matrix", "data.frame"))
+  stopifnot(any(c("matrix", "data.frame") %in% class(PCA)))
   
   clResults <- mclust::Mclust(data = PCA, G = 1:clusters, modelNames = "VVV")
   
