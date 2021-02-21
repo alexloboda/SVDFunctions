@@ -267,6 +267,8 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
                            reportSingletons = TRUE, 
                            minCallRate = 0.9) {
   
+  binaryFile <- normalizePath(binaryFile)
+  metafile <- normalizePath(metafile)
   stopifnot(file.exists(binaryFile))
   stopifnot(file.exists(metafile))
   minMAC <- as.integer(minMAC)

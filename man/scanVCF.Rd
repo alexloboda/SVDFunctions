@@ -4,11 +4,20 @@
 \alias{scanVCF}
 \title{Scan VCF files}
 \usage{
-scanVCF(vcf, DP = 10L, GQ = 20L, samples = NULL,
-  bannedPositions = NULL, variants = NULL,
-  returnGenotypeMatrix = TRUE, predictMissing = FALSE,
-  missingRateThreshold = 0.1, regions = NULL,
-  binaryPathPrefix = NULL, verbose = FALSE)
+scanVCF(
+  vcf,
+  DP = 10L,
+  GQ = 20L,
+  samples = NULL,
+  bannedPositions = NULL,
+  variants = NULL,
+  returnGenotypeMatrix = TRUE,
+  predictMissing = FALSE,
+  missingRateThreshold = 0.1,
+  regions = NULL,
+  binaryPathPrefix = NULL,
+  verbose = FALSE
+)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well

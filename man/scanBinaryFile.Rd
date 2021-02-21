@@ -4,10 +4,21 @@
 \alias{scanBinaryFile}
 \title{Scan binary variant file}
 \usage{
-scanBinaryFile(binaryFile, metafile, samples, variants = NULL,
-  regions = NULL, DP = 10, GQ = 20, minMAF = 0, maxMAF = 1,
-  minMAC = 1L, maxMAC = .Machine$integer.max,
-  reportSingletons = TRUE, minCallRate = 0.9)
+scanBinaryFile(
+  binaryFile,
+  metafile,
+  samples,
+  variants = NULL,
+  regions = NULL,
+  DP = 10,
+  GQ = 20,
+  minMAF = 0,
+  maxMAF = 1,
+  minMAC = 1L,
+  maxMAC = .Machine$integer.max,
+  reportSingletons = TRUE,
+  minCallRate = 0.9
+)
 }
 \arguments{
 \item{binaryFile}{the name of binary file}

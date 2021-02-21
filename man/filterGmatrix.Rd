@@ -4,8 +4,12 @@
 \alias{filterGmatrix}
 \title{Filter gmatrix by minimal sample call rate and minimal variant call rate}
 \usage{
-filterGmatrix(gmatrix, imputationResults, minVariantCallRate = 0.95,
-  minSampleCallRate = 0.95)
+filterGmatrix(
+  gmatrix,
+  imputationResults,
+  minVariantCallRate = 0.95,
+  minSampleCallRate = 0.95
+)
 }
 \arguments{
 \item{gmatrix}{gmatrix with imputed missing values}

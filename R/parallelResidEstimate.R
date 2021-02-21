@@ -3,22 +3,21 @@
 #' @param genotypeMatrix Genotype matrix
 #' @param SVDReference Reference basis of the left singular vectors
 #' @export
-parallelResidEstimate <- function (genotypeMatrix, SVDReference) 
-{
-  inter <- crossprod(SVDReference, genotypeMatrix) 
-  ret <- c()
-  idx <- 1:ncol(genotypeMatrix)
-  groups <- split(idx, ceiling(seq_along(idx) / 256))
-  for (group in groups) {
-    start <- group[1] - 1
-    rhs <- SVDReference %*% inter[, group]
-    for (i in group) {
-      v <- genotypeMatrix[, i] - rhs[, i - start]
-      ret <- c(ret, sqrt(sum(v * v)))
-      rm(v)
-    }
-    rm(rhs)
+parallelResidEstimate <- function(genotypeMatrix, SVDReference,
+                                   caseMeans,  contMeans, SV = 3) {
+  SVint <- ncol(SVDReference)
+  caseMeans <- caseMeans - contMeans
+  genotypeMatrix <- genotypeMatrix - contMeans
+  contDecomp <- svds(genotypeMatrix, k = SV)
+  basisChange <- t(contDecomp$u)
+  center_in_un <- basisChange %*% matrix(caseMeans, ncol = 1)
+  covMatrix <- basisChange %*% SVDReference %*%
+    t(SVDReference) %*% t(basisChange)
+  casesCovInv <- solve(covMatrix, tol = 1e-30)
+  mahalanobis <- function(vector) {
+    new_vector <- matrix(basisChange %*% vector - center_in_un, ncol = 1)
+    t(new_vector) %*% (casesCovInv %*% new_vector)
   }
-  names(ret) <- colnames(genotypeMatrix)
-  ret
+  scores <- apply(genotypeMatrix, 2, mahalanobis)
+  scores
 }

@@ -50,34 +50,41 @@ collapsingToTree <- function(collapsing) {
 #' @param plotDendrogram whether dendrogram should be plotted
 #' @param clusters maximum number of clusters
 #' @export
-estimateCaseClusters <- function(PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
-                                 clusters = 20){
-  stopifnot(any(c("matrix", "data.frame") %in% class(PCA)))
-  
-  clResults <- mclust::Mclust(data = PCA, G = 1:clusters, modelNames = "VVV")
-  
-  if (plotBIC){
-    mclust::plot.Mclust(x = clResults, 
-                        what = "BIC", 
-                        xlab = "Number of Components", 
+estimateCaseClusters2 <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
+                                   minClusters = 1, clusters = 20, keepSamples = NULL) {
+  stopifnot(class(PCA) %in% c("matrix", "data.frame"))
+  clResults <- mclust::Mclust(data = PCA, G = minClusters:clusters, modelNames = "VVV")
+  if (plotBIC) {
+    mclust::plot.Mclust(x = clResults, what = "BIC", xlab = "Number of Components", 
                         ylab = "Bayesian Information Criterion")
   }
-  
   clusters <- clResults$G
   if (clusters > 1) {
     clCombi <- mclust::clustCombi(clResults)
     collapsing <- dendrogramEstimate(clCombi$combiM)
-  } else {
+  }
+  else {
     collapsing <- NULL
   }
-  
-  if (plotDendrogram){
+  if (plotDendrogram & clusters > 1) {
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
   }
-  
-  clustering(clResults$classification, collapsingToTree(collapsing))
+  if(is.null(keepSamples)){
+    keepSamples <- rownames(PCA)
+  }
+  res <- clustering(clResults$classification, collapsingToTree(collapsing))
+  if(!all(rownames(PCA) %in% keepSamples)){
+    clustersToRemove <- setdiff(clResults$classification, clResults$classification[keepSamples])
+    clustersToRemove <- unique(clustersToRemove)
+    if(length(clustersToRemove) > 0){
+      for(i in 1:length(clustersToRemove)){
+        res <- SVDFunctions::removeCluster(res, clustersToRemove[i])
+      }
+    }
+  }
+  res$samples <- res$samples[keepSamples]
+  res
 }
-
 
 #' Estimate PCA from gmatrix without missing values 
 #' 
@@ -198,59 +205,52 @@ writeYaml <- function(clusterResults, clustering, variants,
 #' @param clusters clustering object
 #' @import mclust
 #' @export
-prepareInstance <- function(gmatrix, imputationResults, 
-                            outputFileName, 
-                            clusters = NULL, 
-                            maxVectors = 50, 
-                            title = "DNAScoreInput"){
+prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
+                              maxVectors = 50, title = "DNAScoreInput", contMeans) {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
-    clusters <- clustering(setNames(classes, colnames(gmatrix)), "Main")
+    clusters <- clustering(setNames(classes, colnames(gmatrix)), 
+                           "Main")
   }
-  
   stopifnot("clustering" %in% class(clusters))
   numberOfClusters <- length(clusters$classes)
-
   gmatrixForCounts <- gmatrix
   gmatrixForCounts[which(imputationResults, arr.ind = TRUE)] <- NA
-  
   caseCounts <- list()
-  for (i in 1:numberOfClusters){
+  for (i in 1:numberOfClusters) {
     cluster <- which(clusters$samples == i)
-    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
+    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, 
+                                                          cluster])
   }
-  
-  passVariants <- lapply(caseCounts, checkAlleleCounts)
+  passVariants <- lapply(caseCounts, checkAlleleCounts, mac = 1, maf = 0.001)
   passVariants <- lapply(passVariants, which)
   passVariants <- Reduce(intersect, passVariants)
-  
-  if(length(passVariants) < 100){
+  if (length(passVariants) < 100) {
     stop("Less than 100 variants left after QC.")
   }
-  
   if (length(passVariants) < 500) {
     warning("Less than 500 variants left after QC.")
   }
-  
   gmatrix <- gmatrix[passVariants, ]
+  gmatrixForCounts <- gmatrixForCounts[passVariants, ]
+  contMeans <- contMeans[passVariants]
   clusterResults <- vector("list", numberOfClusters)
-  for (i in 1:numberOfClusters){
-    cluster <- which(clusters$samples == i) 
+  for (i in 1:numberOfClusters) {
+    cluster <- which(clusters$samples == i)
     clusterGenotypes <- gmatrix[, cluster]
+    clusterGenotypes <- gmatrix[, cluster] - contMeans
+    clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
+    caseMeans <- rowMeans(clusterGenotypes)
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
-    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, 
+    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes - caseMeans, 
                                                  k = k))
     US <- svdResult$u %*% diag(svdResult$d)
-    counts <- genotypesToCounts(clusterGenotypes)
+    counts <- genotypesToCounts(clusterGenotypesForCounts)
     clusterResults[[i]] <- list(US = US, counts = counts, 
                                 title = clusters$classes[i])
   }
-  
-  writeYaml(clusterResults, clusters, 
-            variants = rownames(gmatrix),
-            outputFileName = outputFileName, 
-            title = title)
-  
+  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
+            outputFileName = outputFileName, title = title)
 }
 
 processHierarchy <- function(hier) {

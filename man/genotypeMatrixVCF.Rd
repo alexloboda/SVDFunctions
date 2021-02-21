@@ -4,9 +4,17 @@
 \alias{genotypeMatrixVCF}
 \title{Scan VCF file for genotypes}
 \usage{
-genotypeMatrixVCF(vcf, DP = 10L, GQ = 20L, variants = NULL,
-  samples = NULL, bannedPositions = NULL, predictMissing = FALSE,
-  verbose = FALSE, ...)
+genotypeMatrixVCF(
+  vcf,
+  DP = 10L,
+  GQ = 20L,
+  variants = NULL,
+  samples = NULL,
+  bannedPositions = NULL,
+  predictMissing = FALSE,
+  verbose = FALSE,
+  ...
+)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well

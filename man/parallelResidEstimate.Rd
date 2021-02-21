@@ -4,7 +4,13 @@
 \alias{parallelResidEstimate}
 \title{Estimation of residual vector norms for all controls}
 \usage{
-parallelResidEstimate(genotypeMatrix, SVDReference)
+parallelResidEstimate(
+  genotypeMatrix,
+  SVDReference,
+  caseMeans,
+  contMeans,
+  SV = 3
+)
 }
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}

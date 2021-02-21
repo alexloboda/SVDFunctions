@@ -46,48 +46,46 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param maxLambda Maximum possible lambda
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
-selectControls <- function(genotypeMatrix, originalGenotypeMatrix,
-                           SVDReference, caseCounts, 
-                           controlsClustering = NULL,
-                           minLambda = 0.75, softMinLambda = 0.9, 
-                           softMaxLambda = 1.05, maxLambda = 1.3, 
-                           min = 500) {
+selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference, 
+                             caseCounts, controlsClustering = NULL, minLambda = 0.75, 
+                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
+                             min = 500, SV = 3) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
   mode(originalGenotypeMatrix) <- "integer"
   stopifnot(all(!is.na(genotypeMatrix)))
-  
-  if (nrow(genotypeMatrix) != nrow(caseCounts) || 
-      nrow(genotypeMatrix) != nrow(SVDReference)) {
+  if (nrow(genotypeMatrix) != nrow(caseCounts) || nrow(genotypeMatrix) != 
+      nrow(SVDReference)) {
     stop("Check dimensions of the matrices")
   }
-  
   cl <- controlsClustering
   if (is.null(cl)) {
     cl <- 0:(ncol(genotypeMatrix) - 1)
-  } else {
+  }
+  else {
     cl <- as.integer(as.factor(cl)) - 1
   }
   stopifnot(all(!is.na(cl)))
-  
-  residuals <- parallelResidEstimate(genotypeMatrix, SVDReference)
-  
+  contMeans <- rowMeans(genotypeMatrix)
+  caseMeans <- apply(caseCounts, 1, function(x){
+    (x[2] + 2 * x[3]) / sum(x)
+  })
+  residuals <- SVDFunctions::parallelResidEstimate(genotypeMatrix, SVDReference,
+                                                   caseMeans, SV = SV,
+                                                   contMeans = contMeans)
   residuals <- as.numeric(residuals)
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
-  result <- select_controls_cpp(gmatrix, residuals, caseCounts, cl, 
-                      stats::qchisq(stats::ppoints(100000), df = 1), 
-                      minLambda, softMinLambda, maxLambda, softMaxLambda, min)
-  permutation <- result$permutation + 1
+  result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
+                                cl, stats::qchisq(stats::ppoints(1e+05), df = 1), minLambda, 
+                                softMinLambda, maxLambda, softMaxLambda, min)
   result$residuals <- setNames(residuals, colnames(gmatrix))
-  result$residuals <- result$residuals[permutation]
-  
   if (result$controls > 0) {
-    sel <- utils::head(permutation, result$controls)
     result$controls <- colnames(gmatrix)[sel]
-  } else {
+  }
+  else {
     result$controls <- c()
   }
   result

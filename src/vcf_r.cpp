@@ -351,6 +351,7 @@ namespace {
                 names.push_back(as_is ? (string)var : (string)var.reversed());
                 n_variants.push_back(1);
             }
+
             if (in_range && ranges[curr_range].includes(var.position())) {
                 if (range_entry == -1) {
                     cumulative.push(0, 0, 0);

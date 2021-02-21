@@ -4,10 +4,19 @@
 \alias{selectControls}
 \title{Select a set of controls that matches to a set of cases}
 \usage{
-selectControls(genotypeMatrix, originalGenotypeMatrix, SVDReference,
-  caseCounts, controlsClustering = NULL, minLambda = 0.75,
-  softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3,
-  min = 500)
+selectControls(
+  genotypeMatrix,
+  originalGenotypeMatrix,
+  SVDReference,
+  caseCounts,
+  controlsClustering = NULL,
+  minLambda = 0.75,
+  softMinLambda = 0.9,
+  softMaxLambda = 1.05,
+  maxLambda = 1.3,
+  min = 500,
+  SV = 3
+)
 }
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}

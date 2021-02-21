@@ -4,8 +4,15 @@
 \alias{prepareInstance}
 \title{prepare instance and write yaml file from QC-ed gmatrix}
 \usage{
-prepareInstance(gmatrix, imputationResults, outputFileName,
-  clusters = NULL, maxVectors = 50, title = "DNAScoreInput")
+prepareInstance(
+  gmatrix,
+  imputationResults,
+  outputFileName,
+  clusters = NULL,
+  maxVectors = 50,
+  title = "DNAScoreInput",
+  contMeans
+)
 }
 \arguments{
 \item{gmatrix}{gmatrix with imputed missing values}

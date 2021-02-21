@@ -4,10 +4,17 @@
 \alias{selectControlsHier}
 \title{Select a set of controls that matches a set of cases}
 \usage{
-selectControlsHier(controlGMatrix, controlVariants, cases,
-  imputationMatrix = NULL, originalControlGMatrix = NULL,
-  clusterMergeCoef = 1.1, softMinLambda = 0.9, softMaxLambda = 1.05,
-  ...)
+selectControlsHier(
+  controlGMatrix,
+  controlVariants,
+  cases,
+  imputationMatrix = NULL,
+  originalControlGMatrix = NULL,
+  clusterMergeCoef = 1.1,
+  softMinLambda = 0.9,
+  softMaxLambda = 1.05,
+  ...
+)
 }
 \arguments{
 \item{controlGMatrix}{numeric matrix(0 - ref, 1 - het, 2 - both alt). 

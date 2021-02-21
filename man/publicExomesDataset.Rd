@@ -4,7 +4,9 @@
 \name{publicExomesDataset}
 \alias{publicExomesDataset}
 \title{T2D & ESP & 1KG exome collection dataset preparation pack}
-\format{An object of class \code{list} of length 1.}
+\format{
+An object of class \code{list} of length 1.
+}
 \usage{
 publicExomesDataset
 }

@@ -4,8 +4,15 @@
 \alias{callRateMatrixVCF}
 \title{Scan VCF file for call rate matrix}
 \usage{
-callRateMatrixVCF(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
-  bannedPositions = NULL, verbose = FALSE)
+callRateMatrixVCF(
+  vcf,
+  regions,
+  DP = 10L,
+  GQ = 20L,
+  samples = NULL,
+  bannedPositions = NULL,
+  verbose = FALSE
+)
 }
 \arguments{
 \item{vcf}{the name of file to read, can be plain text VCF file as well
