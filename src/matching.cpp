@@ -127,7 +127,7 @@ void matching::process_mvn(const Matrix& cov, const Vector& mean) {
         controls_gmatrix_float.col(i) = cluster_mean(i);
     }
 
-    Eigen::JacobiSVD svd(controls_space);
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(controls_space);
     const Matrix& U = svd.matrixU();
 
     Vector rs_mean = U.transpose() * mean;

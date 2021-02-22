@@ -8,6 +8,7 @@ selectControls(
   genotypeMatrix,
   originalGenotypeMatrix,
   SVDReference,
+  meanGenotype,
   caseCounts,
   controlsClustering = NULL,
   minLambda = 0.75,
@@ -24,6 +25,8 @@ selectControls(
 \item{originalGenotypeMatrix}{Genotype matrix with no imputation applied}
 
 \item{SVDReference}{Reference basis of the left singular vectors}
+
+\item{meanGenotype}{Mean genotype vector}
 
 \item{caseCounts}{Matrix with summary genotype counts from cases}
 

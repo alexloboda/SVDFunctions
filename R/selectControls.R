@@ -38,6 +38,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param genotypeMatrix Genotype matrix
 #' @param originalGenotypeMatrix Genotype matrix with no imputation applied 
 #' @param SVDReference Reference basis of the left singular vectors
+#' @param meanGenotype Mean genotype vector
 #' @param caseCounts Matrix with summary genotype counts from cases
 #' @param controlsClustering cluster names for controls
 #' @param minLambda Minimum possible lambda
@@ -47,9 +48,9 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference, 
-                             caseCounts, controlsClustering = NULL, minLambda = 0.75, 
-                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
-                             min = 500, SV = 3) {
+                            meanGenotype, caseCounts, controlsClustering = NULL, minLambda = 0.75, 
+                            softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
+                            min = 500, SV = 3) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -72,13 +73,11 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference
   caseMeans <- apply(caseCounts, 1, function(x){
     (x[2] + 2 * x[3]) / sum(x)
   })
-  residuals <- SVDFunctions::parallelResidEstimate(genotypeMatrix, SVDReference,
-                                                   caseMeans, SV = SV,
-                                                   contMeans = contMeans)
-  residuals <- as.numeric(residuals)
+  
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
-  result <- select_controls_cpp(gmatrix, residuals, caseCounts, 
+  result <- select_controls_cpp(gmatrix, genotypeMatrix, mean, SVDReference, 
+                                caseCounts, 
                                 cl, stats::qchisq(stats::ppoints(1e+05), df = 1), minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min)
   result$residuals <- setNames(residuals, colnames(gmatrix))

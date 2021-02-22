@@ -1,7 +1,6 @@
 #include <Rcpp.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
-#include <numeric>
 
 #include "include/qchisq.h"
 #include "include/matching.h"
@@ -95,8 +94,9 @@ List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mea
 }
 
 // [[Rcpp::export]]
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& US,
-                     NumericMatrix& gmatrix_imputed, NumericVector& mean,
+List select_controls_cpp(IntegerMatrix& gmatrix,
+                     NumericMatrix& gmatrix_imputed,
+                     NumericVector& mean, NumericMatrix& US,
                      IntegerMatrix& cc, IntegerVector& clustering,
                      NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,

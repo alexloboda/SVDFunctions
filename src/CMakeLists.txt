@@ -17,6 +17,6 @@ file(GLOB SVDF_SRC "*.cpp")
 
 file(GLOB SVDF_TEST_SRC "test/*")
 
-add_executable(test ${SVDF_TEST_SRC} ${SVDF_SRC} test/mvn_stat_test.cpp include/subsample.h subsample.cpp four_russians.cpp matching.cpp include/matching.h include/hw.h)
+add_executable(test ${SVDF_TEST_SRC} ${SVDF_SRC} hw.cpp)
 
 TARGET_LINK_LIBRARIES(test R z ${LIBRARIES_T_LINK})
