@@ -50,9 +50,9 @@ collapsingToTree <- function(collapsing) {
 #' @param plotDendrogram whether dendrogram should be plotted
 #' @param clusters maximum number of clusters
 #' @export
-estimateCaseClusters2 <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
+estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
                                    minClusters = 1, clusters = 20, keepSamples = NULL) {
-  stopifnot(class(PCA) %in% c("matrix", "data.frame"))
+  stopifnot(class(PCA) %in% c("matrix", "data.frame", "array"))
   clResults <- mclust::Mclust(data = PCA, G = minClusters:clusters, modelNames = "VVV")
   if (plotBIC) {
     mclust::plot.Mclust(x = clResults, what = "BIC", xlab = "Number of Components", 
@@ -155,6 +155,11 @@ spaces <- function(depth) {
   strrep("  ", depth)
 }
 
+writeVector <- function(fd, depth, v, title) {
+  cat(spaces(depth), title, ": ", file = fd, sep = "")
+  cat("[", paste0(v, collapse = ", "), "]\n", file = fd, sep = "")
+}
+
 writeMatrix <- function(fd, depth, m, title) {
   cat(spaces(depth), title, ":\n", sep = "", file = fd)
   ss <- spaces(depth + 1)
@@ -164,6 +169,7 @@ writeMatrix <- function(fd, depth, m, title) {
 
 writeCluster <- function(fd, cluster, i) {
   cat("  - cluster: ", i, "\n", file = fd)
+  writeVector(fd, 2, cluster$mean, 'mean')
   writeMatrix(fd, 2, cluster$US, "US")
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
@@ -206,7 +212,7 @@ writeYaml <- function(clusterResults, clustering, variants,
 #' @import mclust
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
-                              maxVectors = 50, title = "DNAScoreInput", contMeans) {
+                              maxVectors = 50, title = "DNAScoreInput") {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
     clusters <- clustering(setNames(classes, colnames(gmatrix)), 
@@ -233,12 +239,10 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
   }
   gmatrix <- gmatrix[passVariants, ]
   gmatrixForCounts <- gmatrixForCounts[passVariants, ]
-  contMeans <- contMeans[passVariants]
   clusterResults <- vector("list", numberOfClusters)
   for (i in 1:numberOfClusters) {
     cluster <- which(clusters$samples == i)
     clusterGenotypes <- gmatrix[, cluster]
-    clusterGenotypes <- gmatrix[, cluster] - contMeans
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     caseMeans <- rowMeans(clusterGenotypes)
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
@@ -247,6 +251,7 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
     US <- svdResult$u %*% diag(svdResult$d)
     counts <- genotypesToCounts(clusterGenotypesForCounts)
     clusterResults[[i]] <- list(US = US, counts = counts, 
+                                mean = caseMeans, 
                                 title = clusters$classes[i])
   }
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 

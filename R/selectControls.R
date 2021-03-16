@@ -76,9 +76,14 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference
   
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
-  result <- select_controls_cpp(gmatrix, genotypeMatrix, mean, SVDReference, 
+  result <- select_controls_cpp(gmatrix, 
+                                genotypeMatrix, 
+                                meanGenotype, 
+                                SVDReference, 
                                 caseCounts, 
-                                cl, stats::qchisq(stats::ppoints(1e+05), df = 1), minLambda, 
+                                cl, 
+                                stats::qchisq(stats::ppoints(1e+05), df = 1), 
+                                minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min)
   result$residuals <- setNames(residuals, colnames(gmatrix))
   if (result$controls > 0) {

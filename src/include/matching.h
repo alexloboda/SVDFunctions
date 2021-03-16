@@ -59,21 +59,13 @@ struct matching_results {
                      std::vector<int>&& lmbd_i, std::vector<int>&& pvals_number);
 };
 
-class Clustering {
-    std::vector<int> cluster_sizes;
-    std::vector<std::vector<int>> clusters;
-    size_t n;
-public:
-    explicit Clustering(const std::vector<int>& clustering);
-    std::vector<int> elements(size_t i) const;
-    size_t size() const;
-};
-
 class matching {
+    static constexpr double EPS = 1e-6;
+
     Eigen::MatrixXi controls_gmatrix;
     Eigen::MatrixXd controls_space;
 
-    Clustering clustering;
+    mvn::Clustering clustering;
     mvn::subsample subsampling;
 
     std::function<void()> interrupts_checker;
@@ -82,8 +74,8 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(Eigen::MatrixXi controls, Eigen::MatrixXd space, Clustering clustering);
-    void process_mvn(const Eigen::MatrixXd& cov, const Eigen::VectorXd& mean);
+    matching(Eigen::MatrixXi controls, Eigen::MatrixXd space, mvn::Clustering clustering);
+    void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean, int threads);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1);
 

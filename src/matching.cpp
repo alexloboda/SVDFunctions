@@ -4,6 +4,8 @@
 
 #include <numeric>
 #include <utility>
+#include <fstream>
+#include <Rcpp.h>
 
 namespace {
 
@@ -21,7 +23,7 @@ namespace matching {
 
 matching::matching(Eigen::MatrixXi controls_gmatrix,
                    Eigen::MatrixXd controls_space,
-                   Clustering clustering) : controls_gmatrix(std::move(controls_gmatrix)),
+                   mvn::Clustering clustering) : controls_gmatrix(std::move(controls_gmatrix)),
                                             controls_space(std::move(controls_space)),
                                             clustering(std::move(clustering)) {}
 
@@ -121,28 +123,55 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num)};
 }
 
-void matching::process_mvn(const Matrix& cov, const Vector& mean) {
-    Eigen::MatrixXd controls_gmatrix_float(controls_space.rows(), clustering.size());
-    for (size_t i = 0; i < clustering.size(); i++) {
-        controls_gmatrix_float.col(i) = cluster_mean(i);
-    }
+void matching::process_mvn(const Matrix& directions, Vector mean, int threads) {
+    Rcpp::Rcerr << "Starting processing controls space." << std::endl;
+    Rcpp::Rcerr << "The size of controls space is " << controls_space.rows() << " by " << controls_space.cols() << std::endl;
 
-    Eigen::JacobiSVD<Eigen::MatrixXd> svd(controls_space);
-    const Matrix& U = svd.matrixU();
+    Vector controls_mean = controls_space.rowwise().mean();
+    Rcpp::Rcerr << "Controls mean size: " << controls_mean.size() << std::endl;
+    mean -= controls_mean;
+    controls_space.colwise() -= controls_mean;
+
+    Rcpp::Rcerr << "SVD started" << std::endl;
+    Eigen::BDCSVD<Eigen::MatrixXd> svd(controls_space, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    Rcpp::Rcerr << "U matrix dims: " << svd.matrixU().rows() << " by " << svd.matrixU().cols() << std::endl;
+    auto U = svd.matrixU().block(0, 0, controls_space.rows(), 10);
+
+    Rcpp::Rcerr << "U matrix dims: " << U.rows() << " by " << U.cols() << std::endl;
 
     Vector rs_mean = U.transpose() * mean;
-    Matrix rs_cov = U.transpose() * cov;
+    Matrix rs_directions = U.transpose() * directions;
 
-    Matrix rs_controls_gmatrix = U.transpose() * controls_gmatrix_float;
-    subsampling = mvn::subsample(rs_controls_gmatrix, rs_mean, rs_cov);
-    subsampling.run(100000, 10, 1.0 / 3.0);
+    std::vector<int> sel_cols;
+    for (int i = 0; i < rs_directions.cols(); i++) {
+        if (rs_directions.col(i).norm() > EPS) {
+            sel_cols.push_back(i);
+        }
+    }
+    Matrix rs_non_singular_vectors(rs_directions.rows(), sel_cols.size());
+    for (int i = 0; i < sel_cols.size(); i++) {
+        rs_non_singular_vectors.col(i) = rs_directions.col(sel_cols[i]);
+    }
+
+    Matrix rs_cov = rs_non_singular_vectors * rs_non_singular_vectors.transpose();
+
+    Matrix rs_controls_gmatrix = U.transpose() * controls_space;
+    Rcpp::Rcerr << "Subsampling started" << std::endl;
+    subsampling = mvn::subsample(rs_controls_gmatrix, clustering, rs_mean, rs_cov);
+    Rcpp::Rcerr << "Mahalanobis distances successfully have been calculated." << std::endl;
+    subsampling.run(100000 / threads, 10, 1.0 / 3.0, threads);
 }
 
 Eigen::VectorXd matching::cluster_mean(int cluster) const {
     auto objects = clustering.elements(cluster);
-    return std::accumulate(objects.begin(), objects.end(), Vector(controls_space.rows()), [&](Vector sum, int obj) {
+    if (objects.empty()) {
+        throw std::invalid_argument("Cluster is empty");
+    }
+    Vector v =  std::accumulate(objects.begin(), objects.end(), Vector(controls_space.rows()), [&](Vector sum, int obj) {
         return sum + controls_space.col(obj);
     });
+    v /= objects.size();
+    return v;
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
@@ -187,29 +216,6 @@ double lambda_range::distance(double lambda) {
     }
 
     return std::max(lambda - ub, lb - lambda);
-}
-
-Clustering::Clustering(const std::vector<int>& clustering) {
-    if (clustering.empty()) {
-        throw std::invalid_argument("Clustering must not be empty");
-    }
-
-    int n_clsuters = *std::max_element(clustering.begin(), clustering.end()) + 1;
-    cluster_sizes.resize(n_clsuters);
-    clusters.resize(n_clsuters);
-    for (size_t i = 0; i < clustering.size(); i++) {
-        int cl = clustering[i];
-        ++cluster_sizes[cl];
-        clusters[cl].push_back(i);
-    }
-}
-
-size_t Clustering::size() const {
-    return n;
-}
-
-std::vector<int> Clustering::elements(size_t i) const {
-    return clusters.at(i);
 }
 
 matching_results::matching_results(std::vector<int>&& prefix, std::vector<double>&& p_values,

@@ -11,14 +11,13 @@ class subsample {
     std::vector<double> best_scores;
 
     std::mt19937 wheel;
-    std::uniform_real_distribution<double> random_unif;
 public:
     subsample();
-    subsample(const Matrix& X, const Vector& mean, const Matrix& cov);
+    subsample(const Matrix& X, const Clustering& clst, const Vector& mean, const Matrix& cov);
     subsample(const subsample&) = default;
     subsample& operator=(const subsample& other) = default;
 
-    std::vector<size_t> run(size_t iterations, size_t restarts, double t0);
+    void run(size_t iterations, size_t restarts, double t0, int threads);
 
     std::vector<size_t> get_solution(size_t size) const;
     double get_statistic(size_t size) const;

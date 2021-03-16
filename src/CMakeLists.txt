@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(src)
 
 find_package (Threads REQUIRED)
-find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(Eigen3 3.3.9 REQUIRED NO_MODULE)
 
 INCLUDE_DIRECTORIES( /usr/lib/R/library/BH/include )
 INCLUDE_DIRECTORIES( /usr/lib/R/library/Rcpp/include/ /usr/include/R )
@@ -17,6 +17,6 @@ file(GLOB SVDF_SRC "*.cpp")
 
 file(GLOB SVDF_TEST_SRC "test/*")
 
-add_executable(test ${SVDF_TEST_SRC} ${SVDF_SRC} hw.cpp)
+add_executable(test_run ${SVDF_TEST_SRC} ${SVDF_SRC} hw.cpp)
 
-TARGET_LINK_LIBRARIES(test R z ${LIBRARIES_T_LINK})
+TARGET_LINK_LIBRARIES(test_run R z ${LIBRARIES_T_LINK})

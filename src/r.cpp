@@ -1,6 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
 #include <eigen3/Eigen/Dense>
+#include <thread>
 
 #include "include/qchisq.h"
 #include "include/matching.h"
@@ -78,8 +79,11 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mean) {
     List ret;
 
-    mvn::subsample annealing(r_to_cpp(matrix), r_to_cpp(mean), r_to_cpp(cov));
-    annealing.run(100000, 10, 0.33);
+    std::vector<int> clusters(matrix.ncol());
+    std::iota(clusters.begin(), clusters.end(), 0);
+    mvn::Clustering clustering(clusters);
+    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), r_to_cpp(cov));
+    annealing.run(10000 / std::thread::hardware_concurrency(), 10, 0.33, std::thread::hardware_concurrency());
 
     for (size_t i = annealing.min_size(); i <= annealing.max_size(); i++) {
         List el;
@@ -113,13 +117,13 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     vector<int> clust_vec(clustering.begin(), clustering.end());
 
     int min_controls = min[0];
-    matching::Clustering cl(clust_vec);
+    mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(gmatrix_c, gmatrix_full, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
-    matcher.process_mvn(gmatrix_full, r_to_cpp(mean));
+    matcher.process_mvn(us_matrix, r_to_cpp(mean), std::thread::hardware_concurrency());
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(case_counts), min_controls);
