@@ -50,7 +50,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference, 
                             meanGenotype, caseCounts, controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
-                            min = 500, SV = 3) {
+                            min = 500, max = 1000, step = 50, SV = 3) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -76,18 +76,25 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference
   
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
+  
+  controlSpaceSVD <- RSpectra::svds(genotypeMatrix - contMeans, k = SV)
+  
+  N <- max(apply(caseCounts, 1, sum))
+  principalDirections <- SVDReference * (1 / sqrt(N - 1))
+  
   result <- select_controls_cpp(gmatrix, 
                                 genotypeMatrix, 
+                                controlSpaceSVD$u, 
                                 meanGenotype, 
-                                SVDReference, 
+                                principalDirections, 
                                 caseCounts, 
                                 cl, 
                                 stats::qchisq(stats::ppoints(1e+05), df = 1), 
                                 minLambda, 
-                                softMinLambda, maxLambda, softMaxLambda, min)
-  result$residuals <- setNames(residuals, colnames(gmatrix))
-  if (result$controls > 0) {
-    result$controls <- colnames(gmatrix)[sel]
+                                softMinLambda, maxLambda, softMaxLambda, min, 
+                                max, step)
+  if (length(result$controls) > 0) {
+    result$controls <- colnames(gmatrix)[result$controls]
   }
   else {
     result$controls <- c()

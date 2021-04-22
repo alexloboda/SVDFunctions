@@ -2,68 +2,52 @@
 
 #include <Rcpp.h>
 #include <iostream>
+#include <fstream>
 #include <random>
+#include <chrono>
 #include "include/third-party/cxxpool.h"
-
-namespace {
-    class solution {
-        std::vector<size_t> elements;
-        double score;
-    public:
-        solution(std::vector<size_t> elements, double score) :elements(elements), score(score) {}
-        solution& operator=(const solution&) = default;
-        solution() :score(std::numeric_limits<double>::infinity()){}
-        bool operator<(const solution& other) const {
-            return score < other.score;
-        }
-        std::vector<size_t> elems() const {
-            return elements;
-        }
-        double fitness() const {
-            return score;
-        }
-    };
-
-}
 
 namespace mvn {
 
 subsample::subsample(const mvn::Matrix& X, const Clustering& clst, const mvn::Vector& mean, const mvn::Matrix& cov)
         :test(X, clst, cov, mean),
-         wheel(std::random_device()()) {}
+         clst(clst),
+         wheel(std::random_device()()) {
+    Rcpp::Rcerr << "Test is prepared, mean vector is " << mean << std::endl <<
+                "Covariance matrix is :" << cov << std::endl;
+    Rcpp::Rcerr << std::flush;
+}
 
-void subsample::run(size_t iterations, size_t restarts, double t0, int pool_size) {
+void subsample::run(size_t iterations, size_t restarts, double t_start, int pool_size, int start, int size_ub, int step) {
     using std::vector;
+    using namespace std::chrono_literals;
 
     best.clear() ;
     best_scores.clear();
+    pool_size = 2;
     cxxpool::thread_pool pool(pool_size);
 
-    while (test.subsample_size() < test.sample_size()) {
-        Rcpp::Rcerr << "Subsampling set of size " << test.subsample_size();
-        Rcpp::Rcerr << ". Current score is " << test.get_normality_statistic() << std::endl;
+    while (test.subsample_size() < start) {
+        test.add_one();
+    }
 
+    while (test.subsample_size() <= size_ub) {
+        double t0 = t_start;
         for (size_t i = 0; i < restarts; i++) {
             Rcpp::checkUserInterrupt();
-            std::vector<std::future<solution>> thread_solutions;
-            for (size_t t = 0; t < pool_size; t++) {
+            std::vector<std::future<mvn_test>> thread_solutions;
+            for (int t = 0; t < pool_size; t++) {
                 thread_solutions.push_back(pool.push([&test = std::as_const(test), iterations, t0,
-                                                             seed = wheel()]() -> solution {
+                                                             seed = wheel()]() -> mvn_test {
                     std::mt19937 mersenne_wheel(seed);
                     std::uniform_real_distribution<double> random_unif(0.0, 1.0);
-                    solution best_thread;
                     mvn_test local_test = test;
                     double score = local_test.get_normality_statistic();
                     for (size_t k = 1; k <= iterations; k++) {
                         double t = t0 / (1.0 + std::log((double) k));
-
                         local_test.swap_once();
                         double new_score = local_test.get_normality_statistic();
                         if (new_score < score) {
-                            if (new_score < best_thread.fitness()) {
-                                best_thread = solution(local_test.current_subset(),
-                                                       local_test.get_normality_statistic());
-                            }
                             score = new_score;
                         } else {
                             double p = std::exp((score - new_score) / t);
@@ -74,39 +58,45 @@ void subsample::run(size_t iterations, size_t restarts, double t0, int pool_size
                             }
                         }
                     }
-                    return best_thread;
+                    return local_test;
                 }));
             }
 
-            solution the_best;
             for (auto& future: thread_solutions) {
-                the_best = std::min(the_best, future.get());
+                test = std::min(test, future.get());
             }
-            best.push_back(the_best.elems());
-            best_scores.push_back(the_best.fitness());
-
-            test.set_solution(the_best.elems());
 
             t0 /= 2.0;
         }
-        test.add_one();
+
+        best.push_back(test.current_subset());
+        best_scores.push_back(test.get_normality_statistic());
+
+        Rcpp::Rcerr << "Subsampling set of size " << test.subsample_size();
+        Rcpp::Rcerr << ". Current score is " << test.get_normality_statistic() << std::endl;
+
+        std::ofstream fout("sets/" + std::to_string(test.subsample_size()) + ".txt");
+        for (int gr: test.current_subset()) {
+            for (int el: clst.elements(gr)) {
+                fout << el << std::endl;
+            }
+        }
+
+        if (test.subsample_size() == test.sample_size()) {
+            return;
+        }
+        for (int i = 0; i < step; i++) {
+            test.add_one();
+        }
     }
 }
 
-size_t subsample::min_size() const {
-    return best.front().size();
+size_t subsample::solutions() const {
+    return best.size();
 }
 
-size_t subsample::max_size() const {
-    return best.back().size();
-}
-
-double subsample::get_statistic(size_t size) const {
-    return best_scores.at(size - min_size());
-}
-
-std::vector<size_t> subsample::get_solution(size_t size) const {
-    return best.at(size - min_size());
+std::vector<size_t> subsample::get_solution(size_t k) const {
+    return best.at(k);
 }
 
 subsample::subsample() {}

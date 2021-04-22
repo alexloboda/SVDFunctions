@@ -76,23 +76,17 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 }
 
 // [[Rcpp::export]]
-List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mean) {
-    List ret;
-
+List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mean, IntegerVector size) {
     std::vector<int> clusters(matrix.ncol());
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
     mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), r_to_cpp(cov));
-    annealing.run(10000 / std::thread::hardware_concurrency(), 10, 0.33, std::thread::hardware_concurrency());
+    annealing.run(1000000, 20, 1.0 / 8.0, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
-    for (size_t i = annealing.min_size(); i <= annealing.max_size(); i++) {
-        List el;
-        el["stat"] = annealing.get_statistic(i);
-        auto points = annealing.get_solution(i);
-        IntegerVector subset(points.begin(), points.end());
-        el["points"] = subset + 1;
-        ret[i] = el;
-    }
+    List ret;
+    auto points = annealing.get_solution(0);
+    IntegerVector subset(points.begin(), points.end());
+    ret["points"] = subset + 1;
 
     return ret;
 }
@@ -100,30 +94,35 @@ List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mea
 // [[Rcpp::export]]
 List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericMatrix& gmatrix_imputed,
-                     NumericVector& mean, NumericMatrix& US,
+                     NumericMatrix& space,
+                     NumericVector& mean, NumericMatrix& directions,
                      IntegerMatrix& cc, IntegerVector& clustering,
                      NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
-                     IntegerVector min) {
+                     IntegerVector min, IntegerVector max, IntegerVector step) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
     auto gmatrix_c = r_to_cpp(gmatrix);
     auto gmatrix_full = r_to_cpp(gmatrix_imputed);
     auto case_counts = r_to_cpp(cc);
-    auto us_matrix = r_to_cpp(US);
+    auto principal_directions = r_to_cpp(directions);
+    auto space_matrix = r_to_cpp(space);
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
 
     int min_controls = min[0];
+    int max_controls = max[0];
+    int step_clusters = step[0];
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(gmatrix_c, gmatrix_full, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
-    matcher.process_mvn(us_matrix, r_to_cpp(mean), std::thread::hardware_concurrency());
+    matcher.process_mvn(principal_directions, space_matrix, r_to_cpp(mean), std::thread::hardware_concurrency(),
+                        min_controls, max_controls, step_clusters);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(case_counts), min_controls);

@@ -11,7 +11,8 @@ prepareInstance(
   clusters = NULL,
   maxVectors = 50,
   title = "DNAScoreInput",
-  contMeans
+  MAC = 10,
+  MAF = 0.01
 )
 }
 \arguments{
@@ -28,6 +29,10 @@ were imputed}
 to be computed and written to a file}
 
 \item{title}{title to put as a first line in yaml file}
+
+\item{MAC}{minor allele count used for QC}
+
+\item{MAF}{minor allele frequency used for QC}
 }
 \description{
 prepare instance and write yaml file from QC-ed gmatrix

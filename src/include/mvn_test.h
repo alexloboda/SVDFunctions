@@ -26,29 +26,27 @@ class mvn_stats {
     Vector mahalanobis_centered;
     Matrix mahalanobis_pairwise;
 
-    Clustering clustering;
-    std::vector<double> full_pairwise_stat;
+    double beta_val;
 public:
-    mvn_stats(const Matrix& X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_stats(const Matrix& X, const Clustering& clst, const Matrix& S, const Vector& mean, double beta);
     mvn_stats() = default;
 
-    size_t effect_size(size_t i) const;
     double pairwise_stat(size_t i, size_t j) const;
     double centered_stat(size_t i) const;
-    double full_pairwise_statistic(size_t i) const;
+    double beta() const;
 private:
-    void compute_full_stats();
 };
 
 class mvn_test {
-    std::shared_ptr<mvn_stats> stats;
+    std::vector<std::shared_ptr<mvn_stats>> stats;
+    std::shared_ptr<Clustering> clustering;
 
     size_t p;
     size_t n;
     size_t effect_size;
 
-    double pairwise_stat;
-    double center_stat;
+    std::vector<double> pairwise_stat;
+    std::vector<double> center_stat;
 
     mutable std::mt19937 wheel;
 
@@ -58,6 +56,7 @@ class mvn_test {
 public:
     mvn_test() = default;
     mvn_test(const mvn_test&);
+    mvn_test& operator=(const mvn_test&);
     mvn_test(const Matrix& X, const Clustering& clst, const Matrix& S, const Vector& mean);
     size_t dimensions() const;
     size_t sample_size() const;
@@ -65,11 +64,15 @@ public:
 
     void add_one();
     void swap_once(bool reject_last = false);
+    void swap(mvn_test& other);
 
     const std::vector<size_t>& current_subset() const;
     double get_normality_statistic() const;
 
-    void set_solution(std::vector<size_t> vector);
+    double get_pairwise_statistic() const;
+    double get_centered_statistic() const;
+
+    friend bool operator<(const mvn_test& lhs, const mvn_test& rhs);
 };
 
 }

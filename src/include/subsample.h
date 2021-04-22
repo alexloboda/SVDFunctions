@@ -9,6 +9,7 @@ class subsample {
 
     std::vector<std::vector<size_t>> best;
     std::vector<double> best_scores;
+    Clustering clst;
 
     std::mt19937 wheel;
 public:
@@ -17,12 +18,10 @@ public:
     subsample(const subsample&) = default;
     subsample& operator=(const subsample& other) = default;
 
-    void run(size_t iterations, size_t restarts, double t0, int threads);
+    void run(size_t iterations, size_t restarts, double t0, int threads, int start, int size_ub, int step);
 
     std::vector<size_t> get_solution(size_t size) const;
-    double get_statistic(size_t size) const;
-    size_t min_size() const;
-    size_t max_size() const;
+    size_t solutions() const;
 };
 
 }

@@ -6,6 +6,27 @@
 #include <utility>
 #include <fstream>
 #include <Rcpp.h>
+namespace Eigen{
+template<class Matrix>
+void write_binary(const char* filename, const Matrix& matrix){
+    std::ofstream out(filename, std::ios::out | std::ios::binary | std::ios::trunc);
+    typename Matrix::Index rows=matrix.rows(), cols=matrix.cols();
+    out.write((char*) (&rows), sizeof(typename Matrix::Index));
+    out.write((char*) (&cols), sizeof(typename Matrix::Index));
+    out.write((char*) matrix.data(), rows*cols*sizeof(typename Matrix::Scalar) );
+    out.close();
+}
+template<class Matrix>
+void read_binary(const char* filename, Matrix& matrix){
+    std::ifstream in(filename, std::ios::in | std::ios::binary);
+    typename Matrix::Index rows=0, cols=0;
+    in.read((char*) (&rows),sizeof(typename Matrix::Index));
+    in.read((char*) (&cols),sizeof(typename Matrix::Index));
+    matrix.resize(rows, cols);
+    in.read( (char *) matrix.data() , rows*cols*sizeof(typename Matrix::Scalar) );
+    in.close();
+}
+} // Eigen::
 
 namespace {
 
@@ -64,7 +85,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     std::vector<int> pvals_num;
     std::vector<double> optimal_pvals;
 
-    for (size_t k = subsampling.min_size(), step = 0; k <= subsampling.max_size(); k++, step++) {
+    for (size_t k = 0, step = 0; k < subsampling.solutions(); k++, step++) {
         if (step % 100 == 0) {
             interrupts_checker();
         }
@@ -72,6 +93,9 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
         std::vector<double> pvals;
 
         auto control_groups = subsampling.get_solution(k);
+        if (control_groups.size() < min_controls) {
+            continue;
+        }
         std::vector<int> controls;
         for (int group: control_groups) {
             auto group_elements = clustering.elements(group);
@@ -105,14 +129,16 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
                 return a.sum() < b.sum();
             })->sum();
             auto num_of_controls = controls.size();
-            cur_lambda = lambda_1000(cur_lambda, cases, num_of_controls);
+            //cur_lambda = lambda_1000(cur_lambda, cases, num_of_controls);
 
             lambdas.push_back(cur_lambda);
             lambda_i.push_back(controls.size());
             pvals_num.push_back(pvals.size());
 
             if (hard_threshold.in(cur_lambda)) {
-                if (soft_threshold.in(cur_lambda) || soft_threshold.distance(cur_lambda) < soft_threshold.distance(lambda)) {
+                if (soft_threshold.in(cur_lambda) ||
+                        (!soft_threshold.in(lambda) &&
+                        soft_threshold.distance(cur_lambda) < soft_threshold.distance(lambda))) {
                     optimal_controls = controls;
                     lambda = cur_lambda;
                     optimal_pvals = pvals;
@@ -123,7 +149,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num)};
 }
 
-void matching::process_mvn(const Matrix& directions, Vector mean, int threads) {
+void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector mean, int threads, int start, int ub, int step) {
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space.rows() << " by " << controls_space.cols() << std::endl;
 
@@ -132,15 +158,10 @@ void matching::process_mvn(const Matrix& directions, Vector mean, int threads) {
     mean -= controls_mean;
     controls_space.colwise() -= controls_mean;
 
-    Rcpp::Rcerr << "SVD started" << std::endl;
-    Eigen::BDCSVD<Eigen::MatrixXd> svd(controls_space, Eigen::ComputeThinU | Eigen::ComputeThinV);
-    Rcpp::Rcerr << "U matrix dims: " << svd.matrixU().rows() << " by " << svd.matrixU().cols() << std::endl;
-    auto U = svd.matrixU().block(0, 0, controls_space.rows(), 10);
+    Rcpp::Rcerr << "U matrix dims: " << space.rows() << " by " << space.cols() << std::endl;
 
-    Rcpp::Rcerr << "U matrix dims: " << U.rows() << " by " << U.cols() << std::endl;
-
-    Vector rs_mean = U.transpose() * mean;
-    Matrix rs_directions = U.transpose() * directions;
+    Vector rs_mean = space.transpose() * mean;
+    Matrix rs_directions = space.transpose() * directions;
 
     std::vector<int> sel_cols;
     for (int i = 0; i < rs_directions.cols(); i++) {
@@ -149,36 +170,24 @@ void matching::process_mvn(const Matrix& directions, Vector mean, int threads) {
         }
     }
     Matrix rs_non_singular_vectors(rs_directions.rows(), sel_cols.size());
-    for (int i = 0; i < sel_cols.size(); i++) {
+    for (unsigned i = 0; i < sel_cols.size(); i++) {
         rs_non_singular_vectors.col(i) = rs_directions.col(sel_cols[i]);
     }
 
     Matrix rs_cov = rs_non_singular_vectors * rs_non_singular_vectors.transpose();
 
-    Matrix rs_controls_gmatrix = U.transpose() * controls_space;
+    Matrix rs_controls_gmatrix = space.transpose() * controls_space;
     Rcpp::Rcerr << "Subsampling started" << std::endl;
     subsampling = mvn::subsample(rs_controls_gmatrix, clustering, rs_mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances successfully have been calculated." << std::endl;
-    subsampling.run(100000 / threads, 10, 1.0 / 3.0, threads);
-}
-
-Eigen::VectorXd matching::cluster_mean(int cluster) const {
-    auto objects = clustering.elements(cluster);
-    if (objects.empty()) {
-        throw std::invalid_argument("Cluster is empty");
-    }
-    Vector v =  std::accumulate(objects.begin(), objects.end(), Vector(controls_space.rows()), [&](Vector sum, int obj) {
-        return sum + controls_space.col(obj);
-    });
-    v /= objects.size();
-    return v;
+    subsampling.run(100000, 20, 1.0 / 16.0, threads, start, ub, step);
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
     Counts counts;
     for (int sample: controls) {
-        double value = controls_gmatrix(variant, sample);
-        if (!std::isnan(value)) {
+        int value = controls_gmatrix(variant, sample);
+        if (value != -1) {
             ++counts[controls_gmatrix(variant, sample)];
         }
     }

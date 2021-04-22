@@ -75,7 +75,8 @@ class matching {
     lambda_range soft_threshold;
 public:
     matching(Eigen::MatrixXi controls, Eigen::MatrixXd space, mvn::Clustering clustering);
-    void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean, int threads);
+    void process_mvn(const Eigen::MatrixXd& directions, const Eigen::MatrixXd& space, Eigen::VectorXd mean, int threads,
+                     int start, int size_ub, int step);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1);
 
@@ -86,7 +87,6 @@ public:
     void set_soft_threshold(lambda_range range);
     void set_hard_threshold(lambda_range range);
 private:
-    Eigen::VectorXd cluster_mean(int cluster) const;
     double get_lambda(std::vector<double>& pvals);
 
     Counts count_controls(const std::vector<int>& vector, size_t j);

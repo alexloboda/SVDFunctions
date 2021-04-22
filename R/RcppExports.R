@@ -5,12 +5,12 @@ quality_control_impl <- function(case_counts, maf, mac, chi2boundary) {
     .Call('_SVDFunctions_quality_control_impl', PACKAGE = 'SVDFunctions', case_counts, maf, mac, chi2boundary)
 }
 
-subsample_mvn <- function(matrix, cov, mean) {
-    .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, cov, mean)
+subsample_mvn <- function(matrix, cov, mean, size) {
+    .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, cov, mean, size)
 }
 
-select_controls_cpp <- function(gmatrix, gmatrix_imputed, mean, US, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min) {
-    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_imputed, mean, US, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min)
+select_controls_cpp <- function(gmatrix, gmatrix_imputed, space, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step) {
+    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_imputed, space, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step)
 }
 
 parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold) {

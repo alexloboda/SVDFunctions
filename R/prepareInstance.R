@@ -95,8 +95,9 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
 #' @param components Number of principal components to be computed
 #' @export
 gmatrixPCA <- function(gmatrix, components = 10){
-  pca <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
-                        k = min(components, ncol(gmatrix)))$v
+  svd <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
+                        k = min(components, ncol(gmatrix)))
+  pca <- t(diag(svd$d) %*% t(svd$v))
   
   colnames(pca) <- c(paste("PC", c(1:min(components, ncol(gmatrix))), sep = ""))
   rownames(pca) <- colnames(gmatrix)
@@ -209,10 +210,12 @@ writeYaml <- function(clusterResults, clustering, variants,
 #' @param outputFileName name of the YAML file to output
 #' @param title title to put as a first line in yaml file
 #' @param clusters clustering object
+#' @param MAC minor allele count used for QC
+#' @param MAF minor allele frequency used for QC
 #' @import mclust
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
-                              maxVectors = 50, title = "DNAScoreInput") {
+                              maxVectors = 50, title = "DNAScoreInput", MAC = 10, MAF = 0.01) {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
     clusters <- clustering(setNames(classes, colnames(gmatrix)), 
@@ -225,10 +228,9 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
   caseCounts <- list()
   for (i in 1:numberOfClusters) {
     cluster <- which(clusters$samples == i)
-    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, 
-                                                          cluster])
+    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
   }
-  passVariants <- lapply(caseCounts, checkAlleleCounts, mac = 1, maf = 0.001)
+  passVariants <- lapply(caseCounts, checkAlleleCounts, mac = MAC, maf = MAF)
   passVariants <- lapply(passVariants, which)
   passVariants <- Reduce(intersect, passVariants)
   if (length(passVariants) < 100) {
@@ -244,14 +246,15 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
     cluster <- which(clusters$samples == i)
     clusterGenotypes <- gmatrix[, cluster]
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
-    caseMeans <- rowMeans(clusterGenotypes)
+    clusterMeans <- rowMeans(clusterGenotypes)
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
-    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes - caseMeans, 
-                                                 k = k))
+    clusterGenotypes <- clusterGenotypes - clusterMeans
+    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, k = k))
     US <- svdResult$u %*% diag(svdResult$d)
+    
     counts <- genotypesToCounts(clusterGenotypesForCounts)
     clusterResults[[i]] <- list(US = US, counts = counts, 
-                                mean = caseMeans, 
+                                mean = clusterMeans, 
                                 title = clusters$classes[i])
   }
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
