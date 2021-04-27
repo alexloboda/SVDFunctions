@@ -42,10 +42,10 @@ using Vector = Eigen::VectorXd;
 
 namespace matching {
 
-matching::matching(Eigen::MatrixXi controls_gmatrix,
-                   Eigen::MatrixXd controls_space,
-                   mvn::Clustering clustering) : controls_gmatrix(std::move(controls_gmatrix)),
-                                            controls_space(std::move(controls_space)),
+matching::matching(std::shared_ptr<Eigen::MatrixXi> controls_gmatrix,
+                   std::shared_ptr<Eigen::MatrixXd> controls_space,
+                   mvn::Clustering clustering) : controls_gmatrix(controls_gmatrix),
+                                            controls_space(controls_space),
                                             clustering(std::move(clustering)) {}
 
 void matching::set_soft_threshold(lambda_range range) {
@@ -151,12 +151,12 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 
 void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector mean, int threads, int start, int ub, int step) {
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
-    Rcpp::Rcerr << "The size of controls space is " << controls_space.rows() << " by " << controls_space.cols() << std::endl;
+    Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
-    Vector controls_mean = controls_space.rowwise().mean();
+    Vector controls_mean = controls_space->rowwise().mean();
     Rcpp::Rcerr << "Controls mean size: " << controls_mean.size() << std::endl;
     mean -= controls_mean;
-    controls_space.colwise() -= controls_mean;
+    controls_space->colwise() -= controls_mean;
 
     Rcpp::Rcerr << "U matrix dims: " << space.rows() << " by " << space.cols() << std::endl;
 
@@ -176,19 +176,20 @@ void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector
 
     Matrix rs_cov = rs_non_singular_vectors * rs_non_singular_vectors.transpose();
 
-    Matrix rs_controls_gmatrix = space.transpose() * controls_space;
+    std::shared_ptr<Matrix> rs_controls_gmatrix = std::make_shared<Matrix>(space.transpose());
+    rs_controls_gmatrix->operator*=(*controls_space);
     Rcpp::Rcerr << "Subsampling started" << std::endl;
     subsampling = mvn::subsample(rs_controls_gmatrix, clustering, rs_mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances successfully have been calculated." << std::endl;
-    subsampling.run(100000, 20, 1.0 / 16.0, threads, start, ub, step);
+    subsampling.run(10000, 10, 1.0 / 16.0, threads, start, ub, step);
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
     Counts counts;
     for (int sample: controls) {
-        int value = controls_gmatrix(variant, sample);
+        int value = controls_gmatrix->operator()(variant, sample);
         if (value != -1) {
-            ++counts[controls_gmatrix(variant, sample)];
+            ++counts[controls_gmatrix->operator()(variant, sample)];
         }
     }
     return counts;

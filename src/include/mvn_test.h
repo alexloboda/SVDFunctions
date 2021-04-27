@@ -22,13 +22,24 @@ public:
     size_t cluster_size(size_t i) const;
 };
 
+class mahalanobis_distances {
+    Matrix xixj;
+    Matrix muxi;
+    Matrix ximu;
+    double mumu;
+public:
+    mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
+    double distance(unsigned i) const;
+    double interpoint_distance(unsigned i, unsigned j) const;
+};
+
 class mvn_stats {
     Vector mahalanobis_centered;
     Matrix mahalanobis_pairwise;
 
     double beta_val;
 public:
-    mvn_stats(const Matrix& X, const Clustering& clst, const Matrix& S, const Vector& mean, double beta);
+    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
     mvn_stats() = default;
 
     double pairwise_stat(size_t i, size_t j) const;
@@ -38,15 +49,16 @@ private:
 };
 
 class mvn_test {
-    std::vector<std::shared_ptr<mvn_stats>> stats;
+protected:
+    std::vector<double> pairwise_stat;
+    std::vector<double> center_stat;
+    std::vector<double> betas;
+
     std::shared_ptr<Clustering> clustering;
 
     size_t p;
     size_t n;
     size_t effect_size;
-
-    std::vector<double> pairwise_stat;
-    std::vector<double> center_stat;
 
     mutable std::mt19937 wheel;
 
@@ -54,10 +66,6 @@ class mvn_test {
     std::vector<size_t> the_rest;
 
 public:
-    mvn_test() = default;
-    mvn_test(const mvn_test&);
-    mvn_test& operator=(const mvn_test&);
-    mvn_test(const Matrix& X, const Clustering& clst, const Matrix& S, const Vector& mean);
     size_t dimensions() const;
     size_t sample_size() const;
     size_t subsample_size() const;
@@ -67,12 +75,44 @@ public:
     void swap(mvn_test& other);
 
     const std::vector<size_t>& current_subset() const;
+
     double get_normality_statistic() const;
 
-    double get_pairwise_statistic() const;
-    double get_centered_statistic() const;
-
     friend bool operator<(const mvn_test& lhs, const mvn_test& rhs);
+    virtual std::unique_ptr<mvn_test> clone() = 0;
+
+protected:
+    virtual void remove(unsigned i) = 0;
+    virtual void add(unsigned i) = 0;
+    virtual void compute_statistics() = 0;
+
+    mvn_test(const mvn_test&);
+    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst);
+    mvn_test() = default;
+};
+
+class mvn_test_fixed: public mvn_test {
+    std::vector<std::shared_ptr<mvn_stats>> stats;
+public:
+    mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_test_fixed(const mvn_test_fixed& other);
+
+    void compute_statistics() override;
+    void remove(unsigned i) override;
+    void add(unsigned i) override;
+    std::unique_ptr<mvn_test> clone() override;
+};
+
+class mvn_test_gen: public mvn_test {
+    std::shared_ptr<const Matrix> X;
+public:
+    mvn_test_gen(std::shared_ptr<const Matrix> X, const Clustering& clst);
+    mvn_test_gen(const mvn_test_gen& other);
+
+    void compute_statistics() override;
+    void remove(unsigned i) override;
+    void add(unsigned i) override;
+    std::unique_ptr<mvn_test> clone() override;
 };
 
 }

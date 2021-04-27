@@ -9,14 +9,16 @@
 
 namespace mvn {
 
-subsample::subsample(const mvn::Matrix& X, const Clustering& clst, const mvn::Vector& mean, const mvn::Matrix& cov)
-        :test(X, clst, cov, mean),
+subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& clst, const mvn::Vector& mean, const mvn::Matrix& cov)
+        :test{std::make_shared<mvn_test_fixed>(mvn_test_fixed(X, clst, cov, mean))},
          clst(clst),
          wheel(std::random_device()()) {
     Rcpp::Rcerr << "Test is prepared, mean vector is " << mean << std::endl <<
                 "Covariance matrix is :" << cov << std::endl;
     Rcpp::Rcerr << std::flush;
 }
+
+
 
 void subsample::run(size_t iterations, size_t restarts, double t_start, int pool_size, int start, int size_ub, int step) {
     using std::vector;
@@ -27,32 +29,32 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, int pool
     pool_size = 2;
     cxxpool::thread_pool pool(pool_size);
 
-    while (test.subsample_size() < start) {
-        test.add_one();
+    while (test->subsample_size() < start) {
+        test->add_one();
     }
 
-    while (test.subsample_size() <= size_ub) {
+    while (test->subsample_size() <= size_ub) {
         double t0 = t_start;
         for (size_t i = 0; i < restarts; i++) {
             Rcpp::checkUserInterrupt();
-            std::vector<std::future<mvn_test>> thread_solutions;
+            std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
             for (int t = 0; t < pool_size; t++) {
-                thread_solutions.push_back(pool.push([&test = std::as_const(test), iterations, t0,
-                                                             seed = wheel()]() -> mvn_test {
+                thread_solutions.push_back(pool.push([test = std::as_const(test), iterations, t0,
+                                                             seed = wheel()]() -> std::shared_ptr<mvn_test> {
                     std::mt19937 mersenne_wheel(seed);
                     std::uniform_real_distribution<double> random_unif(0.0, 1.0);
-                    mvn_test local_test = test;
-                    double score = local_test.get_normality_statistic();
+                    std::shared_ptr<mvn_test> local_test = test->clone();
+                    double score = local_test->get_normality_statistic();
                     for (size_t k = 1; k <= iterations; k++) {
                         double t = t0 / (1.0 + std::log((double) k));
-                        local_test.swap_once();
-                        double new_score = local_test.get_normality_statistic();
+                        local_test->swap_once();
+                        double new_score = local_test->get_normality_statistic();
                         if (new_score < score) {
                             score = new_score;
                         } else {
                             double p = std::exp((score - new_score) / t);
                             if (random_unif(mersenne_wheel) >= p) {
-                                local_test.swap_once(true);
+                                local_test->swap_once(true);
                             } else {
                                 score = new_score;
                             }
@@ -63,30 +65,33 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, int pool
             }
 
             for (auto& future: thread_solutions) {
-                test = std::min(test, future.get());
+                std::shared_ptr<mvn_test> thread = future.get();
+                if (*thread < *test) {
+                    test = thread;
+                }
             }
 
-            t0 /= 2.0;
+            t0 /= 4.0;
         }
 
-        best.push_back(test.current_subset());
-        best_scores.push_back(test.get_normality_statistic());
+        best.push_back(test->current_subset());
+        best_scores.push_back(test->get_normality_statistic());
 
-        Rcpp::Rcerr << "Subsampling set of size " << test.subsample_size();
-        Rcpp::Rcerr << ". Current score is " << test.get_normality_statistic() << std::endl;
+        Rcpp::Rcerr << "Subsampling set of size " << test->subsample_size();
+        Rcpp::Rcerr << ". Current score is " << test->get_normality_statistic() << std::endl;
 
-        std::ofstream fout("sets/" + std::to_string(test.subsample_size()) + ".txt");
-        for (int gr: test.current_subset()) {
+        std::ofstream fout("sets/" + std::to_string(test->subsample_size()) + ".txt");
+        for (int gr: test->current_subset()) {
             for (int el: clst.elements(gr)) {
                 fout << el << std::endl;
             }
         }
 
-        if (test.subsample_size() == test.sample_size()) {
+        if (test->subsample_size() == test->sample_size()) {
             return;
         }
         for (int i = 0; i < step; i++) {
-            test.add_one();
+            test->add_one();
         }
     }
 }
@@ -100,6 +105,11 @@ std::vector<size_t> subsample::get_solution(size_t k) const {
 }
 
 subsample::subsample() {}
+
+subsample::subsample(std::shared_ptr<const Matrix> X, const Clustering& clst)
+    :test{std::make_shared<mvn_test_gen>(mvn_test_gen(X, clst))},
+    clst(clst),
+    wheel(std::random_device()()) {}
 
 }
 

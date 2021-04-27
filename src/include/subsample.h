@@ -5,7 +5,7 @@
 #include "mvn_test.h"
 namespace mvn {
 class subsample {
-    mvn_test test;
+    std::shared_ptr<mvn_test> test;
 
     std::vector<std::vector<size_t>> best;
     std::vector<double> best_scores;
@@ -14,9 +14,10 @@ class subsample {
     std::mt19937 wheel;
 public:
     subsample();
-    subsample(const Matrix& X, const Clustering& clst, const Vector& mean, const Matrix& cov);
-    subsample(const subsample&) = default;
-    subsample& operator=(const subsample& other) = default;
+    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov);
+    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst);
+    subsample(subsample&&) = default;
+    subsample& operator=(subsample&& other) = default;
 
     void run(size_t iterations, size_t restarts, double t0, int threads, int start, int size_ub, int step);
 

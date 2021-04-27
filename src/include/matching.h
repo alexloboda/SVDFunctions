@@ -62,8 +62,8 @@ struct matching_results {
 class matching {
     static constexpr double EPS = 1e-6;
 
-    Eigen::MatrixXi controls_gmatrix;
-    Eigen::MatrixXd controls_space;
+    std::shared_ptr<Eigen::MatrixXi> controls_gmatrix;
+    std::shared_ptr<Eigen::MatrixXd> controls_space;
 
     mvn::Clustering clustering;
     mvn::subsample subsampling;
@@ -74,7 +74,7 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(Eigen::MatrixXi controls, Eigen::MatrixXd space, mvn::Clustering clustering);
+    matching(std::shared_ptr<Eigen::MatrixXi> controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, const Eigen::MatrixXd& space, Eigen::VectorXd mean, int threads,
                      int start, int size_ub, int step);
     void set_qchi_sq_function(const std::function<double(double)>& f);

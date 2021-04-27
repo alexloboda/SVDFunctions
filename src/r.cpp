@@ -30,14 +30,14 @@ LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const Numer
 namespace {
 
 template<typename F, typename T, typename D>
-T r_to_cpp_impl(const F& matrix, D default_value) {
-    T eigen_matrix(matrix.nrow(), matrix.ncol());
+std::shared_ptr<T> r_to_cpp_impl(const F& matrix, D default_value) {
+    std::shared_ptr<T> eigen_matrix = std::make_shared<T>(matrix.nrow(), matrix.ncol());
     for (int i = 0; i < matrix.nrow(); i++) {
         for (int j = 0; j < matrix.ncol(); j++) {
             if (matrix(i, j) == Rcpp::NA) {
-                eigen_matrix(i, j) = default_value;
+                eigen_matrix->operator()(i, j) = default_value;
             } else {
-                eigen_matrix(i, j) = matrix(i, j);
+                eigen_matrix->operator()(i, j) = matrix(i, j);
             }
         }
     }
@@ -59,11 +59,11 @@ std::vector<matching::Counts> matrix_to_counts(const Eigen::MatrixXi& matrix) {
 
 }
 
-Eigen::MatrixXi r_to_cpp(const IntegerMatrix& matrix) {
+std::shared_ptr<Eigen::MatrixXi> r_to_cpp(const IntegerMatrix& matrix) {
     return r_to_cpp_impl<IntegerMatrix, Eigen::MatrixXi, int>(matrix, -1);
 }
 
-Eigen::MatrixXd r_to_cpp(const NumericMatrix& matrix) {
+std::shared_ptr<Eigen::MatrixXd> r_to_cpp(const NumericMatrix& matrix) {
     return r_to_cpp_impl<NumericMatrix, Eigen::MatrixXd, double>(matrix, std::numeric_limits<double>::quiet_NaN());
 }
 
@@ -76,17 +76,17 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 }
 
 // [[Rcpp::export]]
-List subsample_mvn(NumericMatrix& matrix, NumericMatrix& cov, NumericVector& mean, IntegerVector size) {
+List subsample_mvn(NumericMatrix& matrix, IntegerVector size) {
     std::vector<int> clusters(matrix.ncol());
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
-    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), r_to_cpp(cov));
-    annealing.run(1000000, 20, 1.0 / 8.0, std::thread::hardware_concurrency(), size[0], size[0], 1);
+    mvn::subsample annealing(r_to_cpp(matrix), clustering);
+    annealing.run(1'000'000, 20, 1.0 / 8.0, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
     List ret;
-    auto points = annealing.get_solution(0);
-    IntegerVector subset(points.begin(), points.end());
-    ret["points"] = subset + 1;
+    //auto points = annealing.get_solution(0);
+    //IntegerVector subset(points.begin(), points.end());
+    //ret["points"] = subset + 1;
 
     return ret;
 }
@@ -121,11 +121,11 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
-    matcher.process_mvn(principal_directions, space_matrix, r_to_cpp(mean), std::thread::hardware_concurrency(),
+    matcher.process_mvn(*principal_directions, *space_matrix, r_to_cpp(mean), std::thread::hardware_concurrency(),
                         min_controls, max_controls, step_clusters);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
-    auto result = matcher.match(matrix_to_counts(case_counts), min_controls);
+    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls);
 
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());
