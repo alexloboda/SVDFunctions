@@ -20,78 +20,63 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
 
 
 
-void subsample::run(size_t iterations, size_t restarts, double t_start, int pool_size, int start, int size_ub, int step) {
+void subsample::run(size_t iterations, size_t restarts, double t_start, double c, int pool_size, int start, int size_ub, int step) {
     using std::vector;
     using namespace std::chrono_literals;
 
-    best.clear() ;
+    best.clear();
     best_scores.clear();
-    pool_size = 2;
+
     cxxpool::thread_pool pool(pool_size);
+    int curr_size = start;
 
-    while (test->subsample_size() < start) {
-        test->add_one();
-    }
-
-    while (test->subsample_size() <= size_ub) {
-        double t0 = t_start;
-        for (size_t i = 0; i < restarts; i++) {
-            Rcpp::checkUserInterrupt();
-            std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
-            for (int t = 0; t < pool_size; t++) {
-                thread_solutions.push_back(pool.push([test = std::as_const(test), iterations, t0,
-                                                             seed = wheel()]() -> std::shared_ptr<mvn_test> {
-                    std::mt19937 mersenne_wheel(seed);
-                    std::uniform_real_distribution<double> random_unif(0.0, 1.0);
-                    std::shared_ptr<mvn_test> local_test = test->clone();
-                    double score = local_test->get_normality_statistic();
-                    for (size_t k = 1; k <= iterations; k++) {
-                        double t = t0 / (1.0 + std::log((double) k));
-                        local_test->swap_once();
-                        double new_score = local_test->get_normality_statistic();
-                        if (new_score < score) {
-                            score = new_score;
+    while (curr_size <= size_ub) {
+        Rcpp::checkUserInterrupt();
+        std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
+        for (int t = 0; t < restarts; t++) {
+            thread_solutions.push_back(pool.push([test = std::as_const(test), iterations, t_start, curr_size, c,
+                                                         seed = wheel()]() -> std::shared_ptr<mvn_test> {
+                double t = t_start;
+                std::mt19937 mersenne_wheel(seed);
+                std::shared_ptr<mvn_test> local_test = test->clone();
+                while (test->subsample_size() < curr_size) {
+                    local_test->add_one();
+                }
+                std::uniform_real_distribution<double> random_unif(0.0, 1.0);
+                double score = local_test->get_normality_statistic();
+                for (size_t k = 0; k < iterations; k++) {
+                    t = c * t;
+                    local_test->swap_once();
+                    double new_score = local_test->get_normality_statistic();
+                    if (new_score < score) {
+                        score = new_score;
+                    } else {
+                        double p = std::exp((score - new_score) / t);
+                        if (random_unif(mersenne_wheel) >= p) {
+                            local_test->swap_once(true);
                         } else {
-                            double p = std::exp((score - new_score) / t);
-                            if (random_unif(mersenne_wheel) >= p) {
-                                local_test->swap_once(true);
-                            } else {
-                                score = new_score;
-                            }
+                            score = new_score;
                         }
                     }
-                    return local_test;
-                }));
-            }
-
-            for (auto& future: thread_solutions) {
-                std::shared_ptr<mvn_test> thread = future.get();
-                if (*thread < *test) {
-                    test = thread;
                 }
-            }
+                return local_test;
+            }));
+        }
 
-            t0 /= 4.0;
+        for (auto& future: thread_solutions) {
+            std::shared_ptr<mvn_test> thread = future.get();
+            if (*thread < *test) {
+                test = thread;
+            }
         }
 
         best.push_back(test->current_subset());
         best_scores.push_back(test->get_normality_statistic());
 
-        Rcpp::Rcerr << "Subsampling set of size " << test->subsample_size();
-        Rcpp::Rcerr << ". Current score is " << test->get_normality_statistic() << std::endl;
+        curr_size += step;
 
-        std::ofstream fout("sets/" + std::to_string(test->subsample_size()) + ".txt");
-        for (int gr: test->current_subset()) {
-            for (int el: clst.elements(gr)) {
-                fout << el << std::endl;
-            }
-        }
-
-        if (test->subsample_size() == test->sample_size()) {
+        if (curr_size > test->sample_size()) {
             return;
-        }
-        for (int i = 0; i < step; i++) {
-            test->add_one();
         }
     }
 }

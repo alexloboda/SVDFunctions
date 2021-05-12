@@ -19,7 +19,7 @@ public:
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 
-    void run(size_t iterations, size_t restarts, double t0, int threads, int start, int size_ub, int step);
+    void run(size_t iterations, size_t restarts, double t0, double c, int threads, int start, int size_ub, int step);
 
     std::vector<size_t> get_solution(size_t size) const;
     size_t solutions() const;

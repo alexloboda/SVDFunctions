@@ -201,6 +201,17 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
 }
 
+filterCluster <- function(gmatrix, cluster, rate) {
+  gm <- gmatrix[, cluster]
+  gm <- gm - rowMeans(gm)
+  svd <- t(RSpectra::svds(gm, 10)$v)
+  
+  n <- ncol(svd)
+  size <- min(n, ceiling(n * rate))
+  subsample <- normal_subsample(svd, size) 
+  cluster(subsample$points)
+}
+
 #' prepare instance and write yaml file from QC-ed gmatrix
 #' @param gmatrix gmatrix with imputed missing values
 #' @param imputationResults matrix indicating which genotypes
@@ -215,7 +226,8 @@ writeYaml <- function(clusterResults, clustering, variants,
 #' @import mclust
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
-                              maxVectors = 50, title = "DNAScoreInput", MAC = 10, MAF = 0.01) {
+                             maxVectors = 100, title = "DNAScoreInput", MAC = 10, MAF = 0.01,
+                             eliminationRate = 0.1) {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
     clusters <- clustering(setNames(classes, colnames(gmatrix)), 
@@ -242,9 +254,18 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
   gmatrix <- gmatrix[passVariants, ]
   gmatrixForCounts <- gmatrixForCounts[passVariants, ]
   clusterResults <- vector("list", numberOfClusters)
-  for (i in 1:numberOfClusters) {
-    cluster <- which(clusters$samples == i)
+  clusters$hier$Do(function(node) {
+    if (node$isRoot) {
+      return()
+    }
+    cls <- sapply(node$leaves, function(node) node$id)
+    i <- node$id
+    
+    cluster <- which(clusters$samples %in% cls)
+    
+    cluster <- filterCluster(gmatrix, cluster, 1 - eliminationRate)
     clusterGenotypes <- gmatrix[, cluster]
+    
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
     k <- min(length(cluster), nrow(gmatrix), maxVectors)
@@ -256,7 +277,7 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
     clusterResults[[i]] <- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
-  }
+  })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
 }

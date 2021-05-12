@@ -24,7 +24,7 @@ cats <- function(file, depth, ...) {
 
 writePopulationStructure <- function(tree, classes, fd) {
   tree$Do(function(node) {
-    if (node$level == 1) {
+    if (node$isRoot) {
       cats(fd, 0, "hierarchy:\n")
       return()
     }
@@ -35,7 +35,8 @@ writePopulationStructure <- function(tree, classes, fd) {
       cats(fd, margin + 2 , "id: ", node$id, "\n")
       cats(fd, margin + 2, "name: ", node$name, "\n")
     } else {
-      cats(fd, 0, "split:\n")
+      cats(fd, 0, "id: ", node$id, "\n")
+      cats(fd, margin, "split:\n")
     }
   })
 }
@@ -50,6 +51,16 @@ recTree <- function(tree, hier, classes) {
     recTree(node, hier[[1]], classes)
     recTree(node, hier[[2]], classes)
   }
+}
+
+update.nodes <- function(cl) {
+  i <- cl$hier$leafCount
+  cl$hier$Do(function(node) {
+    if (!node$isRoot && !node$isLeaf) {
+      node$id <- i
+      i <<- i + 1
+    }
+  })  
 }
 
 #' Constructor for clustering object
@@ -74,8 +85,10 @@ clustering <- function(classification, hierarchy) {
   
   tree <- data.tree::Node$new("Population structure")
   recTree(tree, hierarchy, classes)
-  structure(list(classes = classes, samples = classification,
+  obj <- structure(list(classes = classes, samples = classification,
                  hier = tree), class = "clustering")
+  update.nodes(obj)
+  obj
 }
 
 normalizeClustering <- function(clustering) {
@@ -91,6 +104,7 @@ normalizeClustering <- function(clustering) {
   names(clustering$samples) <- samples
   clustering$hier$Do(function(node) node$id = map[[node$id]], 
                      filterFun = data.tree::isLeaf)
+  update.nodes(clustering)
   clustering
 }
 

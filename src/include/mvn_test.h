@@ -17,13 +17,14 @@ class Clustering {
 public:
     explicit Clustering(const std::vector<int>& clustering);
     Clustering() = default;
-    std::vector<int> elements(size_t i) const;
+    const std::vector<int>& elements(size_t i) const;
     size_t size() const;
     size_t cluster_size(size_t i) const;
 };
 
 class mahalanobis_distances {
-    Matrix xixj;
+    Matrix distances;
+    Vector diag;
     Matrix muxi;
     Matrix ximu;
     double mumu;
@@ -36,15 +37,12 @@ public:
 class mvn_stats {
     Vector mahalanobis_centered;
     Matrix mahalanobis_pairwise;
-
-    double beta_val;
 public:
     mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
     mvn_stats() = default;
 
     double pairwise_stat(size_t i, size_t j) const;
     double centered_stat(size_t i) const;
-    double beta() const;
 private:
 };
 
@@ -72,13 +70,13 @@ public:
 
     void add_one();
     void swap_once(bool reject_last = false);
-    void swap(mvn_test& other);
 
     const std::vector<size_t>& current_subset() const;
 
-    double get_normality_statistic() const;
+    double get_normality_statistic();
 
-    friend bool operator<(const mvn_test& lhs, const mvn_test& rhs);
+    friend bool operator<(mvn_test& lhs, mvn_test& rhs);
+    virtual std::vector<double> loglikelihood(const std::vector<int>& ids) const = 0;
     virtual std::unique_ptr<mvn_test> clone() = 0;
 
 protected:
@@ -92,6 +90,7 @@ protected:
 };
 
 class mvn_test_fixed: public mvn_test {
+    mahalanobis_distances distances;
     std::vector<std::shared_ptr<mvn_stats>> stats;
 public:
     mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
@@ -101,6 +100,7 @@ public:
     void remove(unsigned i) override;
     void add(unsigned i) override;
     std::unique_ptr<mvn_test> clone() override;
+    std::vector<double> loglikelihood(const std::vector<int>& ids) const override;
 };
 
 class mvn_test_gen: public mvn_test {
@@ -113,6 +113,7 @@ public:
     void remove(unsigned i) override;
     void add(unsigned i) override;
     std::unique_ptr<mvn_test> clone() override;
+    std::vector<double> loglikelihood(const std::vector<int>& ids) const override;
 };
 
 }

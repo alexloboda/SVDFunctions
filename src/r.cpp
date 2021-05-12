@@ -81,12 +81,12 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size) {
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
     mvn::subsample annealing(r_to_cpp(matrix), clustering);
-    annealing.run(1'000'000, 20, 1.0 / 8.0, std::thread::hardware_concurrency(), size[0], size[0], 1);
+    annealing.run(25'000, 10, 1.0, 0.99925, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
     List ret;
-    //auto points = annealing.get_solution(0);
-    //IntegerVector subset(points.begin(), points.end());
-    //ret["points"] = subset + 1;
+    auto points = annealing.get_solution(0);
+    IntegerVector subset(points.begin(), points.end());
+    ret["points"] = subset + 1;
 
     return ret;
 }

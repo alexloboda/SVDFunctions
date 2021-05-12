@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <unordered_set>
+#include <iostream>
 
 #include "include/mvn_test.h"
 
@@ -14,11 +15,8 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst)
         throw std::invalid_argument("Matrix is empty");
     }
 
-    double beta = 0.2;
-    while (beta < 2) {
-        betas.push_back(beta);
-        beta *= 2;
-    }
+    betas.push_back(std::sqrt(2.0) / (1.376 + 0.075 * X->rows()));
+
     pairwise_stat.resize(betas.size(), 0.0);
     center_stat.resize(betas.size(), 0.0);
 
@@ -34,7 +32,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst)
     }
 }
 
-double mvn_test::get_normality_statistic() const {
+double mvn_test::get_normality_statistic() {
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
     }
@@ -55,8 +53,7 @@ const std::vector<size_t>& mvn_test::current_subset() const {
 
 mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta)
     :mahalanobis_centered(Vector::Zero(clst.size())),
-     mahalanobis_pairwise(Matrix::Zero(clst.size(), clst.size())),
-     beta_val(beta) {
+     mahalanobis_pairwise(Matrix::Zero(clst.size(), clst.size())) {
     size_t n = clst.size();
 
     double k_center = -(beta * beta / (2 * (1 + beta * beta)));
@@ -84,10 +81,6 @@ double mvn_stats::pairwise_stat(size_t i, size_t j) const {
 
 double mvn_stats::centered_stat(size_t i) const {
     return mahalanobis_centered(i);
-}
-
-double mvn_stats::beta() const {
-    return beta_val;
 }
 
 size_t mvn_test::dimensions() const {
@@ -133,8 +126,30 @@ void mvn_test::add_one() {
         throw std::logic_error("Can't add point to the model.");
     }
 
-    std::uniform_int_distribution<unsigned> random(0, the_rest.size() - 1);
-    unsigned pos = random(wheel);
+    std::vector<int> ids;
+    for (int cluster: the_rest) {
+        for (int el: clustering->elements(cluster)) {
+            ids.push_back(el);
+        }
+    }
+
+    auto lls = loglikelihood(ids);
+    double maxLL = *std::max_element(lls.begin(), lls.end());
+
+    std::vector<double> prefix_sums;
+    double sum = 0.0;
+    for (int i = 0; i < lls.size(); i++) {
+        double ll = std::exp(lls[i] - maxLL);
+        sum += ll;
+        prefix_sums.push_back(sum);
+    }
+    prefix_sums.pop_back();
+
+    std::uniform_real_distribution<double> random(0.0, sum);
+    double needle = random(wheel);
+    auto it = std::upper_bound(prefix_sums.begin(), prefix_sums.end(), needle);
+    auto pos = std::distance(prefix_sums.begin(), it);
+
     size_t point = the_rest[pos];
     effect_size += clustering->cluster_size(point);
     std::swap(the_rest[pos], the_rest[the_rest.size() - 1]);
@@ -144,28 +159,21 @@ void mvn_test::add_one() {
     add(point);
 }
 
-bool operator<(const mvn_test& lhs, const mvn_test& rhs) {
+bool operator<(mvn_test& lhs, mvn_test& rhs) {
     return lhs.get_normality_statistic() < rhs.get_normality_statistic();
 }
 
 mvn_test::mvn_test(const mvn_test& other)
-    :clustering(other.clustering),
+    :center_stat(other.center_stat),
+     pairwise_stat(other.pairwise_stat),
+     betas(other.betas),
+     clustering(other.clustering),
      p(other.p),
      n(other.n),
      effect_size(other.effect_size),
      wheel{other.wheel()},
      subset(other.subset),
      the_rest(other.the_rest) {}
-
-void mvn_test::swap(mvn_test& other) {
-    std::swap(other.clustering, clustering);
-    std::swap(other.p, p);
-    std::swap(other.n, n);
-    std::swap(other.subset, subset);
-    std::swap(other.the_rest, the_rest);
-    std::swap(other.wheel, wheel);
-    std::swap(other.effect_size, effect_size);
-}
 
 Clustering::Clustering(const std::vector<int>& clustering) {
     if (clustering.empty()) {
@@ -186,7 +194,7 @@ size_t Clustering::size() const {
     return clusters.size();
 }
 
-std::vector<int> Clustering::elements(size_t i) const {
+const std::vector<int>& Clustering::elements(size_t i) const {
     return clusters.at(i);
 }
 
@@ -204,21 +212,21 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
 
     ximu = X->transpose() * S_inv * mean;
     muxi = mean.transpose() * S_inv * *X;
-    xixj = X->transpose() * S_inv * *X;
+    distances = X->transpose() * S_inv * *X;
     mumu = mean.transpose() * S_inv * mean;
+    diag = distances.diagonal();
 }
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
-    return xixj(i, i) - xixj(i, j) - xixj(j, i) + xixj(j, j);
+    return diag(i) - 2 *  distances(i, j) + diag(j);
 }
 
 double mahalanobis_distances::distance(unsigned el) const {
-    return xixj(el, el) - ximu(el) - muxi(el) + mumu;
+    return diag(el) - ximu(el) - muxi(el) + mumu;
 }
 
 mvn_test_fixed::mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
-        :mvn_test(X, clst) {
-    mahalanobis_distances distances(X, S, mean);
+        : mvn_test(X, clst), distances(X, S, mean) {
 
     for (double beta: betas) {
         stats.push_back(std::make_shared<mvn_stats>(distances, clst, beta));
@@ -256,33 +264,49 @@ std::unique_ptr<mvn_test> mvn_test_fixed::clone() {
     return std::make_unique<mvn_test_fixed>(*this);
 }
 
-mvn_test_fixed::mvn_test_fixed(const mvn_test_fixed& other) :mvn_test(other), stats(other.stats) {}
+mvn_test_fixed::mvn_test_fixed(const mvn_test_fixed& other) :mvn_test(other), distances(other.distances), stats(other.stats) {}
 
 void mvn_test_fixed::compute_statistics() {}
+
+std::vector<double> mvn_test_fixed::loglikelihood(const std::vector<int>& ids) const {
+    std::vector<double> ret;
+    for (int id: ids) {
+        ret.push_back(-0.5 * distances.distance(id));
+    }
+    return ret;
+}
 
 mvn_test_gen::mvn_test_gen(std::shared_ptr<const Matrix> X, const Clustering& clst) : mvn_test(X, clst), X(X) {}
 
 mvn_test_gen::mvn_test_gen(const mvn_test_gen& other) :mvn_test(other), X(other.X) {}
 
+namespace {
+    mahalanobis_distances subset_distances(std::shared_ptr<const Matrix> X, std::vector<int> columns) {
+        std::shared_ptr<Matrix> Xs = std::make_shared<Matrix>(X->rows(), columns.size());
+        for (int i = 0; i < columns.size(); i++) {
+            Xs->col(i) = X->col(columns[i]);
+        }
+        Vector mean = Xs->rowwise().mean();
+        Matrix centered = Xs->colwise() - mean;
+        Matrix cov = (centered * centered.adjoint()) / double(centered.cols() - 1);
+        mahalanobis_distances distances(Xs, cov, mean);
+        return {Xs, cov, mean};
+    }
+}
+
 void mvn_test_gen::compute_statistics() {
-    std::vector<unsigned> columns;
+    std::vector<int> columns;
     for (size_t s: subset) {
         columns.insert(columns.end(), clustering->elements(s).begin(), clustering->elements(s).end());
     }
-    std::shared_ptr<Matrix> Xs = std::make_shared<Matrix>(X->rows(), columns.size());
-    for (int i = 0; i < columns.size(); i++) {
-        Xs->col(i) = X->col(columns[i]);
-    }
-    Vector mean = Xs->rowwise().mean();
-    Matrix centered = Xs->colwise() - mean;
-    Matrix cov = (centered * centered.adjoint()) / double(centered.cols() - 1);
-    mahalanobis_distances distances(Xs, cov, mean);
 
+    auto distances = subset_distances(X, columns);
     for (unsigned ibeta = 0; ibeta < betas.size(); ibeta++) {
         double beta = betas[ibeta];
         mvn_stats stats(distances, *clustering, beta);
         center_stat[ibeta] = 0.0;
-        auto n = Xs->cols();
+        pairwise_stat[ibeta] = 0.0;
+        auto n = columns.size();
         for (unsigned i = 0; i < n; i++) {
             center_stat[ibeta] += stats.centered_stat(i);
             for (unsigned j = 0; j < i; j++) {
@@ -293,12 +317,29 @@ void mvn_test_gen::compute_statistics() {
     }
 }
 
-void mvn_test_gen::remove(unsigned int i) {}
+void mvn_test_gen::remove(unsigned int i) {
+    if (subsample_size() > p + 1) {
+        compute_statistics();
+    }
+}
 
-void mvn_test_gen::add(unsigned int i) {}
+void mvn_test_gen::add(unsigned int i) {
+    if (subsample_size() > p + 1) {
+        compute_statistics();
+    }
+}
 
 std::unique_ptr<mvn_test> mvn_test_gen::clone() {
     mvn_test_gen copy(*this);
     return std::make_unique<mvn_test_gen>(copy);
+}
+
+std::vector<double> mvn_test_gen::loglikelihood(const std::vector<int>& ids) const {
+    auto distances = subset_distances(X, ids);
+    std::vector<double> ret;
+    for (int i = 0; i < ids.size(); i++) {
+        ret.push_back(-0.5 * distances.distance(i));
+    }
+    return ret;
 }
 }

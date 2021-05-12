@@ -181,7 +181,7 @@ void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector
     Rcpp::Rcerr << "Subsampling started" << std::endl;
     subsampling = mvn::subsample(rs_controls_gmatrix, clustering, rs_mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances successfully have been calculated." << std::endl;
-    subsampling.run(10000, 10, 1.0 / 16.0, threads, start, ub, step);
+    subsampling.run(25000, 10, 1.0 , 0.99925, threads, start, ub, step);
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
