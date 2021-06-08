@@ -51,7 +51,7 @@ collapsingToTree <- function(collapsing) {
 #' @param clusters maximum number of clusters
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
-                                   minClusters = 1, clusters = 20, keepSamples = NULL) {
+                                   minClusters = 1, clusters = 20) {
   stopifnot(class(PCA) %in% c("matrix", "data.frame", "array"))
   clResults <- mclust::Mclust(data = PCA, G = minClusters:clusters, modelNames = "VVV")
   if (plotBIC) {
@@ -69,21 +69,7 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
   if (plotDendrogram & clusters > 1) {
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
   }
-  if(is.null(keepSamples)){
-    keepSamples <- rownames(PCA)
-  }
-  res <- clustering(clResults$classification, collapsingToTree(collapsing))
-  if(!all(rownames(PCA) %in% keepSamples)){
-    clustersToRemove <- setdiff(clResults$classification, clResults$classification[keepSamples])
-    clustersToRemove <- unique(clustersToRemove)
-    if(length(clustersToRemove) > 0){
-      for(i in 1:length(clustersToRemove)){
-        res <- SVDFunctions::removeCluster(res, clustersToRemove[i])
-      }
-    }
-  }
-  res$samples <- res$samples[keepSamples]
-  res
+  clustering(clResults$classification, collapsingToTree(collapsing))
 }
 
 #' Estimate PCA from gmatrix without missing values 
@@ -209,7 +195,7 @@ filterCluster <- function(gmatrix, cluster, rate) {
   n <- ncol(svd)
   size <- min(n, ceiling(n * rate))
   subsample <- normal_subsample(svd, size) 
-  cluster(subsample$points)
+  cluster[subsample$points]
 }
 
 #' prepare instance and write yaml file from QC-ed gmatrix
@@ -223,6 +209,7 @@ filterCluster <- function(gmatrix, cluster, rate) {
 #' @param clusters clustering object
 #' @param MAC minor allele count used for QC
 #' @param MAF minor allele frequency used for QC
+#' @param elimiinationRate the part of dataset that can be dropped to make the data well shaped
 #' @import mclust
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
@@ -274,7 +261,7 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
     US <- svdResult$u %*% diag(svdResult$d)
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
-    clusterResults[[i]] <- list(US = US, counts = counts, 
+    clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
   })
@@ -284,8 +271,9 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
 
 processHierarchy <- function(hier) {
   if (names(hier) == "split") {
-    list(left = processHierarchy(hier$split[[1]]), 
-         right = processHierarchy(hier$split[[2]]), 
+    list(left = processHierarchy(hier$split$left), 
+         right = processHierarchy(hier$split$right), 
+         id = hier$split$id, 
          type = "split")
   } else {
     c(hier$cluster, list(type = "leaf"))
@@ -297,10 +285,13 @@ getNamesFromHier <- function(hier) {
     userError("Incorrect hierarchy section in the input YML file.")
   }
   if (names(hier) == "split") {
-    if (length(hier$split) != 2) {
+    if (length(hier$split) != 3) {
       userError("Incorrect hierarchy section in the input YML file.")
     }
-    c(getNamesFromHier(hier$split[[1]]), getNamesFromHier(hier$split[[2]]))
+    if (!setequal(names(hier$cluster), c("id", "left", "right"))) {
+      userError("Incorrect hierarchy section in the input YML file.")
+    }
+    c(getNamesFromHier(hier$split$left), getNamesFromHier(hier$split$right))
   }  else {
     if (!setequal(names(hier$cluster), c("id", "name"))) {
       userError("Incorrect hierarchy section in the input YML file.")
@@ -360,3 +351,4 @@ readInstanceFromYml <- function(filename) {
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
+

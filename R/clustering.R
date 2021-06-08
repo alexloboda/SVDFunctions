@@ -22,23 +22,25 @@ cats <- function(file, depth, ...) {
   cat(spaces(depth), ..., file = file, sep = "")
 }
 
-writePopulationStructure <- function(tree, classes, fd) {
-  tree$Do(function(node) {
-    if (node$isRoot) {
-      cats(fd, 0, "hierarchy:\n")
-      return()
-    }
-    margin <- node$level - 2
-    cats(fd, margin, "", ifelse(node$level == 2, "  ", "- "))
-    if (data.tree::isLeaf(node)) {
-      cats(fd, 0, "cluster:\n")
-      cats(fd, margin + 2 , "id: ", node$id, "\n")
-      cats(fd, margin + 2, "name: ", node$name, "\n")
-    } else {
-      cats(fd, 0, "id: ", node$id, "\n")
-      cats(fd, margin, "split:\n")
-    }
-  })
+writePopulationStructure <- function(tree, classes, fd, margin = 0) {
+  node <- tree
+  if (node$isRoot) {
+    cats(fd, 0, "hierarchy:\n")
+    writePopulationStructure(node$children[[1]], classes, fd, 1)
+    return()
+  }
+  if (data.tree::isLeaf(node)) {
+    cats(fd, margin, "cluster:\n")
+    cats(fd, margin + 1 , "id: ", node$id, "\n")
+    cats(fd, margin + 1, "name: ", node$name, "\n")
+  } else {
+    cats(fd, margin, "split:\n")
+    cats(fd, margin + 1, "id: ", node$id, "\n")
+    cats(fd, margin + 1, "left:\n")
+    writePopulationStructure(node$children[[1]], classes, fd, margin + 2)
+    cats(fd, margin + 1, "right:\n")
+    writePopulationStructure(node$children[[2]], classes, fd, margin + 2)
+  }
 }
 
 recTree <- function(tree, hier, classes) {
@@ -54,7 +56,7 @@ recTree <- function(tree, hier, classes) {
 }
 
 update.nodes <- function(cl) {
-  i <- cl$hier$leafCount
+  i <- cl$hier$leafCount + 1
   cl$hier$Do(function(node) {
     if (!node$isRoot && !node$isLeaf) {
       node$id <- i

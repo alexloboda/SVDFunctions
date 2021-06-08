@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cmath>
 #include <unordered_set>
-#include <iostream>
 
 #include "include/mvn_test.h"
 
@@ -15,7 +14,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst)
         throw std::invalid_argument("Matrix is empty");
     }
 
-    betas.push_back(std::sqrt(2.0) / (1.376 + 0.075 * X->rows()));
+    betas = {0.4, 0.8, 1.6, 3.2};
 
     pairwise_stat.resize(betas.size(), 0.0);
     center_stat.resize(betas.size(), 0.0);
@@ -134,21 +133,20 @@ void mvn_test::add_one() {
     }
 
     auto lls = loglikelihood(ids);
-    double maxLL = *std::max_element(lls.begin(), lls.end());
 
-    std::vector<double> prefix_sums;
-    double sum = 0.0;
-    for (int i = 0; i < lls.size(); i++) {
-        double ll = std::exp(lls[i] - maxLL);
-        sum += ll;
-        prefix_sums.push_back(sum);
+    // find the cluster closest to the center
+    std::vector<double> cl_lls;
+    int i = 0;
+    for (int cl: the_rest) {
+        double mean = 0.0;
+        for (int j = 0; j < clustering->cluster_size(cl); j++) {
+            mean += lls[i + j];
+        }
+        mean /= (double)clustering->cluster_size(cl);
+        i += clustering->cluster_size(cl);
+        cl_lls.push_back(mean);
     }
-    prefix_sums.pop_back();
-
-    std::uniform_real_distribution<double> random(0.0, sum);
-    double needle = random(wheel);
-    auto it = std::upper_bound(prefix_sums.begin(), prefix_sums.end(), needle);
-    auto pos = std::distance(prefix_sums.begin(), it);
+    int pos = std::distance(cl_lls.begin(), std::max_element(cl_lls.begin(), cl_lls.end()));
 
     size_t point = the_rest[pos];
     effect_size += clustering->cluster_size(point);
@@ -226,10 +224,10 @@ double mahalanobis_distances::distance(unsigned el) const {
 }
 
 mvn_test_fixed::mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
-        : mvn_test(X, clst), distances(X, S, mean) {
+        : mvn_test(X, clst), distances{std::make_shared<mahalanobis_distances>(X, S, mean)} {
 
     for (double beta: betas) {
-        stats.push_back(std::make_shared<mvn_stats>(distances, clst, beta));
+        stats.push_back(std::make_shared<mvn_stats>(*distances, clst, beta));
     }
 
     while (effect_size < p + 1) {
@@ -255,7 +253,7 @@ void mvn_test_fixed::add(unsigned int point) {
             pairwise_stat[i] += 2 * stats[i]->pairwise_stat(point, s);
         }
     }
-for (size_t i = 0; i < stats.size(); i++) {
+    for (size_t i = 0; i < stats.size(); i++) {
         center_stat[i] += stats[i]->centered_stat(point);
     }
 }
@@ -271,36 +269,54 @@ void mvn_test_fixed::compute_statistics() {}
 std::vector<double> mvn_test_fixed::loglikelihood(const std::vector<int>& ids) const {
     std::vector<double> ret;
     for (int id: ids) {
-        ret.push_back(-0.5 * distances.distance(id));
+        ret.push_back(-0.5 * distances->distance(id));
     }
     return ret;
 }
 
 mvn_test_gen::mvn_test_gen(std::shared_ptr<const Matrix> X, const Clustering& clst) : mvn_test(X, clst), X(X) {}
 
-mvn_test_gen::mvn_test_gen(const mvn_test_gen& other) :mvn_test(other), X(other.X) {}
+mvn_test_gen::mvn_test_gen(const mvn_test_gen& other) :mvn_test(other), X(other.X) {
+}
 
 namespace {
-    mahalanobis_distances subset_distances(std::shared_ptr<const Matrix> X, std::vector<int> columns) {
+    std::vector<int> cluster_fold(std::shared_ptr<Clustering> clustering, const std::vector<size_t>& clusters) {
+        std::vector<int> ret;
+        for (int cluster: clusters) {
+            auto& cls = clustering->elements(cluster);
+            ret.insert(ret.end(), cls.begin(), cls.end());
+        }
+        return ret;
+    }
+
+    std::shared_ptr<Matrix> matrix_subset(std::shared_ptr<const Matrix> X, std::vector<int> columns) {
         std::shared_ptr<Matrix> Xs = std::make_shared<Matrix>(X->rows(), columns.size());
         for (int i = 0; i < columns.size(); i++) {
             Xs->col(i) = X->col(columns[i]);
         }
-        Vector mean = Xs->rowwise().mean();
-        Matrix centered = Xs->colwise() - mean;
-        Matrix cov = (centered * centered.adjoint()) / double(centered.cols() - 1);
-        mahalanobis_distances distances(Xs, cov, mean);
-        return {Xs, cov, mean};
+        return Xs;
+    }
+
+    mahalanobis_distances subset_distances(std::shared_ptr<const Matrix> X, const std::vector<int>& subset,
+                                           const std::vector<int>& columns, bool euclidean = false) {
+        auto Xs = matrix_subset(X, columns);
+        auto Xsubset = matrix_subset(X, subset);
+        Vector mean = Xsubset->rowwise().mean();
+        Matrix centered = Xsubset->colwise() - mean;
+        if (euclidean) {
+            Matrix cov = Eigen::MatrixXd::Identity(centered.rows(), centered.rows());
+            return {Xs, cov, mean};
+        } else {
+            Matrix cov = (centered * centered.adjoint()) / double(centered.cols() - 1);
+            return {Xs, cov, mean};
+        }
     }
 }
 
 void mvn_test_gen::compute_statistics() {
-    std::vector<int> columns;
-    for (size_t s: subset) {
-        columns.insert(columns.end(), clustering->elements(s).begin(), clustering->elements(s).end());
-    }
+    auto columns = cluster_fold(clustering, subset);
 
-    auto distances = subset_distances(X, columns);
+    auto distances = subset_distances(X, columns, columns);
     for (unsigned ibeta = 0; ibeta < betas.size(); ibeta++) {
         double beta = betas[ibeta];
         mvn_stats stats(distances, *clustering, beta);
@@ -335,7 +351,16 @@ std::unique_ptr<mvn_test> mvn_test_gen::clone() {
 }
 
 std::vector<double> mvn_test_gen::loglikelihood(const std::vector<int>& ids) const {
-    auto distances = subset_distances(X, ids);
+    if (subset.size() == 0) {
+        std::vector<double> ret;
+        std::uniform_real_distribution<double> random;
+        for (int i = 0; i < ids.size(); i++) {
+            ret.push_back(random(wheel));
+        }
+        return ret;
+    }
+    auto sub = cluster_fold(clustering, subset);
+    auto distances = subset_distances(X, sub, ids, true);
     std::vector<double> ret;
     for (int i = 0; i < ids.size(); i++) {
         ret.push_back(-0.5 * distances.distance(i));

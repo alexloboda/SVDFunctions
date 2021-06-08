@@ -90,7 +90,7 @@ protected:
 };
 
 class mvn_test_fixed: public mvn_test {
-    mahalanobis_distances distances;
+    std::shared_ptr<mahalanobis_distances> distances;
     std::vector<std::shared_ptr<mvn_stats>> stats;
 public:
     mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
