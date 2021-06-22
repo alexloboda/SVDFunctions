@@ -93,8 +93,7 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size) {
 
 // [[Rcpp::export]]
 List select_controls_cpp(IntegerMatrix& gmatrix,
-                     NumericMatrix& gmatrix_imputed,
-                     NumericMatrix& space,
+                     NumericMatrix& gmatrix_rs,
                      NumericVector& mean, NumericMatrix& directions,
                      IntegerMatrix& cc, IntegerVector& clustering,
                      NumericVector& chi2fn,
@@ -104,11 +103,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
-    auto gmatrix_c = r_to_cpp(gmatrix);
-    auto gmatrix_full = r_to_cpp(gmatrix_imputed);
+    auto gmatrix_counts = r_to_cpp(gmatrix);
     auto case_counts = r_to_cpp(cc);
     auto principal_directions = r_to_cpp(directions);
-    auto space_matrix = r_to_cpp(space);
+    auto space = r_to_cpp(gmatrix_rs);
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
 
@@ -117,7 +115,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int step_clusters = step[0];
     mvn::Clustering cl(clust_vec);
 
-    matching::matching matcher(gmatrix_c, gmatrix_full, cl);
+    matching::matching matcher(gmatrix_counts, space, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});

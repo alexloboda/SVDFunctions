@@ -47,18 +47,18 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param maxLambda Maximum possible lambda
 #' @param min Minimal size of a control set that is permitted for return
 #' @export
-selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference, 
-                            meanGenotype, caseCounts, controlsClustering = NULL, minLambda = 0.75, 
+selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
+                            casesMean, SVDReference, controlsMean, caseCounts, 
+                            controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
-                            min = 500, max = 1000, step = 50, SV = 3) {
+                            min = 500, max = 1000, step = 50) {
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
   mode(originalGenotypeMatrix) <- "integer"
   stopifnot(all(!is.na(genotypeMatrix)))
-  if (nrow(genotypeMatrix) != nrow(caseCounts) || nrow(genotypeMatrix) != 
-      nrow(SVDReference)) {
+  if (nrow(genotypeMatrix) != nrow(caseCounts)) {
     stop("Check dimensions of the matrices")
   }
   cl <- controlsClustering
@@ -69,24 +69,18 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, SVDReference
     cl <- as.integer(as.factor(cl)) - 1
   }
   stopifnot(all(!is.na(cl)))
-  contMeans <- rowMeans(genotypeMatrix)
-  caseMeans <- apply(caseCounts, 1, function(x){
-    (x[2] + 2 * x[3]) / sum(x)
-  })
+  
+  genotypeMatrix <- genotypeMatrix - controlsMean
+  genotypeMatrix <- t(SVDReference) %*% genotypeMatrix
   
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix
   
-  controlSpaceSVD <- RSpectra::svds(genotypeMatrix - contMeans, k = SV)
-  
-  N <- max(apply(caseCounts, 1, sum))
-  principalDirections <- SVDReference * (1 / sqrt(N - 1))
-  
   result <- select_controls_cpp(gmatrix, 
                                 genotypeMatrix, 
-                                controlSpaceSVD$u, 
-                                meanGenotype, 
-                                principalDirections, 
+                                SVDReference, 
+                                casesMean, 
+                                casesPDs, 
                                 caseCounts, 
                                 cl, 
                                 stats::qchisq(stats::ppoints(1e+05), df = 1), 

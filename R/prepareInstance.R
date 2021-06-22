@@ -51,9 +51,12 @@ collapsingToTree <- function(collapsing) {
 #' @param clusters maximum number of clusters
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
-                                   minClusters = 1, clusters = 20) {
+                                   minClusters = 1, clusters = 20, keepSamples = NULL) {
   stopifnot(class(PCA) %in% c("matrix", "data.frame", "array"))
   clResults <- mclust::Mclust(data = PCA, G = minClusters:clusters, modelNames = "VVV")
+  if (is.null(clResults)) {
+    stop("Couldn't fit gaussian mixed model to data. Try another range of clusters.") 
+  }
   if (plotBIC) {
     mclust::plot.Mclust(x = clResults, what = "BIC", xlab = "Number of Components", 
                         ylab = "Bayesian Information Criterion")
@@ -69,7 +72,21 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
   if (plotDendrogram & clusters > 1) {
     mclust::combiTree(clCombi, type = "rectangle", yaxis = "entropy")
   }
-  clustering(clResults$classification, collapsingToTree(collapsing))
+  if(is.null(keepSamples)){
+    keepSamples <- rownames(PCA)
+  }
+  res <- clustering(clResults$classification, collapsingToTree(collapsing))
+  if(!all(rownames(PCA) %in% keepSamples)){
+    clustersToRemove <- setdiff(clResults$classification, clResults$classification[keepSamples])
+    clustersToRemove <- unique(clustersToRemove)
+    if(length(clustersToRemove) > 0){
+      for(i in 1:length(clustersToRemove)){
+        res <- SVDFunctions::removeCluster(res, clustersToRemove[i])
+      }
+    }
+  }
+  res$samples <- res$samples[keepSamples]
+  res
 }
 
 #' Estimate PCA from gmatrix without missing values 
@@ -80,11 +97,28 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
 #' @param gmatrix Genotype matrix wihout missing values
 #' @param components Number of principal components to be computed
 #' @export
-gmatrixPCA <- function(gmatrix, components = 10){
-  svd <- RSpectra::svds(A = gmatrix - rowMeans(gmatrix), 
-                        k = min(components, ncol(gmatrix)))
-  pca <- t(diag(svd$d) %*% t(svd$v))
+gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, components = 10){
+  if (is.null(referenceMean)) {
+    referenceMean <- rowMeans(gmatrix)
+  }
   
+  if (is.null(SVDReference)) {
+    SVDReference <- RSpectra::svds(gmatrix - referenceMean)$u
+  }
+  
+  variants <- intersect(rownames(SVDReference), rownames(gmatrix))
+  gmatrix <- gmatrix[variants, ]
+  
+  refVariants <- stats::setNames(1:nrow(SVDReference), rownames(SVDReference))
+  ids <- refVariants[variants]
+  
+  SVDReference <- SVDReference[ids, ]
+  referenceMean <- referenceMean[ids]
+  
+  gmatrix <- gmatrix - referenceMean
+  pca <- t(SVDReference) %*% gmatrix
+  
+  pca <- t(pca)
   colnames(pca) <- c(paste("PC", c(1:min(components, ncol(gmatrix))), sep = ""))
   rownames(pca) <- colnames(gmatrix)
   pca
@@ -187,34 +221,23 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
 }
 
-filterCluster <- function(gmatrix, cluster, rate) {
-  gm <- gmatrix[, cluster]
-  gm <- gm - rowMeans(gm)
-  svd <- t(RSpectra::svds(gm, 10)$v)
-  
-  n <- ncol(svd)
-  size <- min(n, ceiling(n * rate))
-  subsample <- normal_subsample(svd, size) 
-  cluster[subsample$points]
-}
-
 #' prepare instance and write yaml file from QC-ed gmatrix
 #' @param gmatrix gmatrix with imputed missing values
 #' @param imputationResults matrix indicating which genotypes
 #' were imputed
 #' @param maxVectors maximum number of principal directions for each cluster
 #' to be computed and written to a file
+#' @param 
 #' @param outputFileName name of the YAML file to output
 #' @param title title to put as a first line in yaml file
 #' @param clusters clustering object
 #' @param MAC minor allele count used for QC
 #' @param MAF minor allele frequency used for QC
-#' @param elimiinationRate the part of dataset that can be dropped to make the data well shaped
 #' @import mclust
 #' @export
-prepareInstance <- function (gmatrix, imputationResults, outputFileName, clusters = NULL, 
-                             maxVectors = 100, title = "DNAScoreInput", MAC = 10, MAF = 0.01,
-                             eliminationRate = 0.1) {
+prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl, 
+                             outputFileName, clusters = NULL, 
+                             title = "DNAScoreInput", MAC = 10, MAF = 0.01) {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
     clusters <- clustering(setNames(classes, colnames(gmatrix)), 
@@ -240,31 +263,25 @@ prepareInstance <- function (gmatrix, imputationResults, outputFileName, cluster
   }
   gmatrix <- gmatrix[passVariants, ]
   gmatrixForCounts <- gmatrixForCounts[passVariants, ]
+  controlsU <- controlsU[passVariants, ]
+  meanControl <- meanControl[passVariants]
   clusterResults <- vector("list", numberOfClusters)
-  clusters$hier$Do(function(node) {
-    if (node$isRoot) {
-      return()
-    }
-    cls <- sapply(node$leaves, function(node) node$id)
-    i <- node$id
-    
-    cluster <- which(clusters$samples %in% cls)
-    
-    cluster <- filterCluster(gmatrix, cluster, 1 - eliminationRate)
-    clusterGenotypes <- gmatrix[, cluster]
-    
+  for (i in 1:numberOfClusters) {
+    cluster <- which(clusters$samples == i)
+    clusterGenotypes <- t(controlsU) %*% (gmatrix[, cluster] - meanControl)
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
-    k <- min(length(cluster), nrow(gmatrix), maxVectors)
+    k <- min(nrow(clusterGenotypes), ncol(clusterGenotypes))
     clusterGenotypes <- clusterGenotypes - clusterMeans
     svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, k = k))
     US <- svdResult$u %*% diag(svdResult$d)
+    US <- US / sqrt(lenght(cluster) - 1)
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
-    clusterResults[[i]] <<- list(US = US, counts = counts, 
+    clusterResults[[i]] <- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
-  })
+  }
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
 }
@@ -273,8 +290,7 @@ processHierarchy <- function(hier) {
   if (names(hier) == "split") {
     list(left = processHierarchy(hier$split$left), 
          right = processHierarchy(hier$split$right), 
-         id = hier$split$id, 
-         type = "split")
+         type = "split", id = hier$split$id)
   } else {
     c(hier$cluster, list(type = "leaf"))
   }
@@ -288,10 +304,10 @@ getNamesFromHier <- function(hier) {
     if (length(hier$split) != 3) {
       userError("Incorrect hierarchy section in the input YML file.")
     }
-    if (!setequal(names(hier$cluster), c("id", "left", "right"))) {
-      userError("Incorrect hierarchy section in the input YML file.")
-    }
-    c(getNamesFromHier(hier$split$left), getNamesFromHier(hier$split$right))
+    # needs to be changed
+    ret <- c(getNamesFromHier(hier$split$left), getNamesFromHier(hier$split$right))
+    name <- paste(ret, collapse = " & ")
+    c(ret, setNames(name, hier$split$id))
   }  else {
     if (!setequal(names(hier$cluster), c("id", "name"))) {
       userError("Incorrect hierarchy section in the input YML file.")
@@ -326,7 +342,7 @@ readInstanceFromYml <- function(filename) {
       if (any(is.na(x[[obj]]))) {
         err("US and counts matrices in input must contain only numeric values.")
       }
-      if (nrow(x[[obj]]) != length(inst$variants)) {
+      if (obj == "counts" && nrow(x[[obj]]) != length(inst$variants)) {
         err("Number of rows in US and counts matrices must match number of variants 
                    in the input YML file.")
       }
@@ -345,10 +361,9 @@ readInstanceFromYml <- function(filename) {
     userError("List of populations must go in natural order by their ids")
   }
   inst$names <- getNamesFromHier(inst$hierarchy)
-  if (!setequal(names(inst$names), 1:length(inst$population))) {
+  if (!setequal(names(inst$names), 1:(2 * length(inst$population) - 1))) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
-

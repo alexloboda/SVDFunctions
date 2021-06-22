@@ -149,37 +149,19 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num)};
 }
 
-void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector mean, int threads, int start, int ub, int step) {
+void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector mean,
+                           int threads, int start, int ub, int step) {
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
-    Vector controls_mean = controls_space->rowwise().mean();
-    Rcpp::Rcerr << "Controls mean size: " << controls_mean.size() << std::endl;
-    mean -= controls_mean;
-    controls_space->colwise() -= controls_mean;
-
     Rcpp::Rcerr << "U matrix dims: " << space.rows() << " by " << space.cols() << std::endl;
 
-    Vector rs_mean = space.transpose() * mean;
-    Matrix rs_directions = space.transpose() * directions;
-
-    std::vector<int> sel_cols;
-    for (int i = 0; i < rs_directions.cols(); i++) {
-        if (rs_directions.col(i).norm() > EPS) {
-            sel_cols.push_back(i);
-        }
-    }
-    Matrix rs_non_singular_vectors(rs_directions.rows(), sel_cols.size());
-    for (unsigned i = 0; i < sel_cols.size(); i++) {
-        rs_non_singular_vectors.col(i) = rs_directions.col(sel_cols[i]);
-    }
-
-    Matrix rs_cov = rs_non_singular_vectors * rs_non_singular_vectors.transpose();
+    Matrix rs_cov = directions * directions.transpose();
 
     std::shared_ptr<Matrix> rs_controls_gmatrix = std::make_shared<Matrix>(space.transpose());
     rs_controls_gmatrix->operator*=(*controls_space);
     Rcpp::Rcerr << "Subsampling started" << std::endl;
-    subsampling = mvn::subsample(rs_controls_gmatrix, clustering, rs_mean, rs_cov);
+    subsampling = mvn::subsample(rs_controls_gmatrix, clustering, mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     subsampling.run(50000, 10, 1.0 , 0.999225, threads, start, ub, step);
 }
