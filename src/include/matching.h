@@ -75,7 +75,7 @@ class matching {
     lambda_range soft_threshold;
 public:
     matching(std::shared_ptr<Eigen::MatrixXi> controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
-    void process_mvn(const Eigen::MatrixXd& directions, const Eigen::MatrixXd& space, Eigen::VectorXd mean,
+    void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int threads, int start, int size_ub, int step);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1);

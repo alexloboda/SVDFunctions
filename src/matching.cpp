@@ -125,12 +125,6 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
         if (controls.size() >= min_controls && pvals.size() > 10) {
             double cur_lambda = get_lambda(pvals);
 
-            int cases = std::max_element(case_counts.begin(), case_counts.end(), [](const Counts& a, const Counts& b) {
-                return a.sum() < b.sum();
-            })->sum();
-            auto num_of_controls = controls.size();
-            //cur_lambda = lambda_1000(cur_lambda, cases, num_of_controls);
-
             lambdas.push_back(cur_lambda);
             lambda_i.push_back(controls.size());
             pvals_num.push_back(pvals.size());
@@ -149,19 +143,14 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num)};
 }
 
-void matching::process_mvn(const Matrix& directions, const Matrix& space, Vector mean,
+void matching::process_mvn(const Matrix& directions, Vector mean,
                            int threads, int start, int ub, int step) {
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
-    Rcpp::Rcerr << "U matrix dims: " << space.rows() << " by " << space.cols() << std::endl;
-
     Matrix rs_cov = directions * directions.transpose();
 
-    std::shared_ptr<Matrix> rs_controls_gmatrix = std::make_shared<Matrix>(space.transpose());
-    rs_controls_gmatrix->operator*=(*controls_space);
-    Rcpp::Rcerr << "Subsampling started" << std::endl;
-    subsampling = mvn::subsample(rs_controls_gmatrix, clustering, mean, rs_cov);
+    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     subsampling.run(50000, 10, 1.0 , 0.999225, threads, start, ub, step);
 }

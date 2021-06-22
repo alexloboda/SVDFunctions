@@ -106,7 +106,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     auto gmatrix_counts = r_to_cpp(gmatrix);
     auto case_counts = r_to_cpp(cc);
     auto principal_directions = r_to_cpp(directions);
-    auto space = r_to_cpp(gmatrix_rs);
+    auto gm_rs = r_to_cpp(gmatrix_rs);
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
 
@@ -115,11 +115,11 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int step_clusters = step[0];
     mvn::Clustering cl(clust_vec);
 
-    matching::matching matcher(gmatrix_counts, space, cl);
+    matching::matching matcher(gmatrix_counts, gm_rs, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
-    matcher.process_mvn(*principal_directions, *space_matrix, r_to_cpp(mean), std::thread::hardware_concurrency(),
+    matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
                         min_controls, max_controls, step_clusters);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
