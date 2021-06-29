@@ -103,7 +103,8 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   }
   
   if (is.null(SVDReference)) {
-    SVDReference <- RSpectra::svds(gmatrix - referenceMean)$u
+    SVDReference <- RSpectra::svds(gmatrix - referenceMean, k = 10)$u
+    rownames(SVDReference) <- rownames(gmatrix)
   }
   
   variants <- intersect(rownames(SVDReference), rownames(gmatrix))
@@ -244,7 +245,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
                            "Main")
   }
   stopifnot("clustering" %in% class(clusters))
-  numberOfClusters <- length(clusters$classes)
+  numberOfClusters <- length(clusters$classes) 
   gmatrixForCounts <- gmatrix
   gmatrixForCounts[which(imputationResults, arr.ind = TRUE)] <- NA
   caseCounts <- list()
@@ -263,8 +264,11 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   }
   gmatrix <- gmatrix[passVariants, ]
   gmatrixForCounts <- gmatrixForCounts[passVariants, ]
-  controlsU <- controlsU[passVariants, ]
-  meanControl <- meanControl[passVariants]
+  
+  names(meanControl) <- rownames(controlsU)
+  controlsU <- controlsU[rownames(gmatrix), ]
+  meanControl <- meanControl[rownames(gmatrix)]
+  
   clusterResults <- vector("list", numberOfClusters)
   for (i in 1:numberOfClusters) {
     cluster <- which(clusters$samples == i)
@@ -275,7 +279,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterGenotypes <- clusterGenotypes - clusterMeans
     svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, k = k))
     US <- svdResult$u %*% diag(svdResult$d)
-    US <- US / sqrt(lenght(cluster) - 1)
+    US <- US / sqrt(length(cluster) - 1)
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
     clusterResults[[i]] <- list(US = US, counts = counts, 

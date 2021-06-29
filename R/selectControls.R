@@ -70,6 +70,10 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   }
   stopifnot(all(!is.na(cl)))
   
+  names(controlsMean) <- rownames(gmatrix)
+  controlsMean <- controlsMean[rownames(genotypeMatrix)]
+  SVDReference <- SVDReference[rownames(genotypeMatrix), ]
+  
   genotypeMatrix <- genotypeMatrix - controlsMean
   genotypeMatrix <- t(SVDReference) %*% genotypeMatrix
   
@@ -78,7 +82,6 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   
   result <- select_controls_cpp(gmatrix, 
                                 genotypeMatrix, 
-                                SVDReference, 
                                 casesMean, 
                                 casesPDs, 
                                 caseCounts, 
