@@ -25,6 +25,7 @@ Imports:
     data.table,
     methods,
     seqminer,
+    RcppEigen,
     RSpectra
 LazyData: true
 RoxygenNote: 7.1.1
