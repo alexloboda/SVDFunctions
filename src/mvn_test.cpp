@@ -6,10 +6,10 @@
 
 namespace mvn {
 
-mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst)
-        :clustering(std::make_shared<Clustering>(clst)),
-         wheel(std::random_device()()),
-         the_rest(clst.size()) {
+mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
+        :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
+         clustering(std::make_shared<Clustering>(clst)),
+         wheel(std::random_device()()) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
     }
@@ -19,16 +19,31 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst)
     pairwise_stat.resize(betas.size(), 0.0);
     center_stat.resize(betas.size(), 0.0);
 
-    std::iota(the_rest.begin(), the_rest.end(), 0);
-    std::shuffle(the_rest.begin(), the_rest.end(), wheel);
-
     n = clst.size();
     p = X->rows();
     effect_size = 0;
+    latest_subset_point = -1;
 
     if (n <= p) {
         throw std::logic_error("Too few points.");
     }
+
+    for (double beta: betas) {
+        stats.push_back(std::make_shared<mvn_stats>(*distances, clst, beta));
+    }
+
+    while (effect_size < p + 1) {
+        add_one();
+    }
+
+    std::vector<double> lls;
+    for (size_t i = 0; i < n; i++) {
+        auto ids = clst.elements(i);
+        auto loglikelihoods = loglikelihood(ids);
+        lls.push_back(std::accumulate(loglikelihoods.begin(), loglikelihoods.end(), 0.0));
+    }
+
+    sampler = RandomSampler(lls, wheel());
 }
 
 double mvn_test::get_normality_statistic() {
@@ -95,63 +110,46 @@ size_t mvn_test::sample_size() const {
 }
 
 void mvn_test::swap_once(bool reject_last) {
-    if (subset.empty() || the_rest.empty()) {
+    if (subset.empty() || sampler.n_active() == 0) {
         throw std::logic_error("Unable to swap points.");
     }
 
-    if (!reject_last) {
+    int replacing_point = -1;
+    if (reject_last) {
+        assert(latest_subset_point != -1);
+        replacing_point = latest_subset_point;
+        latest_subset_point = -1;
+    } else {
         std::uniform_int_distribution<unsigned> subset_unif(0, subsample_size() - 1);
-        std::uniform_int_distribution<unsigned> the_rest_unif(0, the_rest.size() - 1);
-
         std::swap(subset[subset_unif(wheel)], subset.back());
-        std::swap(the_rest[the_rest_unif(wheel)], the_rest.back());
+        replacing_point = sampler.sample();
+        latest_subset_point = replacing_point;
     }
 
     auto subset_point = subset.back();
-    auto replacing_point = the_rest.back();
 
     effect_size += clustering->cluster_size(replacing_point) - clustering->cluster_size(subset_point);
 
     remove(subset_point);
 
-    std::swap(subset.back(), the_rest.back());
+    sampler.enable(subset.back());
+    sampler.disable(replacing_point);
+
+    subset.pop_back();
+    subset.push_back(replacing_point);
 
     add(replacing_point);
-
 }
 
 void mvn_test::add_one() {
-    if (the_rest.empty()) {
+    if (sampler.n_active() == 0) {
         throw std::logic_error("Can't add point to the model.");
     }
+    latest_subset_point = -1;
 
-    std::vector<int> ids;
-    for (int cluster: the_rest) {
-        for (int el: clustering->elements(cluster)) {
-            ids.push_back(el);
-        }
-    }
-
-    auto lls = loglikelihood(ids);
-
-    // find the cluster closest to the center
-    std::vector<double> cl_lls;
-    int i = 0;
-    for (int cl: the_rest) {
-        double mean = 0.0;
-        for (int j = 0; j < clustering->cluster_size(cl); j++) {
-            mean += lls[i + j];
-        }
-        mean /= (double)clustering->cluster_size(cl);
-        i += clustering->cluster_size(cl);
-        cl_lls.push_back(mean);
-    }
-    int pos = std::distance(cl_lls.begin(), std::max_element(cl_lls.begin(), cl_lls.end()));
-
-    size_t point = the_rest[pos];
+    size_t point = sampler.sample();
     effect_size += clustering->cluster_size(point);
-    std::swap(the_rest[pos], the_rest[the_rest.size() - 1]);
-    the_rest.pop_back();
+    sampler.disable(point);
 
     subset.push_back(point);
     add(point);
@@ -162,16 +160,19 @@ bool operator<(mvn_test& lhs, mvn_test& rhs) {
 }
 
 mvn_test::mvn_test(const mvn_test& other)
-    :center_stat(other.center_stat),
+    :distances(other.distances),
+     stats(other.stats),
+     sampler(other.sampler),
      pairwise_stat(other.pairwise_stat),
+     center_stat(other.center_stat),
      betas(other.betas),
      clustering(other.clustering),
      p(other.p),
      n(other.n),
      effect_size(other.effect_size),
+     latest_subset_point(other.latest_subset_point),
      wheel{other.wheel()},
-     subset(other.subset),
-     the_rest(other.the_rest) {}
+     subset(other.subset) {}
 
 Clustering::Clustering(const std::vector<int>& clustering) {
     if (clustering.empty()) {
@@ -223,19 +224,7 @@ double mahalanobis_distances::distance(unsigned el) const {
     return diag(el) - ximu(el) - muxi(el) + mumu;
 }
 
-mvn_test_fixed::mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
-        : mvn_test(X, clst), distances{std::make_shared<mahalanobis_distances>(X, S, mean)} {
-
-    for (double beta: betas) {
-        stats.push_back(std::make_shared<mvn_stats>(*distances, clst, beta));
-    }
-
-    while (effect_size < p + 1) {
-        add_one();
-    }
-}
-
-void mvn_test_fixed::remove(unsigned point) {
+void mvn_test::remove(unsigned point) {
     for (size_t i = 0; i < stats.size(); i++) {
         for (auto s: subset) {
             pairwise_stat[i] -= 2 * stats[i]->pairwise_stat(point, s);
@@ -247,7 +236,7 @@ void mvn_test_fixed::remove(unsigned point) {
     }
 }
 
-void mvn_test_fixed::add(unsigned int point) {
+void mvn_test::add(unsigned int point) {
     for (size_t i = 0; i < stats.size(); i++) {
         for (auto s: subset) {
             pairwise_stat[i] += 2 * stats[i]->pairwise_stat(point, s);
@@ -258,15 +247,11 @@ void mvn_test_fixed::add(unsigned int point) {
     }
 }
 
-std::unique_ptr<mvn_test> mvn_test_fixed::clone() {
-    return std::make_unique<mvn_test_fixed>(*this);
+std::unique_ptr<mvn_test> mvn_test::clone() {
+    return std::make_unique<mvn_test>(*this);
 }
 
-mvn_test_fixed::mvn_test_fixed(const mvn_test_fixed& other) :mvn_test(other), distances(other.distances), stats(other.stats) {}
-
-void mvn_test_fixed::compute_statistics() {}
-
-std::vector<double> mvn_test_fixed::loglikelihood(const std::vector<int>& ids) const {
+std::vector<double> mvn_test::loglikelihood(const std::vector<int>& ids) const {
     std::vector<double> ret;
     for (int id: ids) {
         ret.push_back(-0.5 * distances->distance(id));
@@ -274,97 +259,154 @@ std::vector<double> mvn_test_fixed::loglikelihood(const std::vector<int>& ids) c
     return ret;
 }
 
-mvn_test_gen::mvn_test_gen(std::shared_ptr<const Matrix> X, const Clustering& clst) : mvn_test(X, clst), X(X) {}
+RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :runif(0.0, 1.0), wheel(seed), original(logscale),
+                                                                              size(logscale.size()) {
+    if (original.size() < 2) {
+        throw std::invalid_argument("Too little segment tree");
+    }
 
-mvn_test_gen::mvn_test_gen(const mvn_test_gen& other) :mvn_test(other), X(other.X) {
+    active_tree.resize(2 * original.size() - 1);
+    segment_tree.resize(2 * original.size() - 1);
+    for (size_t i = 0; i < original.size(); i++) {
+        auto k = segment_tree.size() - i - 1;
+        active_tree[k] = 1;
+        segment_tree[k] = original[i];
+    }
+    for (int i = segment_tree.size() - size - 1; i >= 0; i--) {
+        update_inner_node(i);
+    }
 }
 
-namespace {
-    std::vector<int> cluster_fold(std::shared_ptr<Clustering> clustering, const std::vector<size_t>& clusters) {
-        std::vector<int> ret;
-        for (int cluster: clusters) {
-            auto& cls = clustering->elements(cluster);
-            ret.insert(ret.end(), cls.begin(), cls.end());
-        }
-        return ret;
-    }
 
-    std::shared_ptr<Matrix> matrix_subset(std::shared_ptr<const Matrix> X, std::vector<int> columns) {
-        std::shared_ptr<Matrix> Xs = std::make_shared<Matrix>(X->rows(), columns.size());
-        for (int i = 0; i < columns.size(); i++) {
-            Xs->col(i) = X->col(columns[i]);
-        }
-        return Xs;
-    }
+bool RandomSampler::is_active(size_t n) const {
+    return active_tree.at(el_pos(n));
+}
 
-    mahalanobis_distances subset_distances(std::shared_ptr<const Matrix> X, const std::vector<int>& subset,
-                                           const std::vector<int>& columns, bool euclidean = false) {
-        auto Xs = matrix_subset(X, columns);
-        auto Xsubset = matrix_subset(X, subset);
-        Vector mean = Xsubset->rowwise().mean();
-        Matrix centered = Xsubset->colwise() - mean;
-        if (euclidean) {
-            Matrix cov = Eigen::MatrixXd::Identity(centered.rows(), centered.rows());
-            return {Xs, cov, mean};
+void RandomSampler::disable(size_t n) {
+    if (!is_active(n)) {
+        throw std::logic_error("Disabling non-active element");
+    }
+    auto pos = el_pos(n);
+    segment_tree[pos] = -std::numeric_limits<double>::infinity();
+    active_tree[pos] = false;
+    update(pos);
+}
+
+void RandomSampler::enable(size_t n) {
+    if (is_active(n)) {
+        throw std::logic_error("Enabling active element.");
+    }
+    auto pos = el_pos(n);
+    segment_tree[pos] = original[n];
+    active_tree.at(pos) = true;
+    update(pos);
+}
+
+size_t RandomSampler::sample() {
+    if (size < 2) {
+        throw std::logic_error("Too little segment tree");
+    }
+    size_t node = 0;
+    while (!is_leaf(node)) {
+        auto chld = children(node);
+        if (active_tree.at(chld.first) == 0) {
+            node = chld.second;
+        } else if(active_tree.at(chld.second) == 0) {
+            node = chld.first;
         } else {
-            Matrix cov = (centered * centered.adjoint()) / double(centered.cols() - 1);
-            return {Xs, cov, mean};
-        }
-    }
-}
-
-void mvn_test_gen::compute_statistics() {
-    auto columns = cluster_fold(clustering, subset);
-
-    auto distances = subset_distances(X, columns, columns);
-    for (unsigned ibeta = 0; ibeta < betas.size(); ibeta++) {
-        double beta = betas[ibeta];
-        mvn_stats stats(distances, *clustering, beta);
-        center_stat[ibeta] = 0.0;
-        pairwise_stat[ibeta] = 0.0;
-        auto n = columns.size();
-        for (unsigned i = 0; i < n; i++) {
-            center_stat[ibeta] += stats.centered_stat(i);
-            for (unsigned j = 0; j < i; j++) {
-                pairwise_stat[ibeta] += 2 *  stats.pairwise_stat(i, j);
+            double l = segment_tree.at(chld.first);
+            double r = segment_tree.at(chld.second);
+            double maxL = std::max(l, r);
+            l = std::exp(l - maxL);
+            r = std::exp(r - maxL);
+            auto sum = l + r;
+            l /= sum;
+            if (runif(wheel) < l) {
+                node = chld.first;
+            } else {
+                node = chld.second;
             }
-            pairwise_stat[ibeta] += stats.pairwise_stat(i, i);
         }
     }
-}
 
-void mvn_test_gen::remove(unsigned int i) {
-    if (subsample_size() > p + 1) {
-        compute_statistics();
+    int aug_nodes = segment_tree.size() - original.size();
+    if (!active_tree.at(node)) {
+        throw std::logic_error("Sampled element is not active.");
     }
+    return node - aug_nodes;
 }
 
-void mvn_test_gen::add(unsigned int i) {
-    if (subsample_size() > p + 1) {
-        compute_statistics();
+std::pair<size_t, size_t> RandomSampler::children(size_t node) const {
+    if (node > segment_tree.size() - original.size() - 1) {
+        throw std::invalid_argument("It's a leaf");
     }
+    return {2 * node + 1, 2 * node + 2};
 }
 
-std::unique_ptr<mvn_test> mvn_test_gen::clone() {
-    mvn_test_gen copy(*this);
-    return std::make_unique<mvn_test_gen>(copy);
+bool RandomSampler::is_root(size_t node) {
+    return node == 0;
 }
 
-std::vector<double> mvn_test_gen::loglikelihood(const std::vector<int>& ids) const {
-    if (subset.size() == 0) {
-        std::vector<double> ret;
-        std::uniform_real_distribution<double> random;
-        for (int i = 0; i < ids.size(); i++) {
-            ret.push_back(random(wheel));
+bool RandomSampler::is_leaf(size_t node) const {
+    return node >= segment_tree.size() - original.size();
+}
+
+size_t RandomSampler::el_pos(size_t el) const {
+    size_t pos = segment_tree.size() -  original.size() - 1 + el;
+    if (pos >= segment_tree.size()) {
+        throw std::out_of_range("Out of range");
+    }
+    return pos;
+}
+
+double RandomSampler::sum_log(double l, double r) {
+    double maxL = std::max(l, r);
+    l = std::exp(l - maxL);
+    r = std::exp(r - maxL);
+    return std::log(l + r) + maxL;
+}
+
+size_t RandomSampler::parent(size_t node) {
+    return (node - 1) / 2;
+}
+
+void RandomSampler::update_inner_node(size_t node) {
+    auto chs = children(node);
+    segment_tree[node] = sum_log(segment_tree[chs.first], segment_tree[chs.second]);
+    active_tree[node] = active_tree.at(chs.first) + active_tree.at(chs.second);
+}
+
+void RandomSampler::update(size_t node) {
+    if (node < segment_tree.size() - original.size()) {
+        throw std::invalid_argument("That's not a leaf");
+    }
+    node = parent(node);
+    while(true) {
+        update_inner_node(node);
+        if (is_root(node)) {
+            break;
         }
-        return ret;
+        node = parent(node);
     }
-    auto sub = cluster_fold(clustering, subset);
-    auto distances = subset_distances(X, sub, ids, true);
-    std::vector<double> ret;
-    for (int i = 0; i < ids.size(); i++) {
-        ret.push_back(-0.5 * distances.distance(i));
-    }
-    return ret;
 }
+
+RandomSampler::RandomSampler() :runif(0.0, 1.0), wheel(0), size(0) {}
+
+RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel(other.wheel()),
+                                                          original(other.original), segment_tree(other.segment_tree),
+                                                          active_tree(other.active_tree), size(other.size) {}
+
+RandomSampler& RandomSampler::operator=(RandomSampler&& other) {
+    runif = std::move(other.runif);
+    wheel = std::move(other.wheel);
+    original = std::move(other.original);
+    segment_tree = std::move(other.segment_tree);
+    active_tree = std::move(other.active_tree);
+    return *this;
+}
+
+size_t RandomSampler::n_active() const {
+    return active_tree.at(0);
+}
+
 }

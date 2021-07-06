@@ -11,6 +11,39 @@ namespace mvn {
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
+class RandomSampler {
+    std::uniform_real_distribution<double> runif;
+    mutable std::mt19937 wheel;
+    std::vector<double> original;
+    std::vector<double> segment_tree;
+    std::vector<size_t> active_tree;
+
+    const size_t size;
+public:
+    RandomSampler();
+    RandomSampler(const std::vector<double>& logscale, long seed);
+    RandomSampler(RandomSampler&&) = default;
+    RandomSampler(const RandomSampler& other);
+    RandomSampler& operator=(RandomSampler&&);
+
+    void disable(size_t n);
+    void enable(size_t n);
+    size_t sample();
+    size_t n_active() const;
+private:
+    std::pair<size_t, size_t> children(size_t node) const;
+    static bool is_root(size_t node);
+    bool is_leaf(size_t node) const;
+    bool is_active(size_t node) const;
+    size_t el_pos(size_t el) const;
+    static size_t parent(size_t node);
+
+    static double sum_log(double l, double r);
+
+    void update_inner_node(size_t node);
+    void update(size_t node);
+};
+
 class Clustering {
     std::vector<int> cluster_sizes;
     std::vector<std::vector<int>> clusters;
@@ -48,6 +81,10 @@ private:
 
 class mvn_test {
 protected:
+    std::shared_ptr<mahalanobis_distances> distances;
+    std::vector<std::shared_ptr<mvn_stats>> stats;
+    RandomSampler sampler;
+
     std::vector<double> pairwise_stat;
     std::vector<double> center_stat;
     std::vector<double> betas;
@@ -56,14 +93,18 @@ protected:
 
     size_t p;
     size_t n;
+
     size_t effect_size;
+    int latest_subset_point;
 
     mutable std::mt19937 wheel;
 
     std::vector<size_t> subset;
-    std::vector<size_t> the_rest;
 
 public:
+    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_test(const mvn_test&);
+
     size_t dimensions() const;
     size_t sample_size() const;
     size_t subsample_size() const;
@@ -76,44 +117,14 @@ public:
     double get_normality_statistic();
 
     friend bool operator<(mvn_test& lhs, mvn_test& rhs);
-    virtual std::vector<double> loglikelihood(const std::vector<int>& ids) const = 0;
-    virtual std::unique_ptr<mvn_test> clone() = 0;
+    std::vector<double> loglikelihood(const std::vector<int>& ids) const;
+    std::unique_ptr<mvn_test> clone();
 
 protected:
-    virtual void remove(unsigned i) = 0;
-    virtual void add(unsigned i) = 0;
-    virtual void compute_statistics() = 0;
+    void remove(unsigned i);
+    void add(unsigned i);
 
-    mvn_test(const mvn_test&);
-    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst);
     mvn_test() = default;
-};
-
-class mvn_test_fixed: public mvn_test {
-    std::shared_ptr<mahalanobis_distances> distances;
-    std::vector<std::shared_ptr<mvn_stats>> stats;
-public:
-    mvn_test_fixed(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
-    mvn_test_fixed(const mvn_test_fixed& other);
-
-    void compute_statistics() override;
-    void remove(unsigned i) override;
-    void add(unsigned i) override;
-    std::unique_ptr<mvn_test> clone() override;
-    std::vector<double> loglikelihood(const std::vector<int>& ids) const override;
-};
-
-class mvn_test_gen: public mvn_test {
-    std::shared_ptr<const Matrix> X;
-public:
-    mvn_test_gen(std::shared_ptr<const Matrix> X, const Clustering& clst);
-    mvn_test_gen(const mvn_test_gen& other);
-
-    void compute_statistics() override;
-    void remove(unsigned i) override;
-    void add(unsigned i) override;
-    std::unique_ptr<mvn_test> clone() override;
-    std::vector<double> loglikelihood(const std::vector<int>& ids) const override;
 };
 
 }

@@ -30,11 +30,6 @@ void read_binary(const char* filename, Matrix& matrix){
 
 namespace {
 
-double lambda_1000(double lambda_observed, int cases, int controls) {
-    double coefficient = 1.0 / cases + 1.0 / controls;
-    return 1.0 + ((lambda_observed - 1) * coefficient) / (2 * 0.001);
-}
-
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 

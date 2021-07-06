@@ -222,7 +222,7 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
 }
 
-#' prepare instance and write yaml file from QC-ed gmatrix
+#' Prepare instance and write yaml file from QC-ed gmatrix
 #' @param gmatrix gmatrix with imputed missing values
 #' @param imputationResults matrix indicating which genotypes
 #' were imputed
@@ -245,14 +245,15 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
                            "Main")
   }
   stopifnot("clustering" %in% class(clusters))
-  numberOfClusters <- length(clusters$classes) 
   gmatrixForCounts <- gmatrix
   gmatrixForCounts[which(imputationResults, arr.ind = TRUE)] <- NA
   caseCounts <- list()
-  for (i in 1:numberOfClusters) {
-    cluster <- which(clusters$samples == i)
-    caseCounts[[i]] <- genotypesToCounts(gmatrixForCounts[, cluster])
-  }
+  clusters$hier$Do(function(node) {
+    i <- ifelse(is.null(node$id), return(), node$id)
+    cluster_leaves <- sapply(node$leaves, function(x) x$id)
+    cluster <- which(clusters$samples %in% cluster_leaves)
+    caseCounts[[i]] <<- genotypesToCounts(gmatrixForCounts[, cluster])
+  })
   passVariants <- lapply(caseCounts, checkAlleleCounts, mac = MAC, maf = MAF)
   passVariants <- lapply(passVariants, which)
   passVariants <- Reduce(intersect, passVariants)
@@ -269,9 +270,13 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   controlsU <- controlsU[rownames(gmatrix), ]
   meanControl <- meanControl[rownames(gmatrix)]
   
+  numberOfClusters <- 2 * length(clusters$classes) - 1
   clusterResults <- vector("list", numberOfClusters)
-  for (i in 1:numberOfClusters) {
-    cluster <- which(clusters$samples == i)
+  caseCl$hier$Do(function(node) {
+    i <- ifelse(is.null(node$id), return(), node$id)
+    cluster_leaves <- sapply(node$leaves, function(x) x$id)
+    
+    cluster <- which(clusters$samples %in% cluster_leaves)
     clusterGenotypes <- t(controlsU) %*% (gmatrix[, cluster] - meanControl)
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
@@ -282,10 +287,10 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     US <- US / sqrt(length(cluster) - 1)
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
-    clusterResults[[i]] <- list(US = US, counts = counts, 
+    clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
-  }
+  })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
 }

@@ -4,6 +4,7 @@
 #include <vector>
 #include "mvn_test.h"
 namespace mvn {
+
 class subsample {
     std::shared_ptr<mvn_test> test;
 
@@ -15,11 +16,10 @@ class subsample {
 public:
     subsample();
     subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov);
-    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst);
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 
-    void run(size_t iterations, size_t restarts, double t0, double c, int threads, int start, int size_ub, int step);
+    void run(size_t iterations, size_t restarts, double t0, double c, size_t threads, size_t start, size_t size_ub, size_t step);
 
     std::vector<size_t> get_solution(size_t size) const;
     size_t solutions() const;

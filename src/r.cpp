@@ -77,18 +77,18 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 
 // [[Rcpp::export]]
 List subsample_mvn(NumericMatrix& matrix, IntegerVector size) {
-    std::vector<int> clusters(matrix.ncol());
-    std::iota(clusters.begin(), clusters.end(), 0);
-    mvn::Clustering clustering(clusters);
-    mvn::subsample annealing(r_to_cpp(matrix), clustering);
-    annealing.run(10'000, 4, 1.0, 0.995, std::thread::hardware_concurrency(), size[0], size[0], 1);
+    //std::vector<int> clusters(matrix.ncol());
+    //std::iota(clusters.begin(), clusters.end(), 0);
+    //mvn::Clustering clustering(clusters);
+    //mvn::subsample annealing(r_to_cpp(matrix), clustering);
+    //annealing.run(10'000, 4, 1.0, 0.995, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
-    List ret;
-    auto points = annealing.get_solution(0);
-    IntegerVector subset(points.begin(), points.end());
-    ret["points"] = subset + 1;
+    //List ret;
+    //auto points = annealing.get_solution(0);
+    //IntegerVector subset(points.begin(), points.end());
+    //ret["points"] = subset + 1;
 
-    return ret;
+    //return ret;
 }
 
 // [[Rcpp::export]]
