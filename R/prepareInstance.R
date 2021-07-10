@@ -370,7 +370,7 @@ readInstanceFromYml <- function(filename) {
     userError("List of populations must go in natural order by their ids")
   }
   inst$names <- getNamesFromHier(inst$hierarchy)
-  if (!setequal(names(inst$names), 1:(2 * length(inst$population) - 1))) {
+  if (!setequal(names(inst$names), 1:length(inst$population))) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
   inst$hierarchy <- processHierarchy(inst$hierarchy)

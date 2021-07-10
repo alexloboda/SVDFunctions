@@ -18,7 +18,7 @@ class RandomSampler {
     std::vector<double> segment_tree;
     std::vector<size_t> active_tree;
 
-    const size_t size;
+    size_t size;
 public:
     RandomSampler();
     RandomSampler(const std::vector<double>& logscale, long seed);

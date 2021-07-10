@@ -1,4 +1,4 @@
 CXX_STD = CXX17
-PKG_CPPFLAGS = -ggdb -pthread -std=gnu++17
+PKG_CPPFLAGS = -ggdb -pthread -std=gnu++17 
 #PKG_CPPFLAGS = -pthread 
 PKG_LIBS = -pthread -lz
