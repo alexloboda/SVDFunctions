@@ -9,7 +9,6 @@ class subsample {
     std::shared_ptr<mvn_test> test;
 
     std::vector<std::vector<size_t>> best;
-    std::vector<double> best_scores;
     Clustering clst;
 
     std::mt19937 wheel;

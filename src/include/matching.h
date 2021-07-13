@@ -54,9 +54,10 @@ struct matching_results {
     std::vector<double> lambdas;
     std::vector<int> lambda_i;
     std::vector<int> pvals_num;
+    double optimal_lambda;
 
     matching_results(std::vector<int>&& optimal_prefix, std::vector<double>&& p_values, std::vector<double>&& lmbds,
-                     std::vector<int>&& lmbd_i, std::vector<int>&& pvals_number);
+                     std::vector<int>&& lmbd_i, std::vector<int>&& pvals_number, double oprimal_lambda);
 };
 
 class matching {

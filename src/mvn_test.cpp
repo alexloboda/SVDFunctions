@@ -48,7 +48,6 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     for (size_t i = 0; i < n; i++) {
         auto ids = clst.elements(i);
         auto loglikelihoods = loglikelihood(ids);
-        //lls.push_back(std::accumulate(loglikelihoods.begin(), loglikelihoods.end(), 0.0));
         lls.push_back(0.0);
     }
 
@@ -269,7 +268,13 @@ std::unique_ptr<mvn_test> mvn_test::clone() {
 std::vector<double> mvn_test::loglikelihood(const std::vector<int>& ids) const {
     std::vector<double> ret;
     for (int id: ids) {
-        ret.push_back(-0.5 * distances->distance(id));
+        double dist = std::sqrt(distances->distance(id));
+        if (dist > 1) {
+            dist = 1.0 / (dist * dist);
+        } else {
+            dist = 1;
+        }
+        ret.push_back(std::log(dist));
     }
     return ret;
 }
@@ -380,6 +385,12 @@ size_t RandomSampler::el_pos(size_t el) const {
 }
 
 double RandomSampler::sum_log(double l, double r) {
+    if (std::isinf(l)) {
+        return r;
+    }
+    if (std::isinf(r)) {
+        return l;
+    }
     double maxL = std::max(l, r);
     l = std::exp(l - maxL);
     r = std::exp(r - maxL);
@@ -393,6 +404,7 @@ size_t RandomSampler::parent(size_t node) {
 void RandomSampler::update_inner_node(size_t node) {
     auto chs = children(node);
     segment_tree[node] = sum_log(segment_tree[chs.first], segment_tree[chs.second]);
+    assert(!std::isnan(segment_tree[node]));
     active_tree[node] = active_tree.at(chs.first) + active_tree.at(chs.second);
 }
 
@@ -417,8 +429,8 @@ RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel
                                                           active_tree(other.active_tree), size(other.size) {}
 
 RandomSampler& RandomSampler::operator=(RandomSampler&& other) {
-    runif = std::move(other.runif);
-    wheel = std::move(other.wheel);
+    runif = other.runif;
+    wheel = other.wheel;
     original = std::move(other.original);
     segment_tree = std::move(other.segment_tree);
     active_tree = std::move(other.active_tree);

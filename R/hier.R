@@ -7,42 +7,23 @@ condition <- function(subclass, message, call = sys.call(-1), ...) {
 }
 
 checkCaseInfo <- function(cases, variants) {
-  if (nrow(cases$counts) != nrow(cases$US)) {
-    userError("Case counts table does not correspond to U matrix")
-  }
   if (!is.numeric(cases$US) | any(is.na(cases$US))) {
     userError("Matrix U contains missing data or non-numeric values")
   }
-  
-  ##check if all sites from cases are found in controls
-  
-  extra_variants <- which(!(cases$variants %in% variants))
-  if (length(extra_variants) != 0) {
-    num <- min(5, length(extra_variants))
-    userError(paste("Not all case sites are found in controls. Please use",
-               "list of available sites to create your case genotype",
-               "matrix. These variants must not be present: ", 
-               paste(cases$variants[extra_variants][1:num], 
-                     collapse = ", ")))
-  }
 }
 
-matchControlsCluster <- function(cases, gmatrix, original, variants, ...) {
+matchControlsCluster <- function(cases, gmatrix, original, ...) {
   softMinLambda <- list(...)$softMinLambda
   softMaxLambda <- list(...)$softMaxLambda
   
   checkCaseInfo(cases, variants)
-  sharedSites <- intersect(cases$variants, variants)
-  selector <- which(variants %in% sharedSites)
-  gmatrix <- gmatrix[selector, ]
-  original <- original[selector, ]
   
   if (nrow(cases$counts) != nrow(gmatrix)){
     userError("Something is wrong with SNP selection")
   }
   
-  U <- apply(cases$US, 2, function(x) x / sqrt(sum(x ^ 2))) 
-  results <- selectControls(gmatrix, original, U, cases$counts, ...)
+  results <- selectControls(gmatrix, original, cases$US, cases$mean, 
+                            cases$counts, ...)
   resid <- results$residuals[results$controls]
   df <- data.frame(sample = names(resid), value = resid, 
                    cluster = if (length(resid) == 0) c() else cases$id,
@@ -111,7 +92,7 @@ countGoodControls <- function(l, r) {
   length(unique(table$sample[table$cluster %in% goodClusters(l, r)]))
 }
 
-jointResult <- function(l, r) {
+jointResult <- function(l, r, res) {
   ret <- list()
   table <- rbind(l$table, r$table)
   ret$table <- table
@@ -125,7 +106,7 @@ jointResult <- function(l, r) {
   } else if (r$ncontrols == 0 && l$ncontrols > 0) {
     ret$cases <- l$cases
   } else {
-    ret$cases <- mergeCases(l$cases, r$cases)
+    ret$cases <- res$cases
   }
   ret
 }
@@ -143,10 +124,8 @@ mergeCondition <- function(l, r, merged, mergeCoef) {
   }
 }
 
-mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef, 
+mergedOrJoint <- function(gmatrix, original, left, right, res, mergeCoef, 
                           ...) {
-  cases <- mergeCases(left$cases, right$cases)
-  res <- matchControlsCluster(cases, gmatrix, original, variants, ...)
   if (mergeCondition(left, right, res, mergeCoef)) {  
     cls <- goodClusters(left, right)
     if (subtreeFailed(left)) {
@@ -172,55 +151,71 @@ mergedOrJoint <- function(gmatrix, original, variants, left, right, mergeCoef,
     res$table <- rbind(table, res$table)
     res
   } else {
-    jointResult(left, right)
+    jointResult(left, right, res)
   }
 }
 
-recSelect <- function(gmatrix, original, variants, cases, 
+recSelect <- function(gmatrix, original, cases, 
                       hierNode, clusterMergeCoef, ...) {
+  cluster <- cases$population[[hierNode$id]]
+  cluster$variants <- cases$variants
+  res <- matchControlsCluster(cluster, gmatrix, original, ...)
   if (hierNode$type == "leaf") {
-    cluster <- cases$population[[hierNode$id]]
-    cluster$variants <- cases$variants
-    matchControlsCluster(cluster, gmatrix, original, variants, ...)
+    return(res)
   } else {
-    left <- recSelect(gmatrix, original, variants, cases, hierNode$left,  
+    left <- recSelect(gmatrix, original, cases, hierNode$left,  
                       clusterMergeCoef, ...)
-    right <- recSelect(gmatrix, original, variants, cases, hierNode$right, 
+    right <- recSelect(gmatrix, original, cases, hierNode$right, 
                        clusterMergeCoef, ...)
-    mergedOrJoint(gmatrix, original, variants, left, right, clusterMergeCoef, ...)
+    mergedOrJoint(gmatrix, original, left, right, res, clusterMergeCoef, ...)
   }
+}
+
+filter_variants <- function(population, ids) {
+  population
 }
 
 #' Select a set of controls that matches a set of cases
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt). 
 #' Intermediate values are allowed, NAs are not.
-#' @param controlVariants character vector of variants(format: "chrN:POS\\tREF\\tALT") 
 #' @param cases result of calling function readInstanceFromYml.
-#' @param imputationMatrix logical matrix of the same dimentions as 
-#' controlGMatrix. Element is set to TRUE if the corresponding value has been
-#' imputed in controlGMatrix.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt).
 #' Missing values are allowed.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
 #' @inheritParams selectControls
 #' @export
-selectControlsHier <- function(controlGMatrix, controlVariants, cases, 
-                               imputationMatrix = NULL, 
-                               originalControlGMatrix = NULL, 
+selectControlsHier <- function(controlGMatrix, cases, 
+                               originalControlGMatrix, 
                                clusterMergeCoef = 1.1, 
                                softMinLambda = 0.9, softMaxLambda = 1.05, 
                                ...) {
   stopifnot(all(!is.na(controlGMatrix)))
-  if (is.null(originalControlGMatrix)) {
-    originalControlGMatrix <- controlGMatrix
-    mode(originalControlGMatrix) <- "integer"
-    if (!is.null(imputationMatrix)) {
-      originalControlGMatrix[imputationMatrix] <- NA
-    }
+  stopifnot(all(rownames(controlGMatrix) == rownames(originalControlGMatrix)))
+  
+  #check if all sites from cases are found in controls
+  
+  extra_variants <- which(!(cases$variants %in% rownames(controlGMatrix)))
+  if (length(extra_variants) != 0) {
+    num <- min(5, length(extra_variants))
+    userError(paste("Not all case sites are found in controls. Please use",
+               "list of available sites to create your case genotype",
+               "matrix. These variants must not be present: ", 
+               paste(cases$variants[extra_variants][1:num], 
+                     collapse = ", ")))
   }
   
-  recSelect(controlGMatrix, originalControlGMatrix, controlVariants, 
+  variants <- intersect(cases$variants, rownames(controlGMatrix))
+  controlGMatrix <- controlGMatrix[variants, ]
+  originalControlGMatrix <- originalControlGMatrix[variants, ]
+  
+  cases_variants_ids <- setNames(1:length(variants), variants)[cases$variants] 
+  cases$population <- lapply(cases$population, function(population) {
+    population$counts <- population$counts[cases_variants_ids, ]
+    population
+  })
+  
+  recSelect(controlGMatrix, originalControlGMatrix,  
             cases, cases$hierarchy, clusterMergeCoef, 
             softMinLambda = softMinLambda, softMaxLambda = softMaxLambda, ...)
 }

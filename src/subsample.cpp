@@ -22,7 +22,6 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     using namespace std::chrono_literals;
 
     best.clear();
-    best_scores.clear();
 
     cxxpool::thread_pool pool(pool_size);
     size_t curr_size = start;
@@ -71,7 +70,6 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         }
 
         best.push_back(test->current_subset());
-        best_scores.push_back(test->get_normality_statistic());
 
         curr_size += step;
 

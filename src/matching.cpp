@@ -135,7 +135,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
             }
         }
     }
-    return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num)};
+    return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num), lambda};
 }
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
@@ -196,8 +196,9 @@ double lambda_range::distance(double lambda) {
 
 matching_results::matching_results(std::vector<int>&& prefix, std::vector<double>&& p_values,
                                    std::vector<double>&& lmbds, std::vector<int>&& lmbd_i,
-                                   std::vector<int>&& pvals_number)
+                                   std::vector<int>&& pvals_number, double optimal_lambda)
         : optimal_prefix(std::move(prefix)), pvals(std::move(p_values)),
-          lambdas(std::move(lmbds)), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)) {}
+          lambdas(std::move(lmbds)), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)),
+          optimal_lambda(optimal_lambda) {}
 
 }

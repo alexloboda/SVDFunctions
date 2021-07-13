@@ -131,10 +131,14 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     IntegerVector names(result.lambda_i.begin(), result.lambda_i.end());
     IntegerVector pvals_num(result.pvals_num.begin(), result.pvals_num.end());
     IntegerVector optimal_controls(result.optimal_prefix.begin(), result.optimal_prefix.end());
+    NumericVector optimal_lambda = {result.optimal_lambda};
+    Rcpp::Rcerr << result.optimal_lambda << std::endl;
+    Rcpp::Rcerr << optimal_lambda << std::endl;
 
     lambda.attr("names") = names;
     pvals_num.attr("names") = names;
     ret["lambda"] = lambda;
+    ret["optimal_lambda"] = optimal_lambda;
     ret["controls"] = optimal_controls + 1;
     ret["pvals"] = pvals;
     ret["snps"] = pvals_num;
