@@ -222,6 +222,25 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
 }
 
+
+drop <- function(pca, knn_rate, mvn_rate) {
+  n <- ncol(pca)
+  knn_n <- ceiling(n * knn_rate)
+  mvn_n <- ceiling(n * mvn_rate)
+  if (knn_n + mvn_n > n - nrow(pca)) {
+    stop("Drop rates are too high.")
+  }
+  
+  ids <- 1:n
+  
+  knn_drop <- adamethods::do_knno(t(pca), 5, knn_n)  
+  pca <- pca[, -knn_drop]
+  ids <- ids[-knn_drop]
+  
+  ids[normal_subsample(pca, n - knn_n - mvn_n)$points]
+  
+}
+
 #' Prepare instance and write yaml file from QC-ed gmatrix
 #' @param gmatrix gmatrix with imputed missing values
 #' @param imputationResults matrix indicating which genotypes
@@ -238,7 +257,8 @@ writeYaml <- function(clusterResults, clustering, variants,
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl, 
                              outputFileName, clusters = NULL, 
-                             title = "DNAScoreInput", MAC = 10, MAF = 0.01) {
+                             title = "DNAScoreInput", MAC = 10, MAF = 0.01, 
+                             knn_drop = 0.05, normalize_drop = 0.05) {
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
     clusters <- clustering(setNames(classes, colnames(gmatrix)), 
@@ -276,8 +296,12 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     i <- ifelse(is.null(node$id), return(), node$id)
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
     
-    cluster <- which(clusters$samples %in% cluster_leaves)
+    initial_cluster <- which(clusters$samples %in% cluster_leaves)
+    clusterGenotypes <- t(controlsU) %*% (gmatrix[, initial_cluster] - meanControl)
+    
+    cluster <- initial_cluster[drop(clusterGenotypes, knn_drop, normalize_drop)]
     clusterGenotypes <- t(controlsU) %*% (gmatrix[, cluster] - meanControl)
+    
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
     k <- min(nrow(clusterGenotypes), ncol(clusterGenotypes))

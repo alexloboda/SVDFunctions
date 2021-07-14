@@ -5,8 +5,8 @@ quality_control_impl <- function(case_counts, maf, mac, chi2boundary) {
     .Call('_SVDFunctions_quality_control_impl', PACKAGE = 'SVDFunctions', case_counts, maf, mac, chi2boundary)
 }
 
-subsample_mvn <- function(matrix, size) {
-    .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, size)
+subsample_mvn <- function(matrix, size, mean, cov) {
+    .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, size, mean, cov)
 }
 
 select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step) {

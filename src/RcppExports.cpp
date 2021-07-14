@@ -20,14 +20,16 @@ BEGIN_RCPP
 END_RCPP
 }
 // subsample_mvn
-List subsample_mvn(NumericMatrix& matrix, IntegerVector size);
-RcppExport SEXP _SVDFunctions_subsample_mvn(SEXP matrixSEXP, SEXP sizeSEXP) {
+List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mean, NumericMatrix& cov);
+RcppExport SEXP _SVDFunctions_subsample_mvn(SEXP matrixSEXP, SEXP sizeSEXP, SEXP meanSEXP, SEXP covSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< NumericMatrix& >::type matrix(matrixSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type size(sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(subsample_mvn(matrix, size));
+    Rcpp::traits::input_parameter< NumericVector& >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix& >::type cov(covSEXP);
+    rcpp_result_gen = Rcpp::wrap(subsample_mvn(matrix, size, mean, cov));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -102,7 +104,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
-    {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 2},
+    {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 14},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 11},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},

@@ -24,8 +24,7 @@ matchControlsCluster <- function(cases, gmatrix, original, ...) {
   
   results <- selectControls(gmatrix, original, cases$US, cases$mean, 
                             cases$counts, ...)
-  resid <- results$residuals[results$controls]
-  df <- data.frame(sample = names(resid), value = resid, 
+  df <- data.frame(sample = results$controls, 
                    cluster = if (length(resid) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
@@ -65,18 +64,6 @@ distributeControls <- function(residuals, threshold = 100) {
     }
   }
   residuals
-}
-
-mergeCases <- function(left, right) {
-  ret <- list()
-  ret$id <- paste0(left$id, ", ", right$id)
-  ret$counts <- left$counts + right$counts
-  lUS <- left$US
-  rUS <- right$US
-  svd <- RSpectra::svds(cbind(lUS, rUS), k = max(ncol(lUS), ncol(rUS)))
-  ret$US <- svd$u %*% diag(svd$d)
-  ret$variants <- left$variants
-  ret
 }
 
 goodClusters <- function(l, r) {
