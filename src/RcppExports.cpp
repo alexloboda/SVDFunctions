@@ -34,8 +34,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // select_controls_cpp
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min, IntegerVector max, IntegerVector step);
-RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP) {
+List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min, IntegerVector max, IntegerVector step, IntegerVector sa_iterations);
+RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP sa_iterationsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -53,7 +53,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerVector >::type min(minSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type max(maxSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type step(stepSEXP);
-    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step));
+    Rcpp::traits::input_parameter< IntegerVector >::type sa_iterations(sa_iterationsSEXP);
+    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -105,7 +106,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
-    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 14},
+    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 15},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 11},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {NULL, NULL, 0}

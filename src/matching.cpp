@@ -65,7 +65,7 @@ std::vector<lm> init_lms(const std::vector<Counts>& case_counts) {
     return lms;
 }
 
-matching_results matching::match(const std::vector<Counts>& case_counts, unsigned min_controls) {
+matching_results matching::match(const std::vector<Counts>& case_counts, unsigned min_controls, int iterations) {
     size_t n_variants = case_counts.size();
 
     std::vector<bool> snp_mask = check_user_counts(case_counts);
@@ -74,6 +74,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     double lambda = std::numeric_limits<double>::infinity();
 
     std::vector<double> lambdas;
+    std::vector<double> stats;
 
     std::vector<int> optimal_controls;
     std::vector<int> lambda_i;
@@ -84,6 +85,8 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
         if (step % 100 == 0) {
             interrupts_checker();
         }
+
+        stats.push_back(subsampling.statistic(k));
 
         std::vector<double> pvals;
 
@@ -135,11 +138,12 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
             }
         }
     }
-    return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas), std::move(lambda_i), std::move(pvals_num), lambda};
+    return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas),
+            std::move(stats), std::move(lambda_i), std::move(pvals_num), lambda};
 }
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
-                           int threads, int start, int ub, int step) {
+                           int threads, int start, int ub, int step, int iterations) {
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
@@ -147,7 +151,7 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
 
     subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
-    subsampling.run(100000, 4, 1.0 , 0.9995, threads, start, ub, step);
+    subsampling.run(iterations, 4, 1.0 , 0.9995, threads, start, ub, step);
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
@@ -195,10 +199,11 @@ double lambda_range::distance(double lambda) {
 }
 
 matching_results::matching_results(std::vector<int>&& prefix, std::vector<double>&& p_values,
-                                   std::vector<double>&& lmbds, std::vector<int>&& lmbd_i,
+                                   std::vector<double>&& lmbds, std::vector<double>&& stats,
+                                   std::vector<int>&& lmbd_i,
                                    std::vector<int>&& pvals_number, double optimal_lambda)
         : optimal_prefix(std::move(prefix)), pvals(std::move(p_values)),
-          lambdas(std::move(lmbds)), lambda_i(std::move(lmbd_i)), pvals_num(std::move(pvals_number)),
-          optimal_lambda(optimal_lambda) {}
+          lambdas(std::move(lmbds)), statistics(std::move(stats)), lambda_i(std::move(lmbd_i)),
+          pvals_num(std::move(pvals_number)), optimal_lambda(optimal_lambda) {}
 
 }

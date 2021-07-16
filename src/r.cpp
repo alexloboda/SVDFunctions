@@ -99,7 +99,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector& chi2fn,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
-                     IntegerVector min, IntegerVector max, IntegerVector step) {
+                     IntegerVector min, IntegerVector max, IntegerVector step,
+                     IntegerVector sa_iterations) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -113,6 +114,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int min_controls = min[0];
     int max_controls = max[0];
     int step_clusters = step[0];
+    int iterations = sa_iterations[0];
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(gmatrix_counts, gm_rs, cl);
@@ -120,23 +122,26 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters);
+                        min_controls, max_controls, step_clusters, iterations);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
-    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls);
+    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, iterations);
 
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());
     NumericVector pvals(result.pvals.begin(), result.pvals.end());
+    NumericVector stats(result.statistics.begin(), result.statistics.end());
     IntegerVector names(result.lambda_i.begin(), result.lambda_i.end());
     IntegerVector pvals_num(result.pvals_num.begin(), result.pvals_num.end());
     IntegerVector optimal_controls(result.optimal_prefix.begin(), result.optimal_prefix.end());
     NumericVector optimal_lambda = {result.optimal_lambda};
 
     lambda.attr("names") = names;
+    stats.attr("names") = names;
     pvals_num.attr("names") = names;
     ret["lambda"] = lambda;
     ret["optimal_lambda"] = optimal_lambda;
+    ret["statistics"] = stats;
     ret["controls"] = optimal_controls + 1;
     ret["pvals"] = pvals;
     ret["snps"] = pvals_num;

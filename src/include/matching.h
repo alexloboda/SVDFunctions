@@ -52,12 +52,14 @@ struct matching_results {
     std::vector<int> optimal_prefix;
     std::vector<double> pvals;
     std::vector<double> lambdas;
+    std::vector<double> statistics;
     std::vector<int> lambda_i;
     std::vector<int> pvals_num;
     double optimal_lambda;
 
     matching_results(std::vector<int>&& optimal_prefix, std::vector<double>&& p_values, std::vector<double>&& lmbds,
-                     std::vector<int>&& lmbd_i, std::vector<int>&& pvals_number, double oprimal_lambda);
+                     std::vector<double>&& statistics, std::vector<int>&& lmbd_i, std::vector<int>&& pvals_number,
+                     double oprimal_lambda);
 };
 
 class matching {
@@ -77,9 +79,9 @@ class matching {
 public:
     matching(std::shared_ptr<Eigen::MatrixXi> controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
-                     int threads, int start, int size_ub, int step);
+                     int threads, int start, int size_ub, int step, int iterations);
     void set_qchi_sq_function(const std::function<double(double)>& f);
-    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1);
+    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, int iterations = 100'000);
 
     void set_interrupts_checker(std::function<void()> checker) {
         interrupts_checker = checker;

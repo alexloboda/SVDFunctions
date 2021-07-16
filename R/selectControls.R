@@ -51,7 +51,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             casesMean, SVDReference, controlsMean, caseCounts, 
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
-                            min = 500, max = 1000, step = 50) {
+                            min = 500, max = 1000, step = 50, iterations = 100000) {
+  iterations <- as.integer(iterations)
+  stopifnot(iterations > 0)
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -89,7 +91,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 stats::qchisq(stats::ppoints(1e+05), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step)
+                                max, step, iterations)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }
