@@ -292,6 +292,15 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   
   numberOfClusters <- 2 * length(clusters$classes) - 1
   clusterResults <- vector("list", numberOfClusters)
+  
+  cluster_ids <- list()
+  gm_names <- c()
+  if (is.null(colnames(gmatrix))) {
+    gm_names <- 1:ncol(gmatrix)
+  } else {
+    gm_names <- colnames(gmatrix)
+  }
+  
   caseCl$hier$Do(function(node) {
     i <- ifelse(is.null(node$id), return(), node$id)
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
@@ -311,12 +320,14 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     US <- US / sqrt(length(cluster) - 1)
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
+    cluster_ids[[i]] <<- gm_names[cluster]
     clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
   })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
+  cluster_ids
 }
 
 processHierarchy <- function(hier) {
