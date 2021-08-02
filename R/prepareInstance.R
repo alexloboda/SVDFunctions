@@ -301,7 +301,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     gm_names <- colnames(gmatrix)
   }
   
-  caseCl$hier$Do(function(node) {
+  clusters$hier$Do(function(node) {
     i <- ifelse(is.null(node$id), return(), node$id)
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
     
