@@ -1,9 +1,6 @@
 language:   r
 dist: xenial
 cache:
-  directories:
-    - $TRAVIS_BUILD_DIR/packrat/src
-    - $TRAVIS_BUILD_DIR/packrat/lib
   packages: true
 
 os:
@@ -11,10 +8,6 @@ os:
 
 r_packages:
     - covr
-
-install:
-  - R -e "0" --args --bootstrap-packrat
-  - R -e "packrat::restore(restart = FALSE)"
 
 after_success:
     - Rscript -e 'library(covr); codecov()'

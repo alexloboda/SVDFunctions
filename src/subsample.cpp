@@ -16,6 +16,16 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
           wheel(std::random_device()()) {
 }
 
+namespace {
+
+template <class T>
+constexpr std::add_const_t<T>& const_ref(T& t) noexcept
+{
+    return t;
+}
+
+}
+
 void subsample::run(size_t iterations, size_t restarts, double t_start, double c, size_t pool_size, size_t start, size_t size_ub,
                     size_t step) {
     using std::vector;
@@ -31,7 +41,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         Rcpp::checkUserInterrupt();
         std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
         for (size_t t = 0; t < restarts; t++) {
-            thread_solutions.push_back(pool.push([test = std::as_const(test), iterations, t_start, curr_size, c,
+            thread_solutions.push_back(pool.push([test = const_ref(test), iterations, t_start, curr_size, c,
                                                          seed = wheel()]() -> std::shared_ptr<mvn_test> {
                 double t = t_start;
                 std::mt19937 mersenne_wheel(seed);
