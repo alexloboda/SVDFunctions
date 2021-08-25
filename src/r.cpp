@@ -1,6 +1,9 @@
 #include <Rcpp.h>
 #include <vector>
-#include <eigen3/Eigen/Dense>
+#include <RcppEigen.h>
+
+// [[Rcpp::depends(RcppEigen)]]
+
 #include <thread>
 
 #include "include/qchisq.h"

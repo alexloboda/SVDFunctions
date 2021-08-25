@@ -2,12 +2,16 @@
 #define SRC_MATCHING_H
 
 #include <vector>
-#include <eigen3/Eigen/Dense>
+#include <RcppEigen.h>
+
+// [[Rcpp::depends(RcppEigen)]]
+
 #include <functional>
 #include <stdexcept>
 
 #include "subsample.h"
 #include "lm.h"
+
 
 namespace matching {
 

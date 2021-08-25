@@ -3,7 +3,10 @@
 
 #include <vector>
 #include <memory>
-#include <eigen3/Eigen/Dense>
+#include <RcppEigen.h>
+
+// [[Rcpp::depends(RcppEigen)]]
+
 #include <random>
 
 namespace mvn {

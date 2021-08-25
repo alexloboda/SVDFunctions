@@ -6,6 +6,7 @@
 #include <utility>
 #include <fstream>
 #include <Rcpp.h>
+
 namespace Eigen{
 template<class Matrix>
 void write_binary(const char* filename, const Matrix& matrix){

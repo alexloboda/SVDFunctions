@@ -32,5 +32,6 @@ RoxygenNote: 7.1.1
 SystemRequirements: C++14
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
-           BH
+           BH,
+           RcppEigen
 Suggests: testthat
