@@ -1,6 +1,6 @@
 Package: SVDFunctions
 Type: Package
-Title: Set of functions for selecting matching genetic controls without sharing genotypes.
+Title: Set of Functions for Selecting Matching Genetic Controls without Sharing Genotypes
 Version: 1.1
 Authors@R: c(person("Alexander", "Loboda", email="aloboda@broadinstitute.org", role=c("aut","cre")),
             person("Mykyta", "Artomov", email="artomov@broadinstitute.org", role=c("aut")),
@@ -9,23 +9,22 @@ Authors@R: c(person("Alexander", "Loboda", email="aloboda@broadinstitute.org", r
 Description: Package contains set of functions used for building SVD-based 
     COntrol REpository (SCORE) - platform for secure matching of control 
     subjects without genotype sharing for exome DNA sequencing studies. 
-    Platform is available at dnascore.net
+    Platform is available at dnascore.net.
 Depends: R (>= 3.1.0)
-License: MIT
+License: MIT + file LICENSE
 Encoding: UTF-8
 biocViews: 
 Imports:
+    Rcpp,
+    adamethods,
     data.tree, 
     plotly,
     mclust,
     yaml,
     magrittr,
-    Rcpp,
-    BH,
     data.table,
     methods,
     seqminer,
-    RcppEigen,
     RSpectra
 LazyData: true
 RoxygenNote: 7.1.1

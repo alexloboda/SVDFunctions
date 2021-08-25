@@ -8,7 +8,7 @@ parallelResidEstimate <- function(genotypeMatrix, SVDReference,
   SVint <- ncol(SVDReference)
   caseMeans <- caseMeans - contMeans
   genotypeMatrix <- genotypeMatrix - contMeans
-  contDecomp <- svds(genotypeMatrix, k = SV)
+  contDecomp <- RSpectra::svds(genotypeMatrix, k = SV)
   basisChange <- t(contDecomp$u)
   center_in_un <- basisChange %*% matrix(caseMeans, ncol = 1)
   covMatrix <- basisChange %*% SVDReference %*%

@@ -6,7 +6,7 @@ condition <- function(subclass, message, call = sys.call(-1), ...) {
   )
 }
 
-checkCaseInfo <- function(cases, variants) {
+checkCaseInfo <- function(cases) {
   if (!is.numeric(cases$US) | any(is.na(cases$US))) {
     userError("Matrix U contains missing data or non-numeric values")
   }
@@ -16,7 +16,7 @@ matchControlsCluster <- function(cases, gmatrix, original, ...) {
   softMinLambda <- list(...)$softMinLambda
   softMaxLambda <- list(...)$softMaxLambda
   
-  checkCaseInfo(cases, variants)
+  checkCaseInfo(cases)
   
   if (nrow(cases$counts) != nrow(gmatrix)){
     userError("Something is wrong with SNP selection")
@@ -25,7 +25,7 @@ matchControlsCluster <- function(cases, gmatrix, original, ...) {
   results <- selectControls(gmatrix, original, cases$US, cases$mean, 
                             cases$counts, ...)
   df <- data.frame(sample = results$controls, 
-                   cluster = if (length(resid) == 0) c() else cases$id,
+                   cluster = if (length(results$controls) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
   pvals <- list()
   lambdas <- list()
@@ -43,27 +43,6 @@ matchControlsCluster <- function(cases, gmatrix, original, ...) {
     list(table = data.frame(), pvals = c(), lambdas = c(), minL = Inf, 
          cases = cases, clusters = c(), ncontrols = 0)
   }
-}
-
-distributeControls <- function(residuals, threshold = 100) {
-  if (nrow(residuals) == 0) {
-    return(NULL)
-  }
-  residuals <- residuals[order(residuals$value), ]
-  while (TRUE) {
-    if (nrow(residuals) == 0) {
-      return(residuals)
-    }
-    top <- residuals[!duplicated(residuals$sample), ]
-    clusterCounts <- table(top$cluster)
-    outsider <- which.min(clusterCounts)
-    if (clusterCounts[outsider] >= threshold) {
-      return(top)
-    } else {
-      residuals <- residuals[residuals$cluster != outsider, ]
-    }
-  }
-  residuals
 }
 
 goodClusters <- function(l, r) {
