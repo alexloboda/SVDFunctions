@@ -35,17 +35,25 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #'  satisfying \eqn{\lambda_GC < max_lambda} and \eqn{\lambda_GC > min_lambda}.
 #' Otherwise no results will be returned. Minimal size of control set 
 #' is \code{min} samples for privacy preservation reasons.
-#' @param genotypeMatrix Genotype matrix
-#' @param originalGenotypeMatrix Genotype matrix with no imputation applied.
-#' @param SVDReference Reference basis of the left singular vectors.
-#' @param meanGenotype Mean genotype vector.
-#' @param caseCounts Matrix with summary genotype counts from cases.
+#' @param genotypeMatrix numeric matrix where rows are variants and columns are
+#' samples. The missing values should be imputed prior calling this function.
+#' @param originalGenotypeMatrix genotype matrix with missing values.
+#' @param casesPDs numeric matrix where rows are variants and columns are 
+#' principal directions of the data in case dataset.
+#' @param casesMean numeric vector representing mean per-variant genotype value.
+#' @param SVDReference reference basis of the left singular vectors.
+#' @param controlsMean mean value of the reference genotypes.
+#' @param caseCounts matrix with summary genotype counts from cases.
 #' @param controlsClustering cluster names for controls.
-#' @param minLambda Minimum possible lambda.
-#' @param softMinLambda Desirable minimum for lambda.
-#' @param softMaxLambda Desirable maximum for lambda.
-#' @param maxLambda Maximum possible lambda.
-#' @param min Minimal size of a control set that is permitted for return.
+#' @param minLambda minimum possible lambda.
+#' @param softMinLambda desirable minimum for lambda.
+#' @param softMaxLambda desirable maximum for lambda.
+#' @param maxLambda maximum possible lambda.
+#' @param min minimal number of clusters from control dataset to be returned.
+#' @param max maximum number of clusters from control dataset to be returned.
+#' @param step perform matching with the step.
+#' @param iterations number of simulated annealing iterations per each subset
+#' size.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 

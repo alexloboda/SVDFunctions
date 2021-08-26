@@ -2,6 +2,11 @@
 #' 
 #' @param genotypeMatrix Genotype matrix.
 #' @param SVDReference Reference basis of the left singular vectors.
+#' @param caseMeans numeric vector representing per-variant mean genotype value
+#' of the cases.
+#' @param contMeans numeric vector representing per-variant mean genotype value
+#' of the controls.
+#' @param SV number of singular vectors to be used.
 #' @export
 parallelResidEstimate <- function(genotypeMatrix, SVDReference,
                                    caseMeans,  contMeans, SV = 3) {

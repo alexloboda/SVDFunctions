@@ -45,11 +45,14 @@ collapsingToTree <- function(collapsing) {
 #' Gaussian mixed model fitting from Mclust package
 #' using ellipsoidal, varying volume, shape, and orientation
 #' model ("VVV").
-#' @param PCA results of gmatrix principal component analysis
+#' @param PCA results of gmatrix principal component analysis.
 #' @param plotBIC logical whether a plot of Bayesian Information 
-#' Criterion vs cluster number should be returned
-#' @param plotDendrogram whether dendrogram should be plotted
-#' @param clusters maximum number of clusters
+#' Criterion vs cluster number should be returned.
+#' @param plotDendrogram whether dendrogram should be plotted.
+#' @param minClusters minimal number of clusters.
+#' @param clusters maximum number of clusters.
+#' @param keelSamples names of the samples to keep in results. The feature is
+#' used in order to cluster jointly with another dataset.
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
                                    minClusters = 1, clusters = 20, keepSamples = NULL) {
@@ -95,8 +98,12 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
 #' PCA is estimated using SVD of the mean centered genotype matrix.
 #' PCA coordinates will be needed to perform clustering of the 
 #' case samples to ensure relatively homogenious matching.
-#' @param gmatrix Genotype matrix wihout missing values
-#' @param components Number of principal components to be computed
+#' @param gmatrix Genotype matrix wihout missing values.
+#' @param SVDReference a U matrix of SVD decomposition of centered reference
+#' genotype matrix. 
+#' @param referenceMean numeric vector representing per-variant genotype mean 
+#' value of the genotype matrix that were used to construct \code{SVDReference}.
+#' @param components Number of principal components to be computed.
 #' @export
 gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, components = 10){
   if (is.null(referenceMean)) {
