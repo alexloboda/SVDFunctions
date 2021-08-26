@@ -25,9 +25,9 @@ Missing values are allowed.}
 
 \item{clusterMergeCoef}{numeric coefficient of preference of merging clusters.}
 
-\item{softMinLambda}{Desirable minimum for lambda.}
+\item{softMinLambda}{desirable minimum for lambda.}
 
-\item{softMaxLambda}{Desirable maximum for lambda.}
+\item{softMaxLambda}{desirable maximum for lambda.}
 
 \item{...}{parameters to be passed to selectControls function.}
 }

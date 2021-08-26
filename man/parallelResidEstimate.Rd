@@ -16,6 +16,14 @@ parallelResidEstimate(
 \item{genotypeMatrix}{Genotype matrix.}
 
 \item{SVDReference}{Reference basis of the left singular vectors.}
+
+\item{caseMeans}{numeric vector representing per-variant mean genotype value
+of the cases.}
+
+\item{contMeans}{numeric vector representing per-variant mean genotype value
+of the controls.}
+
+\item{SV}{number of singular vectors to be used.}
 }
 \description{
 Estimation of residual vector norms for all controls.

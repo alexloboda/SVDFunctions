@@ -14,14 +14,19 @@ estimateCaseClusters(
 )
 }
 \arguments{
-\item{PCA}{results of gmatrix principal component analysis}
+\item{PCA}{results of gmatrix principal component analysis.}
 
 \item{plotBIC}{logical whether a plot of Bayesian Information 
-Criterion vs cluster number should be returned}
+Criterion vs cluster number should be returned.}
 
-\item{plotDendrogram}{whether dendrogram should be plotted}
+\item{plotDendrogram}{whether dendrogram should be plotted.}
 
-\item{clusters}{maximum number of clusters}
+\item{minClusters}{minimal number of clusters.}
+
+\item{clusters}{maximum number of clusters.}
+
+\item{keelSamples}{names of the samples to keep in results. The feature is
+used in order to cluster jointly with another dataset.}
 }
 \description{
 Clusters are estimated from PC loadings using

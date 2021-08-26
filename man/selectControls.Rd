@@ -24,27 +24,40 @@ selectControls(
 )
 }
 \arguments{
-\item{genotypeMatrix}{Genotype matrix}
+\item{genotypeMatrix}{numeric matrix where rows are variants and columns are
+samples. The missing values should be imputed prior calling this function.}
 
-\item{originalGenotypeMatrix}{Genotype matrix with no imputation applied.}
+\item{originalGenotypeMatrix}{genotype matrix with missing values.}
 
-\item{SVDReference}{Reference basis of the left singular vectors.}
+\item{casesPDs}{numeric matrix where rows are variants and columns are 
+principal directions of the data in case dataset.}
 
-\item{caseCounts}{Matrix with summary genotype counts from cases.}
+\item{casesMean}{numeric vector representing mean per-variant genotype value.}
+
+\item{SVDReference}{reference basis of the left singular vectors.}
+
+\item{controlsMean}{mean value of the reference genotypes.}
+
+\item{caseCounts}{matrix with summary genotype counts from cases.}
 
 \item{controlsClustering}{cluster names for controls.}
 
-\item{minLambda}{Minimum possible lambda.}
+\item{minLambda}{minimum possible lambda.}
 
-\item{softMinLambda}{Desirable minimum for lambda.}
+\item{softMinLambda}{desirable minimum for lambda.}
 
-\item{softMaxLambda}{Desirable maximum for lambda.}
+\item{softMaxLambda}{desirable maximum for lambda.}
 
-\item{maxLambda}{Maximum possible lambda.}
+\item{maxLambda}{maximum possible lambda.}
 
-\item{min}{Minimal size of a control set that is permitted for return.}
+\item{min}{minimal number of clusters from control dataset to be returned.}
 
-\item{meanGenotype}{Mean genotype vector.}
+\item{max}{maximum number of clusters from control dataset to be returned.}
+
+\item{step}{perform matching with the step.}
+
+\item{iterations}{number of simulated annealing iterations per each subset
+size.}
 }
 \description{
 Finds an optimal set of controls satisfying 

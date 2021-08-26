@@ -7,9 +7,15 @@
 gmatrixPCA(gmatrix, SVDReference = NULL, referenceMean = NULL, components = 10)
 }
 \arguments{
-\item{gmatrix}{Genotype matrix wihout missing values}
+\item{gmatrix}{Genotype matrix wihout missing values.}
 
-\item{components}{Number of principal components to be computed}
+\item{SVDReference}{a U matrix of SVD decomposition of centered reference
+genotype matrix.}
+
+\item{referenceMean}{numeric vector representing per-variant genotype mean 
+value of the genotype matrix that were used to construct \code{SVDReference}.}
+
+\item{components}{Number of principal components to be computed.}
 }
 \description{
 PCA is estimated using SVD of the mean centered genotype matrix.
