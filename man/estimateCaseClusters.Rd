@@ -25,7 +25,7 @@ Criterion vs cluster number should be returned.}
 
 \item{clusters}{maximum number of clusters.}
 
-\item{keelSamples}{names of the samples to keep in results. The feature is
+\item{keepSamples}{names of the samples to keep in results. The feature is
 used in order to cluster jointly with another dataset.}
 }
 \description{

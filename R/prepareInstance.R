@@ -51,7 +51,7 @@ collapsingToTree <- function(collapsing) {
 #' @param plotDendrogram whether dendrogram should be plotted.
 #' @param minClusters minimal number of clusters.
 #' @param clusters maximum number of clusters.
-#' @param keelSamples names of the samples to keep in results. The feature is
+#' @param keepSamples names of the samples to keep in results. The feature is
 #' used in order to cluster jointly with another dataset.
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
