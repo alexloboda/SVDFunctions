@@ -2,15 +2,15 @@
 % Please edit documentation in R/clustering.R
 \name{removeCluster}
 \alias{removeCluster}
-\title{Remove cluster from clusutering object with all samples in it}
+\title{Remove cluster from clusutering object with all samples in it.}
 \usage{
 removeCluster(clustering, cluster)
 }
 \arguments{
-\item{clustering}{clustering object}
+\item{clustering}{clustering object.}
 
-\item{cluster}{a name of the cluster to delete or its id}
+\item{cluster}{a name of the cluster to delete or its id.}
 }
 \description{
-Remove cluster from clusutering object with all samples in it
+Remove cluster from clusutering object with all samples in it.
 }

@@ -65,11 +65,11 @@ update.nodes <- function(cl) {
   })  
 }
 
-#' Constructor for clustering object
+#' Constructor for clustering object.
 #' @param classification named with sample names character vector of 
 #' classes.
 #' @param hierarchy tree-like structure, a list containing cluster name(leafs) or
-#' two lists with the same structure. See examples
+#' two lists with the same structure. See examples.
 #' @examples
 #' samples <- c("C1", "C1", "C2", "C2", "C3", "C4")
 #' names(samples) <- paste0("sample", 1:6)
@@ -125,9 +125,9 @@ findNode <- function(tree, id) {
   ret[[1]]
 }
 
-#' Remove cluster from clusutering object with all samples in it
-#' @param clustering clustering object 
-#' @param cluster a name of the cluster to delete or its id
+#' Remove cluster from clusutering object with all samples in it.
+#' @param clustering clustering object.
+#' @param cluster a name of the cluster to delete or its id.
 #' @export
 removeCluster <- function(clustering, cluster) {
   clustering$hier <- data.tree::Clone(clustering$hier)
@@ -155,9 +155,9 @@ removeCluster <- function(clustering, cluster) {
   normalizeClustering(clustering)
 }
 
-#' Merge a cluster with its sibling in a tree
-#' @param clustering clustering object
-#' @param cluster a name of the cluster or its id
+#' Merge a cluster with its sibling in a tree.
+#' @param clustering clustering object.
+#' @param cluster a name of the cluster or its id.
 #' @export
 mergeCluster <- function(clustering, cluster) {
   clustering$hier <- data.tree::Clone(clustering$hier)

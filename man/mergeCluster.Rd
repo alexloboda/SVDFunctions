@@ -2,15 +2,15 @@
 % Please edit documentation in R/clustering.R
 \name{mergeCluster}
 \alias{mergeCluster}
-\title{Merge a cluster with its sibling in a tree}
+\title{Merge a cluster with its sibling in a tree.}
 \usage{
 mergeCluster(clustering, cluster)
 }
 \arguments{
-\item{clustering}{clustering object}
+\item{clustering}{clustering object.}
 
-\item{cluster}{a name of the cluster or its id}
+\item{cluster}{a name of the cluster or its id.}
 }
 \description{
-Merge a cluster with its sibling in a tree
+Merge a cluster with its sibling in a tree.
 }

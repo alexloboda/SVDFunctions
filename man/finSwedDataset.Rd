@@ -3,7 +3,7 @@
 \docType{data}
 \name{finSwedDataset}
 \alias{finSwedDataset}
-\title{Finnish & Swedish exome collection dataset preparation pack}
+\title{Finnish & Swedish exome collection dataset preparation pack.}
 \format{
 An object of class \code{list} of length 1.
 }
@@ -12,6 +12,6 @@ finSwedDataset
 }
 \description{
 A dataset containing all required information that is necessary for
-creating an instance that can be submitted to website \url{http://dnascore.net}
+creating an instance that can be submitted to website \url{http://dnascore.net}.
 }
 \keyword{datasets}

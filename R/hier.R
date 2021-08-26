@@ -141,11 +141,11 @@ filter_variants <- function(population, ids) {
   population
 }
 
-#' Select a set of controls that matches a set of cases
+#' Select a set of controls that populationally matches a set of cases.
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt). 
 #' Intermediate values are allowed, NAs are not.
 #' @param cases result of calling function readInstanceFromYml.
-#' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt).
+#' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt)
 #' Missing values are allowed.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.

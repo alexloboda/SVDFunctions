@@ -2,11 +2,7 @@
 % Please edit documentation in R/prepareInstance.R
 \name{estimateCaseClusters}
 \alias{estimateCaseClusters}
-\title{Estimate clusters within case data
-Clusters are estimated from PC loadings using
-Gaussian mixed model fitting from Mclust package
-using ellipsoidal, varying volume, shape, and orientation
-model ("VVV")}
+\title{Estimate clusters within case data.}
 \usage{
 estimateCaseClusters(
   PCA,
@@ -28,9 +24,8 @@ Criterion vs cluster number should be returned}
 \item{clusters}{maximum number of clusters}
 }
 \description{
-Estimate clusters within case data
 Clusters are estimated from PC loadings using
 Gaussian mixed model fitting from Mclust package
 using ellipsoidal, varying volume, shape, and orientation
-model ("VVV")
+model ("VVV").
 }

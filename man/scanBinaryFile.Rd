@@ -2,7 +2,7 @@
 % Please edit documentation in R/vcf.R
 \name{scanBinaryFile}
 \alias{scanBinaryFile}
-\title{Scan binary variant file}
+\title{Scan binary variant file.}
 \usage{
 scanBinaryFile(
   binaryFile,
@@ -21,11 +21,11 @@ scanBinaryFile(
 )
 }
 \arguments{
-\item{binaryFile}{the name of binary file}
+\item{binaryFile}{the name of binary file.}
 
-\item{metafile}{the name of metadata file}
+\item{metafile}{the name of metadata file.}
 
-\item{samples}{the set of samples to be analyzed}
+\item{samples}{the set of samples to be analyzed.}
 
 \item{variants}{the set of variants in format "chr#:# REF ALT"
 (i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
@@ -39,17 +39,17 @@ otherwise assumed as missing.}
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
 
-\item{minMAF}{numeric minimum minor allele frequency}
+\item{minMAF}{numeric minimum minor allele frequency.}
 
-\item{maxMAF}{numeric maximum minor allele frequency}
+\item{maxMAF}{numeric maximum minor allele frequency.}
 
-\item{minMAC}{integer minimum minor allele count}
+\item{minMAC}{integer minimum minor allele count.}
 
-\item{maxMAC}{integer maximum minor allele count}
+\item{maxMAC}{integer maximum minor allele count.}
 
-\item{reportSingletons}{logical if TRUE singletons will be reported}
+\item{reportSingletons}{logical if TRUE singletons will be reported.}
 
-\item{minCallRate}{numeric minimum call rate}
+\item{minCallRate}{numeric minimum call rate.}
 }
 \value{
 matrix with three columns:  

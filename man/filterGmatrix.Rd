@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepareInstance.R
 \name{filterGmatrix}
 \alias{filterGmatrix}
-\title{Filter gmatrix by minimal sample call rate and minimal variant call rate}
+\title{Filter gmatrix by minimal sample call rate and minimal variant call rate.}
 \usage{
 filterGmatrix(
   gmatrix,
@@ -12,15 +12,15 @@ filterGmatrix(
 )
 }
 \arguments{
-\item{gmatrix}{gmatrix with imputed missing values}
+\item{gmatrix}{gmatrix with imputed missing values.}
 
-\item{imputationResults}{matrix indicating which genotypes
-were imputed}
+\item{imputationResults}{matrix of the same dimensions as \code{gmatrix} 
+filled with values TRUE/FALSE indicating which genotypes were imputed.}
 
-\item{minVariantCallRate}{minimal variant call rate}
+\item{minVariantCallRate}{minimal variant call rate.}
 
-\item{minSampleCallRate}{minimal sample call rate}
+\item{minSampleCallRate}{minimal sample call rate.}
 }
 \description{
-Filter gmatrix by minimal sample call rate and minimal variant call rate
+Filter gmatrix by minimal sample call rate and minimal variant call rate.
 }

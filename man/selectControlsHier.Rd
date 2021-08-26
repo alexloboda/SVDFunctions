@@ -2,7 +2,7 @@
 % Please edit documentation in R/hier.R
 \name{selectControlsHier}
 \alias{selectControlsHier}
-\title{Select a set of controls that matches a set of cases}
+\title{Select a set of controls that populationally matches a set of cases.}
 \usage{
 selectControlsHier(
   controlGMatrix,
@@ -20,17 +20,17 @@ Intermediate values are allowed, NAs are not.}
 
 \item{cases}{result of calling function readInstanceFromYml.}
 
-\item{originalControlGMatrix}{integer matrix(0 - ref, 1 - het, 2 - both alt).
+\item{originalControlGMatrix}{integer matrix(0 - ref, 1 - het, 2 - both alt)
 Missing values are allowed.}
 
 \item{clusterMergeCoef}{numeric coefficient of preference of merging clusters.}
 
-\item{softMinLambda}{Desirable minimum for lambda}
+\item{softMinLambda}{Desirable minimum for lambda.}
 
-\item{softMaxLambda}{Desirable maximum for lambda}
+\item{softMaxLambda}{Desirable maximum for lambda.}
 
 \item{...}{parameters to be passed to selectControls function.}
 }
 \description{
-Select a set of controls that matches a set of cases
+Select a set of controls that populationally matches a set of cases.
 }

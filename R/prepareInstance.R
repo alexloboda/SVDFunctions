@@ -39,11 +39,12 @@ collapsingToTree <- function(collapsing) {
   nodes[[length(nodes)]]
 }
 
-#' Estimate clusters within case data
+#' Estimate clusters within case data.
+#' 
 #' Clusters are estimated from PC loadings using
 #' Gaussian mixed model fitting from Mclust package
 #' using ellipsoidal, varying volume, shape, and orientation
-#' model ("VVV")
+#' model ("VVV").
 #' @param PCA results of gmatrix principal component analysis
 #' @param plotBIC logical whether a plot of Bayesian Information 
 #' Criterion vs cluster number should be returned
@@ -89,9 +90,9 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
   res
 }
 
-#' Estimate PCA from gmatrix without missing values 
+#' Estimate PCA from gmatrix without missing values.
 #' 
-#' PCA is estimated using SVD of the mean centered genotype matrix
+#' PCA is estimated using SVD of the mean centered genotype matrix.
 #' PCA coordinates will be needed to perform clustering of the 
 #' case samples to ensure relatively homogenious matching.
 #' @param gmatrix Genotype matrix wihout missing values
@@ -125,9 +126,10 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   pca
 }
 
-#' Filter gmatrix by minimal sample call rate and minimal variant call rate
-#' @param minVariantCallRate minimal variant call rate
-#' @param minSampleCallRate minimal sample call rate
+#' Filter gmatrix by minimal sample call rate and minimal variant call rate.
+#' 
+#' @param minVariantCallRate minimal variant call rate.
+#' @param minSampleCallRate minimal sample call rate.
 #' @inheritParams prepareInstance
 #' @export
 filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
@@ -152,8 +154,9 @@ filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
   list(gmatrix = gmatrix, imputationResults = imputationResults)
 }
 
-#' Plot 3d PCA plot 
-#' @param PCA pca of genotype matrix returned by function gmatrixPCA
+#' Plot 3d PCA plot.
+#' 
+#' @param PCA pca of genotype matrix returned by function gmatrixPCA.
 #' @inheritParams prepareInstance
 #' @inheritParams estimateCaseClusters
 #' @export 
@@ -241,18 +244,25 @@ drop <- function(pca, knn_rate, mvn_rate) {
   
 }
 
-#' Prepare instance and write yaml file from QC-ed gmatrix
-#' @param gmatrix gmatrix with imputed missing values
-#' @param imputationResults matrix indicating which genotypes
-#' were imputed
-#' @param maxVectors maximum number of principal directions for each cluster
-#' to be computed and written to a file
-#' @param 
-#' @param outputFileName name of the YAML file to output
-#' @param title title to put as a first line in yaml file
-#' @param clusters clustering object
-#' @param MAC minor allele count used for QC
-#' @param MAF minor allele frequency used for QC
+#' Prepare instance and write yaml file from QC-ed gmatrix.
+#' 
+#' @param gmatrix gmatrix with imputed missing values.
+#' @param imputationResults matrix of the same dimensions as \code{gmatrix} 
+#' filled with values TRUE/FALSE indicating which genotypes were imputed.
+#' @param controlsU Reference U matrix from SVD decomposition of centered
+#' genotype matrix of control dataset or joint dataset.
+#' @param meanControl numeric vector representing mean per-variant genotype, 
+#' that were taken as a center while costructing \code{controlsU} matrix.
+#' @param outputFileName name of the YAML file to output.
+#' @param clusters clustering object.
+#' @param title title to put as a first line in yaml file.
+#' @param MAC minor allele count used for QC.
+#' @param MAF minor allele frequency used for QC.
+#' @param knn_drop fraction of samples that would be excluded from dataset at
+#' each level of hierarchy clustering by applying knn anomaly detection algorithm.
+#' @param normalize_drop fraction of samples to be excluded from dataset at
+#' each level of hierarchy clustering by applying function \code{normal_subsample} 
+#' from the package.
 #' @import mclust
 #' @export
 prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl, 
@@ -360,10 +370,11 @@ getNamesFromHier <- function(hier) {
   } 
 }
 
-#' Read instance from YML file 
-#' @param filename YML file
+#' Read instance from YML file.
+#' 
+#' @param filename YML file.
 #' @return a list of four: title of dataset, list of variants, hierarchy and
-#' population description
+#' population description.
 #' @export
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 

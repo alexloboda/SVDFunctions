@@ -2,15 +2,15 @@
 % Please edit documentation in R/prepareInstance.R
 \name{plotPCA}
 \alias{plotPCA}
-\title{Plot 3d PCA plot}
+\title{Plot 3d PCA plot.}
 \usage{
 plotPCA(PCA, clusters = NULL)
 }
 \arguments{
-\item{PCA}{pca of genotype matrix returned by function gmatrixPCA}
+\item{PCA}{pca of genotype matrix returned by function gmatrixPCA.}
 
-\item{clusters}{clustering object}
+\item{clusters}{clustering object.}
 }
 \description{
-Plot 3d PCA plot
+Plot 3d PCA plot.
 }

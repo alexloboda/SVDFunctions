@@ -2,7 +2,7 @@
 % Please edit documentation in R/clustering.R
 \name{clustering}
 \alias{clustering}
-\title{Constructor for clustering object}
+\title{Constructor for clustering object.}
 \usage{
 clustering(classification, hierarchy)
 }
@@ -11,10 +11,10 @@ clustering(classification, hierarchy)
 classes.}
 
 \item{hierarchy}{tree-like structure, a list containing cluster name(leafs) or
-two lists with the same structure. See examples}
+two lists with the same structure. See examples.}
 }
 \description{
-Constructor for clustering object
+Constructor for clustering object.
 }
 \examples{
 samples <- c("C1", "C1", "C2", "C2", "C3", "C4")

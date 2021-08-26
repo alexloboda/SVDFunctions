@@ -2,7 +2,7 @@
 % Please edit documentation in R/vcf.R
 \name{scanVCF}
 \alias{scanVCF}
-\title{Scan VCF files}
+\title{Scan VCF file.}
 \usage{
 scanVCF(
   vcf,
@@ -29,7 +29,7 @@ otherwise assumed as missing.}
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
 
-\item{samples}{the set of samples to be scanned and returned}
+\item{samples}{the set of samples to be scanned and returned.}
 
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
@@ -37,7 +37,7 @@ must be eliminated from consideration.}
 \item{variants}{the set of variants in format "chr#:# REF ALT"
 (i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
 
-\item{returnGenotypeMatrix}{logical: whether or not return genotype matrix}
+\item{returnGenotypeMatrix}{logical: whether or not return genotype matrix.}
 
 \item{predictMissing}{if TRUE missing values will be replaced with predicted
 values.}

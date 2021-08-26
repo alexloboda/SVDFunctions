@@ -2,19 +2,19 @@
 % Please edit documentation in R/predictAncestry.R
 \name{predictAncestry}
 \alias{predictAncestry}
-\title{SVD-based ancestry prediction}
+\title{SVD-based ancestry prediction.}
 \usage{
 predictAncestry(genotypeMatrix, referenceUList, SV, ancestryList)
 }
 \arguments{
-\item{genotypeMatrix}{Vector of genotypes for a sample}
+\item{genotypeMatrix}{Vector of genotypes for a sample.}
 
 \item{referenceUList}{List object containing matrices of the left singular
-vectors for every ancestry reference}
+vectors for every ancestry reference.}
 
-\item{SV}{Number of singular vectors to use}
+\item{SV}{Number of singular vectors to use.}
 
-\item{ancestryList}{Vector of ancestry names}
+\item{ancestryList}{Vector of ancestry names.}
 }
 \description{
 Requires several left singular vector bases from every ancestry to be detected. 

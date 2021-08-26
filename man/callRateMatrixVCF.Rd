@@ -2,7 +2,7 @@
 % Please edit documentation in R/vcf.R
 \name{callRateMatrixVCF}
 \alias{callRateMatrixVCF}
-\title{Scan VCF file for call rate matrix}
+\title{Scan VCF file for call rate matrix.}
 \usage{
 callRateMatrixVCF(
   vcf,
@@ -27,7 +27,7 @@ otherwise assumed as missing.}
 \item{GQ}{integer: minimum required genotype quality for position to be 
 considered, otherwise assumed as missing.}
 
-\item{samples}{the set of samples to be scanned and returned}
+\item{samples}{the set of samples to be scanned and returned.}
 
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}

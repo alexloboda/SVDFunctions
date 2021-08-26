@@ -1,7 +1,7 @@
-#' Estimation of residual vector norms for all controls
+#' Estimation of residual vector norms for all controls.
 #' 
-#' @param genotypeMatrix Genotype matrix
-#' @param SVDReference Reference basis of the left singular vectors
+#' @param genotypeMatrix Genotype matrix.
+#' @param SVDReference Reference basis of the left singular vectors.
 #' @export
 parallelResidEstimate <- function(genotypeMatrix, SVDReference,
                                    caseMeans,  contMeans, SV = 3) {

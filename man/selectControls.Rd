@@ -2,7 +2,7 @@
 % Please edit documentation in R/selectControls.R
 \name{selectControls}
 \alias{selectControls}
-\title{Select a set of controls that matches to a set of cases}
+\title{Select a set of controls that matches to a set of cases.}
 \usage{
 selectControls(
   genotypeMatrix,
@@ -26,25 +26,25 @@ selectControls(
 \arguments{
 \item{genotypeMatrix}{Genotype matrix}
 
-\item{originalGenotypeMatrix}{Genotype matrix with no imputation applied}
+\item{originalGenotypeMatrix}{Genotype matrix with no imputation applied.}
 
-\item{SVDReference}{Reference basis of the left singular vectors}
+\item{SVDReference}{Reference basis of the left singular vectors.}
 
-\item{caseCounts}{Matrix with summary genotype counts from cases}
+\item{caseCounts}{Matrix with summary genotype counts from cases.}
 
-\item{controlsClustering}{cluster names for controls}
+\item{controlsClustering}{cluster names for controls.}
 
-\item{minLambda}{Minimum possible lambda}
+\item{minLambda}{Minimum possible lambda.}
 
-\item{softMinLambda}{Desirable minimum for lambda}
+\item{softMinLambda}{Desirable minimum for lambda.}
 
-\item{softMaxLambda}{Desirable maximum for lambda}
+\item{softMaxLambda}{Desirable maximum for lambda.}
 
-\item{maxLambda}{Maximum possible lambda}
+\item{maxLambda}{Maximum possible lambda.}
 
-\item{min}{Minimal size of a control set that is permitted for return}
+\item{min}{Minimal size of a control set that is permitted for return.}
 
-\item{meanGenotype}{Mean genotype vector}
+\item{meanGenotype}{Mean genotype vector.}
 }
 \description{
 Finds an optimal set of controls satisfying 

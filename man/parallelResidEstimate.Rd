@@ -2,7 +2,7 @@
 % Please edit documentation in R/parallelResidEstimate.R
 \name{parallelResidEstimate}
 \alias{parallelResidEstimate}
-\title{Estimation of residual vector norms for all controls}
+\title{Estimation of residual vector norms for all controls.}
 \usage{
 parallelResidEstimate(
   genotypeMatrix,
@@ -13,10 +13,10 @@ parallelResidEstimate(
 )
 }
 \arguments{
-\item{genotypeMatrix}{Genotype matrix}
+\item{genotypeMatrix}{Genotype matrix.}
 
-\item{SVDReference}{Reference basis of the left singular vectors}
+\item{SVDReference}{Reference basis of the left singular vectors.}
 }
 \description{
-Estimation of residual vector norms for all controls
+Estimation of residual vector norms for all controls.
 }

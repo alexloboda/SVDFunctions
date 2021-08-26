@@ -59,7 +59,7 @@ createVCFFromTabixIndex <- function(vcf, variants, regions, verbose) {
   t
 }
 
-#' Scan VCF file for call rate matrix
+#' Scan VCF file for call rate matrix.
 #' 
 #' The method parses VCF file and calculate call rate for all specified regions.
 #' @inheritParams scanVCF
@@ -80,12 +80,12 @@ callRateMatrixVCF <- function(vcf, regions, DP = 10L, GQ = 20L, samples = NULL,
           verbose = verbose, returnGenotypeMatrix = FALSE)$callrate
 }
 
-#' Scan VCF file for genotypes
+#' Scan VCF file for genotypes.
 #' 
 #' The method scans VCF files and returns genotype matrix for specified 
 #' variants after applying neccessary filters.
 #' @inheritParams scanVCF
-#' @param ... other arguments to be passed to scanVCF function
+#' @param ... other arguments to be passed to scanVCF function.
 #' @examples
 #' vcf <- "CEU.exon.2010_09.genotypes.vcf.gz"
 #' filepath <- system.file("extdata", vcf, package = "SVDFunctions")
@@ -118,7 +118,7 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
     scanVCF(vcf, returnGenotypeMatrix = FALSE, verbose = verbose)$sample
 }
 
-#' Scan VCF files 
+#' Scan VCF file.
 #' 
 #' Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
 #' with applied filters. In addition, the method can generate binary and 
@@ -129,12 +129,12 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' otherwise assumed as missing.
 #' @param GQ integer: minimum required genotype quality for position to be 
 #' considered, otherwise assumed as missing.
-#' @param samples the set of samples to be scanned and returned
+#' @param samples the set of samples to be scanned and returned.
 #' @param bannedPositions the set of positions in format "chr#:#" that 
 #' must be eliminated from consideration. 
 #' @param variants the set of variants in format "chr#:# REF ALT"
 #' (i.e. chr23:1532 T GT). In case of deletion ALT must be "*".
-#' @param returnGenotypeMatrix logical: whether or not return genotype matrix
+#' @param returnGenotypeMatrix logical: whether or not return genotype matrix.
 #' @param predictMissing if TRUE missing values will be replaced with predicted
 #' values.
 #' @param missingRateThreshold the rows of VCF file with missing rate more
@@ -213,13 +213,13 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   res
 }
 
-#' Collect counts statistics from genotype matrix
+#' Collect counts statistics from genotype matrix.
 #' 
 #' Calculate counts statistics for genotype matrix and return data.frame
 #' @param genotypeMatrix matrix containing values 0 for sample with both 
 #' reference alleles, 1 for heterozygous samples, and 2 - with both alternative
-#' alleles. Missing values are allowed
-#' @return data.frame with counts statistics 
+#' alleles. Missing values are allowed.
+#' @return data.frame with counts statistics.
 #' @export
 genotypesToCounts <- function(genotypeMatrix) {
   df <- NULL
@@ -238,22 +238,22 @@ genotypesToCounts <- function(genotypeMatrix) {
   df
 }
 
-#' Scan binary variant file
+#' Scan binary variant file.
 #' 
 #' Scan binary file produced by \code{\link{scanVCF}} and collect required 
 #' per variant allele counts statistics after applying quality control filters.
 #' @inheritParams scanVCF
-#' @param binaryFile the name of binary file
-#' @param metafile the name of metadata file
-#' @param samples the set of samples to be analyzed
+#' @param binaryFile the name of binary file.
+#' @param metafile the name of metadata file.
+#' @param samples the set of samples to be analyzed.
 #' @param regions the set of regions [startPos, endPos] in format 
 #' "chr# startPos endPos". Regions must be non-overlapping.
-#' @param minMAF numeric minimum minor allele frequency
-#' @param maxMAF numeric maximum minor allele frequency
-#' @param minMAC integer minimum minor allele count
-#' @param maxMAC integer maximum minor allele count
-#' @param minCallRate numeric minimum call rate
-#' @param reportSingletons logical if TRUE singletons will be reported
+#' @param minMAF numeric minimum minor allele frequency.
+#' @param maxMAF numeric maximum minor allele frequency.
+#' @param minMAC integer minimum minor allele count.
+#' @param maxMAC integer maximum minor allele count.
+#' @param minCallRate numeric minimum call rate.
+#' @param reportSingletons logical if TRUE singletons will be reported.
 #' @return matrix with three columns:  
 #' number of samples with 
 #' both reference alleles, with  one reference allele and one alternative allele,

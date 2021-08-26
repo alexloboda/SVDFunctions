@@ -2,17 +2,17 @@
 % Please edit documentation in R/prepareInstance.R
 \name{readInstanceFromYml}
 \alias{readInstanceFromYml}
-\title{Read instance from YML file}
+\title{Read instance from YML file.}
 \usage{
 readInstanceFromYml(filename)
 }
 \arguments{
-\item{filename}{YML file}
+\item{filename}{YML file.}
 }
 \value{
 a list of four: title of dataset, list of variants, hierarchy and
-population description
+population description.
 }
 \description{
-Read instance from YML file
+Read instance from YML file.
 }

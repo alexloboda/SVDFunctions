@@ -2,16 +2,16 @@
 #' @importFrom Rcpp sourceCpp
 NULL
 
-#' Perform quality control on a set of allele counts
+#' Perform quality control on a set of allele counts.
 #' 
 #' The methods checks which sets of allele counts pass standard quality 
-#' control filters(minor allele frequency, minor allele count, HWE)
-#' @param countsMatrix matrix 3-column integer matrix
-#' @param maf numeric minor allele frequency
-#' @param mac integer minor allele count
-#' @param significance numeric significance level for HWE
+#' control filters(minor allele frequency, minor allele count, HWE).
+#' @param countsMatrix matrix 3-column integer matrix.
+#' @param maf numeric minor allele frequency.
+#' @param mac integer minor allele count.
+#' @param significance numeric significance level for HWE.
 #' @return logical vector(each value - whether or not the corresponding set 
-#' of allele counts passed the quality control)
+#' of allele counts passed the quality control).
 #' @export
 checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10, 
                               significance = 1e-4) {
@@ -26,7 +26,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   quality_control_impl(countsMatrix, maf, mac, chisq_threshold)
 }
 
-#' Select a set of controls that matches to a set of cases
+#' Select a set of controls that matches to a set of cases.
 #' 
 #' Finds an optimal set of controls satisfying 
 #' \eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}
@@ -36,16 +36,16 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' Otherwise no results will be returned. Minimal size of control set 
 #' is \code{min} samples for privacy preservation reasons.
 #' @param genotypeMatrix Genotype matrix
-#' @param originalGenotypeMatrix Genotype matrix with no imputation applied 
-#' @param SVDReference Reference basis of the left singular vectors
-#' @param meanGenotype Mean genotype vector
-#' @param caseCounts Matrix with summary genotype counts from cases
-#' @param controlsClustering cluster names for controls
-#' @param minLambda Minimum possible lambda
-#' @param softMinLambda Desirable minimum for lambda
-#' @param softMaxLambda Desirable maximum for lambda
-#' @param maxLambda Maximum possible lambda
-#' @param min Minimal size of a control set that is permitted for return
+#' @param originalGenotypeMatrix Genotype matrix with no imputation applied.
+#' @param SVDReference Reference basis of the left singular vectors.
+#' @param meanGenotype Mean genotype vector.
+#' @param caseCounts Matrix with summary genotype counts from cases.
+#' @param controlsClustering cluster names for controls.
+#' @param minLambda Minimum possible lambda.
+#' @param softMinLambda Desirable minimum for lambda.
+#' @param softMaxLambda Desirable maximum for lambda.
+#' @param maxLambda Maximum possible lambda.
+#' @param min Minimal size of a control set that is permitted for return.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 

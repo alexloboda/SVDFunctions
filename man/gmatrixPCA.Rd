@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepareInstance.R
 \name{gmatrixPCA}
 \alias{gmatrixPCA}
-\title{Estimate PCA from gmatrix without missing values}
+\title{Estimate PCA from gmatrix without missing values.}
 \usage{
 gmatrixPCA(gmatrix, SVDReference = NULL, referenceMean = NULL, components = 10)
 }
@@ -12,7 +12,7 @@ gmatrixPCA(gmatrix, SVDReference = NULL, referenceMean = NULL, components = 10)
 \item{components}{Number of principal components to be computed}
 }
 \description{
-PCA is estimated using SVD of the mean centered genotype matrix
+PCA is estimated using SVD of the mean centered genotype matrix.
 PCA coordinates will be needed to perform clustering of the 
 case samples to ensure relatively homogenious matching.
 }

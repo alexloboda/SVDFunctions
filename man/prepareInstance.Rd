@@ -2,7 +2,7 @@
 % Please edit documentation in R/prepareInstance.R
 \name{prepareInstance}
 \alias{prepareInstance}
-\title{Prepare instance and write yaml file from QC-ed gmatrix}
+\title{Prepare instance and write yaml file from QC-ed gmatrix.}
 \usage{
 prepareInstance(
   gmatrix,
@@ -19,24 +19,34 @@ prepareInstance(
 )
 }
 \arguments{
-\item{gmatrix}{gmatrix with imputed missing values}
+\item{gmatrix}{gmatrix with imputed missing values.}
 
-\item{imputationResults}{matrix indicating which genotypes
-were imputed}
+\item{imputationResults}{matrix of the same dimensions as \code{gmatrix} 
+filled with values TRUE/FALSE indicating which genotypes were imputed.}
 
-\item{outputFileName}{name of the YAML file to output}
+\item{controlsU}{Reference U matrix from SVD decomposition of centered
+genotype matrix of control dataset or joint dataset.}
 
-\item{clusters}{clustering object}
+\item{meanControl}{numeric vector representing mean per-variant genotype, 
+that were taken as a center while costructing \code{controlsU} matrix.}
 
-\item{title}{title to put as a first line in yaml file}
+\item{outputFileName}{name of the YAML file to output.}
 
-\item{MAC}{minor allele count used for QC}
+\item{clusters}{clustering object.}
 
-\item{MAF}{minor allele frequency used for QC}
+\item{title}{title to put as a first line in yaml file.}
 
-\item{maxVectors}{maximum number of principal directions for each cluster
-to be computed and written to a file}
+\item{MAC}{minor allele count used for QC.}
+
+\item{MAF}{minor allele frequency used for QC.}
+
+\item{knn_drop}{fraction of samples that would be excluded from dataset at
+each level of hierarchy clustering by applying knn anomaly detection algorithm.}
+
+\item{normalize_drop}{fraction of samples to be excluded from dataset at
+each level of hierarchy clustering by applying function \code{normal_subsample} 
+from the package.}
 }
 \description{
-Prepare instance and write yaml file from QC-ed gmatrix
+Prepare instance and write yaml file from QC-ed gmatrix.
 }

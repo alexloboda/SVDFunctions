@@ -2,7 +2,7 @@
 % Please edit documentation in R/vcf.R
 \name{genotypeMatrixVCF}
 \alias{genotypeMatrixVCF}
-\title{Scan VCF file for genotypes}
+\title{Scan VCF file for genotypes.}
 \usage{
 genotypeMatrixVCF(
   vcf,
@@ -29,7 +29,7 @@ considered, otherwise assumed as missing.}
 \item{variants}{the set of variants in format "chr#:# REF ALT"
 (i.e. chr23:1532 T GT). In case of deletion ALT must be "*".}
 
-\item{samples}{the set of samples to be scanned and returned}
+\item{samples}{the set of samples to be scanned and returned.}
 
 \item{bannedPositions}{the set of positions in format "chr#:#" that 
 must be eliminated from consideration.}
@@ -39,7 +39,7 @@ values.}
 
 \item{verbose}{logical}
 
-\item{...}{other arguments to be passed to scanVCF function}
+\item{...}{other arguments to be passed to scanVCF function.}
 }
 \description{
 The method scans VCF files and returns genotype matrix for specified 
