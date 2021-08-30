@@ -111,7 +111,7 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   }
   
   if (is.null(SVDReference)) {
-    SVDReference <- RSpectra::svds(gmatrix - referenceMean, k = 10)$u
+    SVDReference <- RSpectra::svds(gmatrix - referenceMean, k = components)$u
     rownames(SVDReference) <- rownames(gmatrix)
   }
   
@@ -127,8 +127,9 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   gmatrix <- gmatrix - referenceMean
   pca <- t(SVDReference) %*% gmatrix
   
+  pca <- pca[1:components, ]
   pca <- t(pca)
-  colnames(pca) <- c(paste("PC", c(1:min(components, ncol(gmatrix))), sep = ""))
+  colnames(pca) <- c(paste("PC", 1:components, sep = ""))
   rownames(pca) <- colnames(gmatrix)
   pca
 }
