@@ -221,7 +221,7 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
   
   write("title: ", title, "\n")
-  write("version: ", toString(packageVersion(packageName())), "\n")
+  write("version: ", toString(utils::packageVersion(utils::packageName())), "\n")
   titleF <- function(x) x[["title"]]
   writePopulationStructure(clustering$hier, clustering$classes, fd)
   write("\nvariants:\n")
@@ -367,7 +367,6 @@ getNamesFromHier <- function(hier) {
     if (length(hier$split) != 3) {
       userError("Incorrect hierarchy section in the input YML file.")
     }
-    # needs to be changed
     ret <- c(getNamesFromHier(hier$split$left), getNamesFromHier(hier$split$right))
     name <- paste(ret, collapse = " & ")
     c(ret, setNames(name, hier$split$id))
@@ -407,7 +406,7 @@ readInstanceFromYml <- function(filename) {
         err("US and counts matrices in input must contain only numeric values.")
       }
       if (obj == "counts" && nrow(x[[obj]]) != length(inst$variants)) {
-        err("Number of rows in US and counts matrices must match number of variants 
+        err("Number of rows in counts matrix must match number of variants 
                    in the input YML file.")
       }
       if (length(unique(sapply(raw, length))) != 1) {

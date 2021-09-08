@@ -6,8 +6,10 @@
 \usage{
 selectControlsHier(
   controlGMatrix,
-  cases,
   originalControlGMatrix,
+  cases,
+  SVDReference,
+  controlsMean,
   clusterMergeCoef = 1.1,
   softMinLambda = 0.9,
   softMaxLambda = 1.05,
@@ -18,10 +20,14 @@ selectControlsHier(
 \item{controlGMatrix}{numeric matrix(0 - ref, 1 - het, 2 - both alt). 
 Intermediate values are allowed, NAs are not.}
 
-\item{cases}{result of calling function readInstanceFromYml.}
-
 \item{originalControlGMatrix}{integer matrix(0 - ref, 1 - het, 2 - both alt)
 Missing values are allowed.}
+
+\item{cases}{result of calling function readInstanceFromYml.}
+
+\item{SVDReference}{reference basis of the left singular vectors.}
+
+\item{controlsMean}{mean value of the reference genotypes.}
 
 \item{clusterMergeCoef}{numeric coefficient of preference of merging clusters.}
 

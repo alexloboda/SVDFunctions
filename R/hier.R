@@ -180,8 +180,10 @@ selectControlsHier <- function(controlGMatrix, originalControlGMatrix,
     population
   })
   
-  recSelect(controlGMatrix, originalControlGMatrix,  
-            cases, SVDReference, controlsMean, cases$hierarchy, 
-            clusterMergeCoef, softMinLambda = softMinLambda,
-            softMaxLambda = softMaxLambda, ...)
+  ret <- recSelect(controlGMatrix, originalControlGMatrix,  
+                   cases, SVDReference, controlsMean, cases$hierarchy, 
+                   clusterMergeCoef, softMinLambda = softMinLambda,
+                   softMaxLambda = softMaxLambda, ...)
+  ret$names <- cases$names
+  ret
 }

@@ -10,7 +10,7 @@ readInstanceFromYml(filename)
 \item{filename}{YML file.}
 }
 \value{
-a list of four: title of dataset, list of variants, hierarchy and
+a list of four: title of dataset, version, list of variants, hierarchy and
 population description.
 }
 \description{
