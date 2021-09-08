@@ -221,6 +221,7 @@ writeYaml <- function(clusterResults, clustering, variants,
   }
   
   write("title: ", title, "\n")
+  write("version: ", toString(packageVersion(packageName())), "\n")
   titleF <- function(x) x[["title"]]
   writePopulationStructure(clustering$hier, clustering$classes, fd)
   write("\nvariants:\n")
@@ -381,13 +382,13 @@ getNamesFromHier <- function(hier) {
 #' Read instance from YML file.
 #' 
 #' @param filename YML file.
-#' @return a list of four: title of dataset, list of variants, hierarchy and
+#' @return a list of four: title of dataset, version, list of variants, hierarchy and
 #' population description.
 #' @export
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 
            error = function(e) userError("File is not a correct YML file"))
-  if (!setequal(names(inst), c("title", "hierarchy", "variants", "population"))) {
+  if (!setequal(names(inst), c("title", "version", "hierarchy", "variants", "population"))) {
     userError("Incorrect input YML file: missing or extra sections.")
   }
   i <- 1

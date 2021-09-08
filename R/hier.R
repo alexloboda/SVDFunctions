@@ -12,7 +12,7 @@ checkCaseInfo <- function(cases) {
   }
 }
 
-matchControlsCluster <- function(cases, gmatrix, original, ...) {
+matchControlsCluster <- function(cases, gmatrix, original, SVD, mean, ...) {
   softMinLambda <- list(...)$softMinLambda
   softMaxLambda <- list(...)$softMaxLambda
   
@@ -23,7 +23,7 @@ matchControlsCluster <- function(cases, gmatrix, original, ...) {
   }
   
   results <- selectControls(gmatrix, original, cases$US, cases$mean, 
-                            cases$counts, ...)
+                            SVD, mean, cases$counts, ...)
   df <- data.frame(sample = results$controls, 
                    cluster = if (length(results$controls) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
@@ -90,8 +90,7 @@ mergeCondition <- function(l, r, merged, mergeCoef) {
   }
 }
 
-mergedOrJoint <- function(gmatrix, original, left, right, res, mergeCoef, 
-                          ...) {
+mergedOrJoint <- function(left, right, res, mergeCoef, ...) {
   if (mergeCondition(left, right, res, mergeCoef)) {  
     cls <- goodClusters(left, right)
     if (subtreeFailed(left)) {
@@ -121,19 +120,19 @@ mergedOrJoint <- function(gmatrix, original, left, right, res, mergeCoef,
   }
 }
 
-recSelect <- function(gmatrix, original, cases, 
+recSelect <- function(gmatrix, original, cases, reference, mean, 
                       hierNode, clusterMergeCoef, ...) {
   cluster <- cases$population[[hierNode$id]]
   cluster$variants <- cases$variants
-  res <- matchControlsCluster(cluster, gmatrix, original, ...)
+  res <- matchControlsCluster(cluster, gmatrix, original, reference, mean, ...)
   if (hierNode$type == "leaf") {
     return(res)
   } else {
-    left <- recSelect(gmatrix, original, cases, hierNode$left,  
+    left <- recSelect(gmatrix, original, cases, reference, mean, hierNode$left,  
                       clusterMergeCoef, ...)
-    right <- recSelect(gmatrix, original, cases, hierNode$right, 
+    right <- recSelect(gmatrix, original, cases, reference, mean, hierNode$right, 
                        clusterMergeCoef, ...)
-    mergedOrJoint(gmatrix, original, left, right, res, clusterMergeCoef, ...)
+    mergedOrJoint(left, right, res, clusterMergeCoef, ...)
   }
 }
 
@@ -144,15 +143,15 @@ filter_variants <- function(population, ids) {
 #' Select a set of controls that populationally matches a set of cases.
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt). 
 #' Intermediate values are allowed, NAs are not.
-#' @param cases result of calling function readInstanceFromYml.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt)
 #' Missing values are allowed.
+#' @param cases result of calling function readInstanceFromYml.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
 #' @inheritParams selectControls
 #' @export
-selectControlsHier <- function(controlGMatrix, cases, 
-                               originalControlGMatrix, 
+selectControlsHier <- function(controlGMatrix, originalControlGMatrix, 
+                               cases, SVDReference, controlsMean, 
                                clusterMergeCoef = 1.1, 
                                softMinLambda = 0.9, softMaxLambda = 1.05, 
                                ...) {
@@ -182,6 +181,7 @@ selectControlsHier <- function(controlGMatrix, cases,
   })
   
   recSelect(controlGMatrix, originalControlGMatrix,  
-            cases, cases$hierarchy, clusterMergeCoef, 
-            softMinLambda = softMinLambda, softMaxLambda = softMaxLambda, ...)
+            cases, SVDReference, controlsMean, cases$hierarchy, 
+            clusterMergeCoef, softMinLambda = softMinLambda,
+            softMaxLambda = softMaxLambda, ...)
 }
