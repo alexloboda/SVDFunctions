@@ -4,8 +4,10 @@ project(src)
 find_package (Threads REQUIRED)
 
 INCLUDE_DIRECTORIES( /usr/lib/R/library/BH/include )
+INCLUDE_DIRECTORIES(/usr/lib/R/library/RcppEigen/include)
 INCLUDE_DIRECTORIES( /usr/lib/R/library/Rcpp/include/ /usr/include/R )
 LINK_DIRECTORIES( /usr/lib64/R/lib )
+LINK_DIRECTORIES(/usr/lib/R/library/RcppEigen/libs)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic -pthread")
 set(CMAKE_CXX_STANDARD 17)

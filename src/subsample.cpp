@@ -85,13 +85,6 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
         curr_size += step;
 
-        std::ofstream fout("sets/" + std::to_string(test->subsample_size()) + ".txt");
-        for (int gr: test->current_subset()) {
-            for (int el: clst.elements(gr)) {
-                fout << el << std::endl;
-            }
-        }
-
         if (curr_size > test->sample_size()) {
             return;
         }

@@ -69,7 +69,7 @@ struct matching_results {
 class matching {
     static constexpr double EPS = 1e-6;
 
-    std::shared_ptr<Eigen::MatrixXi> controls_gmatrix;
+    std::vector<std::vector<int>> controls_gmatrix;
     std::shared_ptr<Eigen::MatrixXd> controls_space;
 
     mvn::Clustering clustering;
@@ -81,11 +81,11 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(std::shared_ptr<Eigen::MatrixXi> controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
+    matching(std::vector<std::vector<int>>&& controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int threads, int start, int size_ub, int step, int iterations);
     void set_qchi_sq_function(const std::function<double(double)>& f);
-    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, int iterations = 100'000);
+    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, int iterations = 100000);
 
     void set_interrupts_checker(std::function<void()> checker) {
         interrupts_checker = checker;

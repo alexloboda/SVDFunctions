@@ -38,9 +38,9 @@ using Vector = Eigen::VectorXd;
 
 namespace matching {
 
-matching::matching(std::shared_ptr<Eigen::MatrixXi> controls_gmatrix,
+matching::matching(std::vector<std::vector<int>>&& controls_gmatrix,
                    std::shared_ptr<Eigen::MatrixXd> controls_space,
-                   mvn::Clustering clustering) : controls_gmatrix(controls_gmatrix),
+                   mvn::Clustering clustering) : controls_gmatrix(std::move(controls_gmatrix)),
                                             controls_space(controls_space),
                                             clustering(std::move(clustering)) {}
 
@@ -158,9 +158,9 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
     Counts counts;
     for (int sample: controls) {
-        int value = controls_gmatrix->operator()(variant, sample);
+        int value = controls_gmatrix[variant][sample];
         if (value != -1) {
-            ++counts[controls_gmatrix->operator()(variant, sample)];
+            ++counts[value];
         }
     }
     return counts;

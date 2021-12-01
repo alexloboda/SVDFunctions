@@ -78,22 +78,24 @@ const std::vector<size_t>& mvn_test::current_subset() const {
 }
 
 mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta)
-    :mahalanobis_centered(Vector::Zero(clst.size())),
-     mahalanobis_pairwise(Matrix::Zero(clst.size(), clst.size())) {
+    :mahalanobis_centered(clst.size()),
+     mahalanobis_pairwise() {
+    mahalanobis_pairwise.resize(clst.size());
     size_t n = clst.size();
 
     double k_center = -(beta * beta / (2 * (1 + beta * beta)));
     double k_pw = -(beta * beta) / 2.0;
 
     for (size_t cl = 0; cl < n; cl++) {
+        mahalanobis_pairwise[cl].resize(clst.size());
         for (int el: clst.elements(cl)) {
             mahalanobis_centered[cl] += std::exp(k_center * distances.distance(el));
             for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
                 for (int pair_el: clst.elements(pair_cl)) {
                     if (cl == pair_cl) {
-                        mahalanobis_pairwise(cl, pair_cl) += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
+                        mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
                     } else {
-                        mahalanobis_pairwise(cl, pair_cl) += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
+                        mahalanobis_pairwise[cl][pair_cl] += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
                     }
                 }
             }
@@ -102,11 +104,19 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
 }
 
 double mvn_stats::pairwise_stat(size_t i, size_t j) const {
-    return mahalanobis_pairwise(i, j);
+    return mahalanobis_pairwise[i][j];
 }
 
 double mvn_stats::centered_stat(size_t i) const {
-    return mahalanobis_centered(i);
+    return mahalanobis_centered[i];
+}
+
+double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) const {
+    double ret = 0.0;
+    for (auto s: ss) {
+        ret += mahalanobis_pairwise[point][s];
+    }
+    return ret;
 }
 
 size_t mvn_test::dimensions() const {
@@ -215,7 +225,9 @@ size_t Clustering::cluster_size(size_t i) const {
     return clusters.at(i).size();
 }
 
-mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& S, const Vector& mean) {
+mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& S, const Vector& mean)
+        :dist(X->cols()) {
+    inter.resize(X->cols());
     Eigen::FullPivHouseholderQR<Matrix> qr(S);
     if (!qr.isInvertible()) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");
@@ -223,26 +235,35 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
 
     Matrix S_inv = qr.inverse();
 
-    ximu = X->transpose() * S_inv * mean;
-    muxi = mean.transpose() * S_inv * *X;
-    distances = X->transpose() * S_inv * *X;
-    mumu = mean.transpose() * S_inv * mean;
-    diag = distances.diagonal();
+    Vector ximu = X->transpose() * S_inv * mean;
+    Vector muxi = mean.transpose() * S_inv * *X;
+    Matrix distances = X->transpose() * S_inv * *X;
+    double mumu = mean.transpose() * S_inv * mean;
+    std::vector<double> diag(distances.rows());
+
+    for (auto i = 0; i < X->cols(); i++) {
+        diag[i] = distances(i, i);
+    }
+    for (auto i = 0; i < X->cols(); i++) {
+        inter[i].resize(X->cols());
+        dist[i] = diag[i] - ximu(i) - muxi(i) + mumu;
+        for (auto j = 0; j < X->cols(); j++) {
+            inter[i][j] = diag[i] - 2 *  distances(i, j) + diag[j];
+        }
+    }
 }
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
-    return diag(i) - 2 *  distances(i, j) + diag(j);
+    return inter[i][j];
 }
 
 double mahalanobis_distances::distance(unsigned el) const {
-    return diag(el) - ximu(el) - muxi(el) + mumu;
+    return dist[el];
 }
 
 void mvn_test::remove(unsigned point) {
     for (size_t i = 0; i < stats.size(); i++) {
-        for (auto s: subset) {
-            pairwise_stat[i] -= 2 * stats[i]->pairwise_stat(point, s);
-        }
+        pairwise_stat[i] -= 2 * stats[i]->sum_pairwise(point, subset);
     }
 
     for (size_t i = 0; i < stats.size(); i++) {
@@ -252,9 +273,7 @@ void mvn_test::remove(unsigned point) {
 
 void mvn_test::add(unsigned int point) {
     for (size_t i = 0; i < stats.size(); i++) {
-        for (auto s: subset) {
-            pairwise_stat[i] += 2 * stats[i]->pairwise_stat(point, s);
-        }
+        pairwise_stat[i] += 2 * stats[i]->sum_pairwise(point, subset);
     }
     for (size_t i = 0; i < stats.size(); i++) {
         center_stat[i] += stats[i]->centered_stat(point);

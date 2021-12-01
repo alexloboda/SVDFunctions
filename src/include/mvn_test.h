@@ -59,11 +59,9 @@ public:
 };
 
 class mahalanobis_distances {
-    Matrix distances;
-    Vector diag;
-    Matrix muxi;
-    Matrix ximu;
-    double mumu;
+    std::vector<std::vector<double>> inter;
+    std::vector<double> dist;
+
 public:
     mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
     double distance(unsigned i) const;
@@ -71,13 +69,14 @@ public:
 };
 
 class mvn_stats {
-    Vector mahalanobis_centered;
-    Matrix mahalanobis_pairwise;
+    std::vector<double> mahalanobis_centered;
+    std::vector<std::vector<double>> mahalanobis_pairwise;
 public:
     mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
     mvn_stats() = default;
 
     double pairwise_stat(size_t i, size_t j) const;
+    double sum_pairwise(size_t point, const std::vector<size_t>& ss) const;
     double centered_stat(size_t i) const;
 private:
 };

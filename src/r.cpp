@@ -78,6 +78,18 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
     return eigen_vector;
 }
 
+
+std::vector<std::vector<int>> r_to_cpp_vector(IntegerMatrix& matrix) {
+    std::vector<std::vector<int>> ret(matrix.nrow());
+    for (int i = 0; i < matrix.nrow(); i++) {
+        ret[i].resize(matrix.ncol());
+        for (int j = 0; j < matrix.ncol(); j++) {
+            ret[i][j] = (matrix(i, j) == Rcpp::NA) ? -1 : matrix(i, j);
+        }
+    }
+    return ret;
+}
+
 // [[Rcpp::export]]
 List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mean, NumericMatrix& cov) {
     std::vector<int> clusters(matrix.ncol());
@@ -107,7 +119,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
-    auto gmatrix_counts = r_to_cpp(gmatrix);
+    auto gmatrix_counts = r_to_cpp_vector(gmatrix);
     auto case_counts = r_to_cpp(cc);
     auto principal_directions = r_to_cpp(directions);
     auto gm_rs = r_to_cpp(gmatrix_rs);
@@ -120,7 +132,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int iterations = sa_iterations[0];
     mvn::Clustering cl(clust_vec);
 
-    matching::matching matcher(gmatrix_counts, gm_rs, cl);
+    matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
