@@ -80,6 +80,7 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
     keepSamples <- rownames(PCA)
   }
   res <- clustering(clResults$classification, collapsingToTree(collapsing))
+  names(res$samples) <- rownames(PCA)
   if(!all(rownames(PCA) %in% keepSamples)){
     clustersToRemove <- setdiff(clResults$classification, clResults$classification[keepSamples])
     clustersToRemove <- unique(clustersToRemove)
@@ -222,6 +223,7 @@ writeYaml <- function(clusterResults, clustering, variants,
   
   write("title: ", title, "\n")
   write("version: ", toString(utils::packageVersion(utils::packageName())), "\n")
+  write("salt: ", stringi::stri_rand_strings(1, 16, "[0-9a-f]"), "\n")
   titleF <- function(x) x[["title"]]
   writePopulationStructure(clustering$hier, clustering$classes, fd)
   write("\nvariants:\n")

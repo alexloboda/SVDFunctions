@@ -153,6 +153,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE) {
+  vcf <- normalizePath(vcf)
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
