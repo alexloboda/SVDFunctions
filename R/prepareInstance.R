@@ -389,7 +389,7 @@ getNamesFromHier <- function(hier) {
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 
            error = function(e) userError("File is not a correct YML file"))
-  if (!setequal(names(inst), c("title", "version", "hierarchy", "variants", "population"))) {
+  if (!setequal(names(inst), c("title", "salt", "version", "hierarchy", "variants", "population"))) {
     userError("Incorrect input YML file: missing or extra sections.")
   }
   i <- 1
