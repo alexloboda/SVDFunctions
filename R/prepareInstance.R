@@ -338,7 +338,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterGenotypes <- clusterGenotypes - clusterMeans
     svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, k = k))
     US <- svdResult$u %*% diag(svdResult$d)
-    US <- US / sqrt(length(cluster) - 1)
+    US <- US / sqrt(length(cluster))
     
     counts <- genotypesToCounts(clusterGenotypesForCounts)
     cluster_ids[[i]] <<- gm_names[cluster]
