@@ -170,7 +170,9 @@ filterGmatrix <- function(gmatrix, imputationResults, minVariantCallRate = 0.95,
 #' @inheritParams estimateCaseClusters
 #' @export 
 plotPCA <- function(PCA, clusters = NULL) {
-  stopifnot(all(rownames(PCA) %in% names(clusters$samples)))
+  if (!is.null(clusters)) {
+    stopifnot(all(rownames(PCA) %in% names(clusters$samples)))
+  }
   samples <- rownames(PCA)
   colors <- if (is.null(clusters)) 1 else clusters$classes[clusters$samples[samples]]
   texts <- paste("Sample:", rownames(PCA))

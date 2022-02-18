@@ -329,6 +329,9 @@ namespace {
         int curr_range = 0;
         int range_entry = -1;
         for (size_t i = 0; i < variants.size(); i++) {
+            if (i % 100 == 0) {
+                Rcpp::checkUserInterrupt();
+            }
             const Variant& var = variants[i];
 
             if (!counts.pass(i, min_maf, max_maf, cr, min_mac, max_mac, n, report_singletons)) {
