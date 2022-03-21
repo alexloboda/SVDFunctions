@@ -27,7 +27,7 @@ Imports:
     seqminer,
     RSpectra
 LazyData: true
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 SystemRequirements: C++14
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 

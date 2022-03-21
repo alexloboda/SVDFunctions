@@ -20,7 +20,8 @@ selectControls(
   min = 500,
   max = 1000,
   step = 50,
-  iterations = 1e+05
+  iterations = 1e+05,
+  minCallRate = 0.98
 )
 }
 \arguments{
@@ -56,7 +57,9 @@ principal directions of the data in case dataset.}
 
 \item{step}{perform matching with the step.}
 
-\item{iterations}{number of simulated annealing iterations per each subset
+\item{iterations}{number of simulated annealing iterations per each subset}
+
+\item{minCallRate}{numeric minimal call rate for SNP to be considered.
 size.}
 }
 \description{

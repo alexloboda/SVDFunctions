@@ -115,7 +115,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
                      IntegerVector min, IntegerVector max, IntegerVector step,
-                     IntegerVector sa_iterations) {
+                     IntegerVector sa_iterations, NumericVector min_call_rate) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -130,6 +130,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int max_controls = max[0];
     int step_clusters = step[0];
     int iterations = sa_iterations[0];
+    double mcr = min_call_rate[0];
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
@@ -140,7 +141,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                         min_controls, max_controls, step_clusters, iterations);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
-    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, iterations);
+    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);
 
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());

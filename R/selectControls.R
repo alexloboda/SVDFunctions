@@ -53,13 +53,15 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param max maximum number of clusters from control dataset to be returned.
 #' @param step perform matching with the step.
 #' @param iterations number of simulated annealing iterations per each subset
+#' @param minCallRate numeric minimal call rate for SNP to be considered.   
 #' size.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
-                            min = 500, max = 1000, step = 50, iterations = 100000) {
+                            min = 500, max = 1000, step = 50, iterations = 100000, 
+                            minCallRate = 0.98) {
   iterations <- as.integer(iterations)
   stopifnot(iterations > 0)
   stopifnot(is.matrix(genotypeMatrix))
@@ -99,7 +101,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 stats::qchisq(stats::ppoints(1e+05), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step, iterations)
+                                max, step, iterations, minCallRate)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }

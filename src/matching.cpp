@@ -66,7 +66,7 @@ std::vector<lm> init_lms(const std::vector<Counts>& case_counts) {
     return lms;
 }
 
-matching_results matching::match(const std::vector<Counts>& case_counts, unsigned min_controls, int iterations) {
+matching_results matching::match(const std::vector<Counts>& case_counts, unsigned min_controls, double min_call_rate) {
     size_t n_variants = case_counts.size();
 
     std::vector<bool> snp_mask = check_user_counts(case_counts);
@@ -107,6 +107,11 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
             }
 
             Counts controls_counts = count_controls(controls, j);
+
+            auto overall = controls_counts[0] + controls_counts[1] + controls_counts[2];
+            if ((double)overall / (double)(controls.size()) < min_call_rate) {
+                continue;
+            }
 
             if (!check_counts(controls_counts[0], controls_counts[1], controls_counts[2])) {
                 continue;

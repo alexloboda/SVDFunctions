@@ -85,7 +85,7 @@ public:
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int threads, int start, int size_ub, int step, int iterations);
     void set_qchi_sq_function(const std::function<double(double)>& f);
-    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, int iterations = 100000);
+    matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);
 
     void set_interrupts_checker(std::function<void()> checker) {
         interrupts_checker = checker;
