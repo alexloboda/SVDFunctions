@@ -98,7 +98,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 casesPDs, 
                                 caseCounts, 
                                 cl, 
-                                stats::qchisq(stats::ppoints(1e+05), df = 1), 
+                                stats::qchisq(stats::ppoints(1e+07), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
                                 max, step, iterations, minCallRate)
