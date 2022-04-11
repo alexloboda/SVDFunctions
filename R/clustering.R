@@ -149,7 +149,7 @@ removeCluster <- function(clustering, cluster) {
   gp <- p$parent
   p$AddSiblingNode(sibling)
   gp$RemoveChild(deletionName)
-  gp$id <- ""
+  gp$id <- NULL
   
   clustering$samples <- clustering$samples[clustering$samples != id]
   normalizeClustering(clustering)
