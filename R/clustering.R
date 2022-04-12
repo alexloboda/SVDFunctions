@@ -79,7 +79,7 @@ update.nodes <- function(cl) {
 clustering <- function(classification, hierarchy) {
   classes <- as.character(unique(classification))
   map <- setNames(1:length(classes), classes)
-  classification <- setNames(map[classification], names(classification))
+  classification <- setNames(map[as.character(classification)], names(classification))
   left <- checkTree(hierarchy, classes)
   if(length(left) != 0) {
     stop(paste0("Following classes are not mentioned in herarchy: ", left))
