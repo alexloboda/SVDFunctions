@@ -69,8 +69,7 @@ estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE,
   if (clusters > 1) {
     clCombi <- mclust::clustCombi(clResults)
     collapsing <- dendrogramEstimate(clCombi$combiM)
-  }
-  else {
+  } else {
     collapsing <- NULL
   }
   if (plotDendrogram & clusters > 1) {
@@ -349,6 +348,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
+    save(i, cluster_leaves, initial_cluster, cluster, file = paste0(node$id, ".txt"))
   })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
