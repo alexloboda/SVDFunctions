@@ -18,8 +18,8 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         throw std::invalid_argument("Matrix is empty");
     }
 
-    betas = {0.4, 0.8, 1.6, 3.2};
-    //betas = {0.4, 1.6};
+    //betas = {0.4, 0.8, 1.6, 3.2};
+    betas = {0.4, 1.6};
 
     pairwise_stat.resize(betas.size(), 0.0);
     center_stat.resize(betas.size(), 0.0);
