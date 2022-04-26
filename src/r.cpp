@@ -96,7 +96,7 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
     mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), *r_to_cpp(cov));
-    annealing.run(10'000'000, 4, 1.0, 0.9995, std::thread::hardware_concurrency(), size[0], size[0], 1);
+    annealing.run(1'000'000, 4, 1.0, 0.9995, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
     List ret;
     auto points = annealing.get_solution(0);
