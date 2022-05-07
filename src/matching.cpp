@@ -159,7 +159,7 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
 
     subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
-    double c = std::pow(EPS, 1 / iterations);
+    double c = std::pow(EPS, 1 / (double)iterations);
     subsampling.run(iterations, 4, 1.0 , c, threads, start, ub, step);
 }
 
