@@ -211,7 +211,7 @@ writeCluster <- function(fd, cluster, i) {
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
 
-writeYaml <- function(clusterResults, clustering, variants, 
+writeYaml <- function(clusterResults, clustering, variants, Ucontrols, 
                       outputFileName, title) {
   if(missing(outputFileName)){
     stop("Output file name missing")
@@ -233,6 +233,8 @@ writeYaml <- function(clusterResults, clustering, variants,
   for (v in variants) {
     write("  - ", v, "\n")
   }
+  write("U matrix:\n")
+  writeMatrix(fd, 0, Ucontrols, "U control:")
   write("population:\n")
   for (i in 1:length(clusterResults)) {
     writeCluster(fd, clusterResults[[i]], i)
@@ -327,7 +329,6 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     gm_names <- colnames(gmatrix)
   }
   
-  print(getwd())
   clusters$hier$Do(function(node) {
     i <- ifelse(is.null(node$id), return(), node$id)
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
@@ -351,9 +352,8 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
-    save(i, cluster_leaves, initial_cluster, cluster, file = paste0(node$id, ".RData"))
   })
-  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
+  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), controlsU,
             outputFileName = outputFileName, title = title)
   cluster_ids
 }
