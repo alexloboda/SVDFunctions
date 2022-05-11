@@ -233,8 +233,7 @@ writeYaml <- function(clusterResults, clustering, variants, Ucontrols,
   for (v in variants) {
     write("  - ", v, "\n")
   }
-  write("U matrix:\n")
-  writeMatrix(fd, 0, Ucontrols, "U control:")
+  writeMatrix(fd, 0, Ucontrols, "U")
   write("population:\n")
   for (i in 1:length(clusterResults)) {
     writeCluster(fd, clusterResults[[i]], i)
@@ -387,6 +386,26 @@ getNamesFromHier <- function(hier) {
   } 
 }
 
+readMatrix <- function(obj, nvars, name) {
+  raw <- obj
+  if (length(obj) == 0) {
+    err(paste("Missing", name, "matrix."))
+  }
+  ret <- do.call(rbind, obj)
+  mode(ret) <- "numeric"
+  if (any(is.na(ret))) {
+    err("US and counts matrices in input must contain only numeric values.")
+  }
+  if (name == "counts" && nrow(ret) != nvars) {
+    err("Number of rows in counts matrix must match number of variants 
+               in the input YML file.")
+  }
+  if (length(unique(sapply(raw, length))) != 1) {
+    err(paste0("Malformed one of the ", obj, " matrices in the input YML file."))
+  }
+  ret
+}
+
 #' Read instance from YML file.
 #' 
 #' @param filename YML file.
@@ -396,7 +415,8 @@ getNamesFromHier <- function(hier) {
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 
            error = function(e) userError("File is not a correct YML file"))
-  if (!setequal(names(inst), c("title", "salt", "version", "hierarchy", "variants", "population"))) {
+  cols <- c("title", "salt", "version", "hierarchy", "variants", "population", "U")
+  if (!setequal(names(inst), cols)) {
     userError("Incorrect input YML file: missing or extra sections.")
   }
   i <- 1
@@ -405,22 +425,7 @@ readInstanceFromYml <- function(filename) {
       userError(paste0(x, " The error occurred while processing population #", i, "."))
     }
     for (obj in c("counts", "US")) {
-      raw <- x[[obj]]
-      if (length(raw) == 0) {
-        err(paste("Missing", obj, "matrix."))
-      }
-      x[[obj]] <- do.call(rbind, x[[obj]])
-      mode(x[[obj]]) <- "numeric"
-      if (any(is.na(x[[obj]]))) {
-        err("US and counts matrices in input must contain only numeric values.")
-      }
-      if (obj == "counts" && nrow(x[[obj]]) != length(inst$variants)) {
-        err("Number of rows in counts matrix must match number of variants 
-                   in the input YML file.")
-      }
-      if (length(unique(sapply(raw, length))) != 1) {
-        err(paste0("Malformed one of the ", obj, " matrices in the input YML file."))
-      }
+      x[[obj]] <- readMatrix(x[[obj]], length(inst$variants), obj)
     }
     if (ncol(x$counts) != 3) {
       userError("Number of columns of counts matrix in the YML file must be three.")
@@ -436,6 +441,7 @@ readInstanceFromYml <- function(filename) {
   if (!setequal(names(inst$names), 1:length(inst$population))) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
+  inst$U <- readMatrix(inst$U, length(inst$variants), "U") 
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
