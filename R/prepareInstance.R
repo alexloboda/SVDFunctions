@@ -351,6 +351,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
+    save(i, cluster_leaves, initial_cluster, cluster, file = paste0(node$id, ".RData"))
   })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), controlsU,
             outputFileName = outputFileName, title = title)
