@@ -251,12 +251,16 @@ drop <- function(pca, knn_rate, mvn_rate) {
   
   ids <- 1:n
   
-  knn_drop <- adamethods::do_knno(t(pca), 5, knn_n)  
-  pca <- pca[, -knn_drop]
-  ids <- ids[-knn_drop]
+  if (knn_n > 0) {
+    knn_drop <- adamethods::do_knno(t(pca), 5, knn_n)  
+    pca <- pca[, -knn_drop]
+    ids <- ids[-knn_drop]
+  }
   
-  ids[normal_subsample(pca, n - knn_n - mvn_n)$points]
-  
+  if (mvn_n > 0) {
+    ids <- ids[normal_subsample(pca, n - knn_n - mvn_n)$points]
+  }
+  ids
 }
 
 #' Prepare instance and write yaml file from QC-ed gmatrix.
@@ -351,7 +355,6 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     clusterResults[[i]] <<- list(US = US, counts = counts, 
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
-    save(i, cluster_leaves, initial_cluster, cluster, file = paste0(node$id, ".RData"))
   })
   writeYaml(clusterResults, clusters, variants = rownames(gmatrix), controlsU,
             outputFileName = outputFileName, title = title)
