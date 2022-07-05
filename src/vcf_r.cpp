@@ -413,6 +413,9 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
 
         vector<size_t> positions;
         for (const char *s: samples) {
+            if (sample_positions.find(s) == sample_positions.end()) {
+                Rcpp::stop("Sample " + std::string(s) + " not found.");
+            }
             positions.push_back(sample_positions[string(s)]);
         }
 
