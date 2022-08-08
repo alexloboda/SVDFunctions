@@ -446,6 +446,7 @@ readInstanceFromYml <- function(filename) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
   inst$U <- readMatrix(inst$U, length(inst$variants), "U") 
+  rownames(inst$U) <- inst$variants
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }

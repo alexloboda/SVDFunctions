@@ -1,7 +1,7 @@
 Package: SVDFunctions
 Type: Package
 Title: Set of Functions for Selecting Matching Genetic Controls without Sharing Genotypes
-Version: 1.2
+Version: 1.21
 Authors@R: c(person("Alexander", "Loboda", email="aloboda@broadinstitute.org", role=c("aut","cre")),
             person("Mykyta", "Artomov", email="artomov@broadinstitute.org", role=c("aut")),
             person("Maxim", "Artyomov",role=c("aut")),
