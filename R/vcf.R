@@ -152,7 +152,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
-                    verbose = FALSE) {
+                    verbose = FALSE, ntree = 12) {
   vcf <- normalizePath(vcf)
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
@@ -186,7 +186,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing), regions, 
-                     binaryPathPrefix, missingRateThreshold),
+                     binaryPathPrefix, missingRateThreshold, ntree),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {

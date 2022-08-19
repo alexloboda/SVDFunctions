@@ -4,6 +4,7 @@
 #include "vcf_handlers.h"
 #include "genotype_predictor.h"
 #include "vcf_parser.h"
+#include <vector>
 
 namespace vcf {
     class Window {
@@ -26,15 +27,20 @@ namespace vcf {
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;
+        std::vector<double> cv_mse;
+        size_t trees;
+        bool cv;
 
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size);
+                                   int window_size_kb, int window_size, bool cv = false, size_t trees = 12);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
         void fix_labels(const std::pair<Features, Labels>& dataset);
+        void cross_validation(const std::pair<Features, Labels>& dataset);
+        std::vector<double> mses() const;
     };
 }
 

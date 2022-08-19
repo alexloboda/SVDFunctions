@@ -2,16 +2,20 @@
 #include "include/genotype_predictor.h"
 #include "include/vcf_parser.h"
 
+#include <random>
+#include <utility>
+
 namespace {
     using std::size_t;
 }
 
 namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                         int window_size_kb, int window_size)
+                                         int window_size_kb, int window_size, bool cv, size_t trees)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
                                           window(window_size),
-                                          thread_pool(std::thread::hardware_concurrency()) {
+                                          thread_pool(std::thread::hardware_concurrency()), cv(cv),
+                                          trees(trees) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
         for (const Variant& v : variants) {
@@ -68,7 +72,68 @@ namespace vcf {
         window.clear();
     }
 
+    namespace {
+        std::vector<AlleleType> subset(const std::vector<AlleleType>& set, const std::vector<size_t>& idx) {
+            std::vector<AlleleType> ret;
+            for (auto i: idx) {
+                ret.push_back(set[i]);
+            }
+            return ret;
+        }
+
+        std::pair<Features, Labels> subdataset(std::pair<Features, Labels> dataset, const std::vector<size_t>& idx) {
+            dataset.second = subset(dataset.second, idx);
+            for (size_t i = 0; i < dataset.first.size(); i++) {
+                dataset.first[i] = subset(dataset.first[i], idx);
+            }
+            return dataset;
+        }
+    }
+
+    void PredictingHandler::cross_validation(const std::pair<Features, Labels>& dataset) {
+        std::vector<size_t> nonmissing;
+        for (size_t i = 0; i < dataset.second.size(); i++) {
+            if (dataset.second[i] != MISSING) {
+                nonmissing.push_back(i);
+            }
+        }
+        int seed = rand();
+        Random random(seed);
+        std::shuffle(nonmissing.begin(), nonmissing.end(), random);
+        int chunk = nonmissing.size() / 5;
+        double mse = 0.0;
+        for (int k = 0; k < 5; k++) {
+            std::vector<size_t> train;
+            std::vector<size_t> test = nonmissing;
+            for (size_t i = 0; i < nonmissing.size(); i++) {
+                if (i >= chunk * i && i < chunk * (k + 1)) {
+                    test.push_back(nonmissing[i]);
+                } else {
+                    train.push_back(nonmissing[i]);
+                }
+            }
+            auto training_set = subdataset(dataset, train);
+
+            TreeBuilder tree_builder = make_tree_builder(training_set);
+            RandomForest forest{tree_builder, thread_pool, trees};
+            for (size_t i: test) {
+                std::vector<AlleleType> features;
+                for (size_t j = 0; j < dataset.first.size(); j++) {
+                    features.push_back(dataset.first[j][i]);
+                }
+                auto predicted = forest.predict(features);
+                double error = predicted - to_int(dataset.second[i]);
+                mse += error * error;
+            }
+            mse /= test.size();
+        }
+        cv_mse.push_back(mse);
+    }
+
     void PredictingHandler::fix_labels(const std::pair<Features, Labels>& dataset) {
+        if (cv) {
+            cross_validation(dataset);
+        }
         bool missing = false;
         for (auto l: dataset.second) {
             if (l == MISSING) {
@@ -79,7 +144,7 @@ namespace vcf {
             return;
         }
         TreeBuilder tree_builder = make_tree_builder(dataset);
-        RandomForest forest{tree_builder, thread_pool};
+        RandomForest forest{tree_builder, thread_pool, trees};
         std::vector<float> labels;
         for (size_t i = 0; i < dataset.second.size(); i++) {
             AlleleType curr = dataset.second[i];
@@ -101,7 +166,11 @@ namespace vcf {
         return {dataset.first, dataset.second, mtry};
     }
 
-    Window::Window(size_t max_size) :max_size(max_size), start(0) {}
+std::vector<double> PredictingHandler::mses() const {
+    return cv_mse;
+}
+
+Window::Window(size_t max_size) :max_size(max_size), start(0) {}
 
     void Window::clear() {
         features.clear();
