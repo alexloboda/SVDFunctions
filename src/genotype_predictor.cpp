@@ -371,21 +371,12 @@ namespace vcf {
         :features(features), values(labels), max_features(max_features) {}
 
     DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
-        Bags tmp;
+        Bags tmp, bags;
         for (size_t i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
                 tmp.add(i, 1.0);
+                bags.add(i, 1.0);
             }
-        }
-        Bags bags;
-        for (size_t i = 0; i < values.size(); i++) {
-                switch(values[i]) {
-                    case HOMREF: case HET: case HOM:
-                        bags.add(i, 1.0);
-                        break;
-                    default:
-                        continue;
-                }
         }
 
         if (features.empty()) {
@@ -435,13 +426,13 @@ namespace vcf {
         }
     }
 
-    RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) {
+    RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees, bool bagging) {
         std::vector<std::future<DecisionTree>> futures;
         for (size_t i = 0; i < ntrees; i++) {
             int seed = rand();
-            futures.push_back(pool.push([seed, &treeBuilder]() -> DecisionTree {
+            futures.push_back(pool.push([seed, &treeBuilder, bagging]() -> DecisionTree {
                 Random random(seed);
-                return treeBuilder.build_a_tree(random);
+                return treeBuilder.build_a_tree(random, bagging);
             }));
         }
         for (size_t i = 0; i < ntrees; i++) {

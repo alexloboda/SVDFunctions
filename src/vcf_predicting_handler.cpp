@@ -11,11 +11,11 @@ namespace {
 
 namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                         int window_size_kb, int window_size, bool cv, size_t trees)
+                                         int window_size_kb, int window_size, bool cv, size_t trees, bool mean)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
                                           window(window_size),
                                           thread_pool(std::thread::hardware_concurrency()), cv(cv),
-                                          trees(trees) {
+                                          trees(trees), mean(mean) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
         for (const Variant& v : variants) {
@@ -101,12 +101,12 @@ namespace vcf {
         Random random(seed);
         std::shuffle(nonmissing.begin(), nonmissing.end(), random);
         int chunk = nonmissing.size() / 5;
-        double mse = 0.0;
         for (int k = 0; k < 5; k++) {
+            std::vector<double> mse = {0.0, 0.0, 0.0, 0.0};
             std::vector<size_t> train;
-            std::vector<size_t> test = nonmissing;
+            std::vector<size_t> test;
             for (size_t i = 0; i < nonmissing.size(); i++) {
-                if (i >= chunk * i && i < chunk * (k + 1)) {
+                if (i >= chunk * k && i < chunk * (k + 1)) {
                     test.push_back(nonmissing[i]);
                 } else {
                     train.push_back(nonmissing[i]);
@@ -114,8 +114,9 @@ namespace vcf {
             }
             auto training_set = subdataset(dataset, train);
 
-            TreeBuilder tree_builder = make_tree_builder(training_set);
-            RandomForest forest{tree_builder, thread_pool, trees};
+            TreeBuilder tree_builder = make_tree_builder(training_set, mean);
+            RandomForest forest{tree_builder, thread_pool, trees, !mean};
+            std::vector<int> counts = {0, 0, 0};
             for (size_t i: test) {
                 std::vector<AlleleType> features;
                 for (size_t j = 0; j < dataset.first.size(); j++) {
@@ -123,11 +124,15 @@ namespace vcf {
                 }
                 auto predicted = forest.predict(features);
                 double error = predicted - to_int(dataset.second[i]);
-                mse += error * error;
+                mse[to_int(dataset.second[i])] += error * error;
+                counts[to_int(dataset.second[i])]++;
             }
-            mse /= test.size();
+            mse[3] = (mse[0] + mse[1] + mse[2]) / (double)test.size();
+            for (int i = 0; i < 3; i++) {
+                mse[i] /= counts[i];
+            }
+            cv_mse.push_back(mse);
         }
-        cv_mse.push_back(mse);
     }
 
     void PredictingHandler::fix_labels(const std::pair<Features, Labels>& dataset) {
@@ -143,7 +148,7 @@ namespace vcf {
         if (!missing) {
             return;
         }
-        TreeBuilder tree_builder = make_tree_builder(dataset);
+        TreeBuilder tree_builder = make_tree_builder(dataset, false);
         RandomForest forest{tree_builder, thread_pool, trees};
         std::vector<float> labels;
         for (size_t i = 0; i < dataset.second.size(); i++) {
@@ -161,12 +166,16 @@ namespace vcf {
         iterator.set(labels);
     }
 
-    TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset) {
+    TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset, bool mean) {
         size_t mtry = ceil(sqrt(dataset.first.size()));
-        return {dataset.first, dataset.second, mtry};
+        if (mean) {
+            return {{}, dataset.second, mtry};
+        } else {
+            return {dataset.first, dataset.second, mtry};
+        }
     }
 
-std::vector<double> PredictingHandler::mses() const {
+std::vector<std::vector<double>> PredictingHandler::mses() const {
     return cv_mse;
 }
 

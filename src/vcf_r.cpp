@@ -116,7 +116,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold,
-               const IntegerVector& trees) {
+               const IntegerVector& trees, const LogicalVector& mean) {
     List ret;
 
     int ntree = trees[0];
@@ -146,7 +146,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100, true, ntree);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100, true, ntree, mean[0]);
                 parser.register_handler(predicting_handler, 2);
             }
         }
@@ -181,8 +181,13 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         }
         if (predictMissing[0]) {
             auto mses = predicting_handler->mses();
-            NumericVector ms(mses.begin(), mses.end());
-            ret["mses"] = ms;
+            List mse(mses.size());
+            for(auto i = 0; i < mses.size(); i++) {
+                auto vec = mses[i];
+                NumericVector cs(vec.begin(), vec.end());
+                mse[i] = cs;
+            }
+            ret["mses"] = mse;
         }
         ret["stats"] = ret_stats;
     } catch (ParserException& e) {

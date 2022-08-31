@@ -27,20 +27,21 @@ namespace vcf {
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;
-        std::vector<double> cv_mse;
+        std::vector<std::vector<double>> cv_mse;
         size_t trees;
+        bool mean;
         bool cv;
 
-        TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
+        TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset, bool mean);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size, bool cv = false, size_t trees = 12);
+                                   int window_size_kb, int window_size, bool cv = false, size_t trees = 12, bool mean = false);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
         void fix_labels(const std::pair<Features, Labels>& dataset);
         void cross_validation(const std::pair<Features, Labels>& dataset);
-        std::vector<double> mses() const;
+        std::vector<std::vector<double>> mses() const;
     };
 }
 
