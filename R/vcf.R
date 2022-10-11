@@ -284,7 +284,7 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   total <- as.integer(res["total"])
   res[["names"]] <- NULL
   res[["total"]] <- NULL
-  res <- matrix(do.call(c, res), ncol = 4, dimnames = list(NULL, names(res)))
+  res <- matrix(do.call(c, res), ncol = 5, dimnames = list(NULL, names(res)))
   alleles <- res[, "hom_ref"] + res[, "het"] + res[, "hom_alt"]
   res <- cbind(res, call_rate = alleles / (res[, "n_variants"] * total))
   rownames(res) <- names

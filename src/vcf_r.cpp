@@ -185,11 +185,13 @@ namespace {
         vector<int> hom;
         vector<int> het;
         vector<int> alt;
+        vector<double> dps;
     public:
-        void push(int homc, int hetc, int altc) {
+        void push(int homc, int hetc, int altc, double dp) {
             hom.push_back(homc);
             het.push_back(hetc);
             alt.push_back(altc);
+            dps.push_back(dp);
         }
 
         void add(int entry, int homc, int hetc, int altc) {
@@ -202,6 +204,7 @@ namespace {
             hom.insert(hom.end(), counts.hom.begin(), counts.hom.end());
             het.insert(het.end(), counts.het.begin(), counts.het.end());
             alt.insert(alt.end(), counts.alt.begin(), counts.alt.end());
+            dps.insert(dps.end(), counts.dps.begin(), counts.dps.end());
         }
 
         List get_table() {
@@ -209,6 +212,7 @@ namespace {
             ret["hom_ref"] = NumericVector(hom.begin(), hom.end());
             ret["het"] = NumericVector(het.begin(), het.end());
             ret["hom_alt"] = NumericVector(alt.begin(), alt.end());
+            ret["dp"] = NumericVector(dps.begin(), dps.end());
             return ret;
         }
 
@@ -243,6 +247,10 @@ namespace {
         int get_alt(int i) const {
             return alt[i];
         }
+
+        double get_dp(int i) const {
+            return dps[i];
+        }
     };
 
     int ceiling_devision(size_t x, size_t y) {
@@ -262,10 +270,12 @@ namespace {
 
         CountsReader(const CountsReader&) = default;
 
-        std::tuple<int, int, int> read(size_t position) const {
+        std::tuple<int, int, int, double> read(size_t position) const {
             int homref = 0, het = 0, hom = 0;
+            double meanDP = 0.0;
             for (size_t sample_position: samples) {
                 Allele allele = BinaryAllele::toAllele(scanner.scan(position * total_samples + sample_position));
+                meanDP += (double)allele.DP() / samples.size();
                 if (allele.DP() >= DP && allele.GQ() >= GQ) {
                     switch (allele.alleleType()) {
                         case HOM:
@@ -282,7 +292,7 @@ namespace {
                     }
                 }
             }
-            return std::tuple<int, int, int>{homref, het, hom};
+            return std::tuple<int, int, int, double>{homref, het, hom, meanDP};
         }
     };
 
@@ -301,7 +311,7 @@ namespace {
                     Counts counts = {};
                     for (size_t pos: thread_jobs) {
                         auto cts = reader.read(pos);
-                        counts.push(std::get<0>(cts), std::get<1>(cts), std::get<2>(cts));
+                        counts.push(std::get<0>(cts), std::get<1>(cts), std::get<2>(cts), std::get<3>(cts));
                     }
                     return counts;
                 }));
@@ -347,9 +357,9 @@ namespace {
             if (requested.find(var) != requested.end()) {
                 bool as_is = requested.at(var);
                 if (as_is) {
-                    cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
+                    cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i), counts.get_dp(i));
                 } else {
-                    cumulative.push(counts.get_alt(i), counts.get_het(i), counts.get_hom(i));
+                    cumulative.push(counts.get_alt(i), counts.get_het(i), counts.get_hom(i), counts.get_dp(i));
                 }
                 names.push_back(as_is ? (string)var : (string)var.reversed());
                 n_variants.push_back(1);
@@ -357,7 +367,7 @@ namespace {
 
             if (in_range && ranges[curr_range].includes(var.position())) {
                 if (range_entry == -1) {
-                    cumulative.push(0, 0, 0);
+                    cumulative.push(0, 0, 0, 0.0);
                     range_entry = cumulative.size() - 1;
                     names.push_back((string)ranges[curr_range]);
                     n_variants.push_back(0);
