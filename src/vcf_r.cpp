@@ -344,9 +344,9 @@ namespace {
             }
             const Variant& var = variants[i];
 
-            if (!counts.pass(i, min_maf, max_maf, cr, min_mac, max_mac, n, report_singletons)) {
-                continue;
-            }
+            //if (!counts.pass(i, min_maf, max_maf, cr, min_mac, max_mac, n, report_singletons)) {
+            //    continue;
+            //}
 
             bool in_range = curr_range < (long)ranges.size();
             while (in_range && ranges[curr_range] < var.position()) {
