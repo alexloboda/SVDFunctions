@@ -317,8 +317,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   
   names(meanControl) <- rownames(controlsU)
   controlsU <- controlsU[rownames(gmatrix), ]
-  q <- qr(controlsU)
-  controlsU <- qr.Q(q)
+  controlsU <- pinv(controlsU)
   meanControl <- meanControl[rownames(gmatrix)]
   
   numberOfClusters <- 2 * length(clusters$classes) - 1
@@ -337,10 +336,10 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
     
     initial_cluster <- which(clusters$samples %in% cluster_leaves)
-    clusterGenotypes <- t(controlsU) %*% (gmatrix[, initial_cluster] - meanControl)
+    clusterGenotypes <- controlsU %*% (gmatrix[, initial_cluster] - meanControl)
     
     cluster <- initial_cluster[drop(clusterGenotypes, knn_drop, normalize_drop)]
-    clusterGenotypes <- t(controlsU) %*% (gmatrix[, cluster] - meanControl)
+    clusterGenotypes <- controlsU %*% (gmatrix[, cluster] - meanControl)
     
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
