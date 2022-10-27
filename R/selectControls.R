@@ -85,7 +85,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   names(controlsMean) <- rownames(SVDReference)
   controlsMean <- controlsMean[rownames(genotypeMatrix)]
   SVDReference <- SVDReference[rownames(genotypeMatrix), ]
-  transition <- pinv(SVDReference)
+  transition <- pracma::pinv(SVDReference)
   rm(SVDReference)
   
   genotypeMatrix <- genotypeMatrix - controlsMean

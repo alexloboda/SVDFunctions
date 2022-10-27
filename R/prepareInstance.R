@@ -316,7 +316,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   
   names(meanControl) <- rownames(controlsU)
   controlsU <- controlsU[rownames(gmatrix), ]
-  controlsU <- pinv(controlsU)
+  controlsU <- pracma::pinv(controlsU)
   meanControl <- meanControl[rownames(gmatrix)]
   
   numberOfClusters <- 2 * length(clusters$classes) - 1
