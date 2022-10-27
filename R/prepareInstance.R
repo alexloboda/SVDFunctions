@@ -211,7 +211,7 @@ writeCluster <- function(fd, cluster, i) {
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
 
-writeYaml <- function(clusterResults, clustering, variants, Ucontrols, 
+writeYaml <- function(clusterResults, clustering, variants,
                       outputFileName, title) {
   if(missing(outputFileName)){
     stop("Output file name missing")
@@ -233,7 +233,6 @@ writeYaml <- function(clusterResults, clustering, variants, Ucontrols,
   for (v in variants) {
     write("  - ", v, "\n")
   }
-  writeMatrix(fd, 0, Ucontrols, "U")
   write("population:\n")
   for (i in 1:length(clusterResults)) {
     writeCluster(fd, clusterResults[[i]], i)
@@ -355,7 +354,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
   })
-  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), controlsU,
+  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
   cluster_ids
 }
@@ -444,8 +443,6 @@ readInstanceFromYml <- function(filename) {
   if (!setequal(names(inst$names), 1:length(inst$population))) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
-  inst$U <- readMatrix(inst$U, length(inst$variants), "U") 
-  rownames(inst$U) <- inst$variants
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
