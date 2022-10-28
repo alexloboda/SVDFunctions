@@ -417,7 +417,7 @@ readMatrix <- function(obj, nvars, name) {
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 
            error = function(e) userError("File is not a correct YML file"))
-  cols <- c("title", "salt", "version", "hierarchy", "variants", "population", "U")
+  cols <- c("title", "salt", "version", "hierarchy", "variants", "population")
   if (!setequal(names(inst), cols)) {
     userError("Incorrect input YML file: missing or extra sections.")
   }
