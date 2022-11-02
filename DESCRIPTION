@@ -25,7 +25,8 @@ Imports:
     data.table,
     methods,
     seqminer,
-    RSpectra
+    RSpectra,
+    pracma
 LazyData: true
 RoxygenNote: 7.1.2
 SystemRequirements: C++14

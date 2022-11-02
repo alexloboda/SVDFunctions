@@ -211,7 +211,7 @@ writeCluster <- function(fd, cluster, i) {
   writeMatrix(fd, 2, cluster$counts, "counts")
 }
 
-writeYaml <- function(clusterResults, clustering, variants, Ucontrols, 
+writeYaml <- function(clusterResults, clustering, variants,
                       outputFileName, title) {
   if(missing(outputFileName)){
     stop("Output file name missing")
@@ -233,7 +233,6 @@ writeYaml <- function(clusterResults, clustering, variants, Ucontrols,
   for (v in variants) {
     write("  - ", v, "\n")
   }
-  writeMatrix(fd, 0, Ucontrols, "U")
   write("population:\n")
   for (i in 1:length(clusterResults)) {
     writeCluster(fd, clusterResults[[i]], i)
@@ -317,8 +316,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
   
   names(meanControl) <- rownames(controlsU)
   controlsU <- controlsU[rownames(gmatrix), ]
-  q <- qr(controlsU)
-  controlsU <- qr.Q(q)
+  controlsU <- pracma::pinv(controlsU)
   meanControl <- meanControl[rownames(gmatrix)]
   
   numberOfClusters <- 2 * length(clusters$classes) - 1
@@ -337,10 +335,10 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
     cluster_leaves <- sapply(node$leaves, function(x) x$id)
     
     initial_cluster <- which(clusters$samples %in% cluster_leaves)
-    clusterGenotypes <- t(controlsU) %*% (gmatrix[, initial_cluster] - meanControl)
+    clusterGenotypes <- controlsU %*% (gmatrix[, initial_cluster] - meanControl)
     
     cluster <- initial_cluster[drop(clusterGenotypes, knn_drop, normalize_drop)]
-    clusterGenotypes <- t(controlsU) %*% (gmatrix[, cluster] - meanControl)
+    clusterGenotypes <- controlsU %*% (gmatrix[, cluster] - meanControl)
     
     clusterGenotypesForCounts <- gmatrixForCounts[, cluster]
     clusterMeans <- rowMeans(clusterGenotypes)
@@ -356,7 +354,7 @@ prepareInstance <- function (gmatrix, imputationResults, controlsU, meanControl,
                                 mean = clusterMeans, 
                                 title = clusters$classes[i])
   })
-  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), controlsU,
+  writeYaml(clusterResults, clusters, variants = rownames(gmatrix), 
             outputFileName = outputFileName, title = title)
   cluster_ids
 }
@@ -419,7 +417,7 @@ readMatrix <- function(obj, nvars, name) {
 readInstanceFromYml <- function(filename) {
   tryCatch(inst <- yaml::read_yaml(filename), 
            error = function(e) userError("File is not a correct YML file"))
-  cols <- c("title", "salt", "version", "hierarchy", "variants", "population", "U")
+  cols <- c("title", "salt", "version", "hierarchy", "variants", "population")
   if (!setequal(names(inst), cols)) {
     userError("Incorrect input YML file: missing or extra sections.")
   }
@@ -445,8 +443,6 @@ readInstanceFromYml <- function(filename) {
   if (!setequal(names(inst$names), 1:length(inst$population))) {
     userError("Hierarchy section in input YML file have entries with unexpected IDs")
   }
-  inst$U <- readMatrix(inst$U, length(inst$variants), "U") 
-  rownames(inst$U) <- inst$variants
   inst$hierarchy <- processHierarchy(inst$hierarchy)
   inst
 }
