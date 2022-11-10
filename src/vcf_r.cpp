@@ -405,10 +405,11 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         getline(fin, line);
         istringstream iss(line);
         unordered_map<string, int> sample_positions;
-        string sample;
         size_t n = 0;
-        for (; iss >> sample; n++) {
-            sample_positions.insert({sample, n});
+        while(iss) {
+            string sample;
+            if (!getline(iss, sample, '\t')) break;
+            sample_positions.insert({sample, n++});
         }
 
         vector<size_t> positions;
