@@ -28,7 +28,7 @@ Imports:
     RSpectra,
     pracma
 LazyData: true
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.2
 SystemRequirements: C++14
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
