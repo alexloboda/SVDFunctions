@@ -280,14 +280,5 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, 
                            minMAF, maxMAF, minCallRate, minMAC, maxMAC, 
                            reportSingletons,  DP, GQ);
-  names <- res[["names"]]
-  total <- as.integer(res["total"])
-  res[["names"]] <- NULL
-  res[["total"]] <- NULL
-  res <- matrix(do.call(c, res), ncol = 4, dimnames = list(NULL, names(res)))
-  alleles <- res[, "hom_ref"] + res[, "het"] + res[, "hom_alt"]
-  res <- cbind(res, call_rate = alleles / (res[, "n_variants"] * total))
-  rownames(res) <- names
-  
   res
 }

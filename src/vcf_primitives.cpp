@@ -281,8 +281,14 @@ namespace vcf {
         return in;
     }
 
-    Allele BinaryAllele::toAllele(const BinaryAllele& allele) {
+    Allele BinaryAllele::toAllele(const BinaryAllele& allele, bool as_is) {
         auto type = (AlleleType)allele.allele;
+        if (!as_is) {
+            if (type == HOMREF)
+                type = HOM;
+            if (type == HOM)
+                type = HOMREF;
+        }
         return {type, allele.DP, allele.GQ};
     }
 

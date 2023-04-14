@@ -249,42 +249,141 @@ namespace {
         return ((int)x + y - 1) / y;
     }
 
+    struct VariantPos {
+        size_t pos;
+        bool as_is;
+
+        VariantPos(size_t pos, bool as_is) :pos(pos), as_is(as_is) {}
+    };
+
+    struct QC {
+        double min_maf;
+        double max_maf;
+        double min_cr;
+        int min_mac;
+        int max_mac;
+        int DP;
+        int GQ;
+
+        QC(double min_maf, double max_maf, double min_cr, int min_mac, int max_mac, int DP, int GQ)
+            :min_maf(min_maf), max_maf(max_maf), min_cr(min_cr), min_mac(min_mac), max_mac(max_mac), DP(DP), GQ(GQ) {}
+    };
+
     class CountsReader {
         vector<size_t> samples;
         MemoryMappedScanner scanner;
-        unsigned DP;
-        unsigned GQ;
+        QC qc;
 
         int total_samples;
     public:
-        CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, unsigned DP, unsigned GQ, int tot_samples)
-            :samples(samples), scanner(scanner), DP(DP), GQ(GQ), total_samples(tot_samples) {}
+        CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, QC qc, int tot_samples)
+            :samples(samples), scanner(scanner), qc(qc), total_samples(tot_samples)  {}
 
         CountsReader(const CountsReader&) = default;
 
-        std::tuple<int, int, int> read(size_t position) const {
-            int homref = 0, het = 0, hom = 0;
-            for (size_t sample_position: samples) {
-                Allele allele = BinaryAllele::toAllele(scanner.scan(position * total_samples + sample_position));
-                if (allele.DP() >= DP && allele.GQ() >= GQ) {
-                    switch (allele.alleleType()) {
-                        case HOM:
-                            ++hom;
-                            break;
-                        case HET:
-                            ++het;
-                            break;
-                        case HOMREF:
-                            ++homref;
-                            break;
-                        default:
-                            break;
+        Allele read_allele(VariantPos pos, size_t sample_pos) const {
+            vcf::BinaryAllele ball = scanner.scan(pos.pos * total_samples + sample_pos);
+            return BinaryAllele::toAllele(ball, pos.as_is);
+        }
+
+        int read_group(const std::vector<VariantPos>& positions) const {
+            std::vector<bool> mask(samples.size(), false);
+            for (VariantPos pos: positions) {
+                int missing = 0;
+                int minor_alleles = 0;
+                for (size_t sample_position: samples) {
+                    if (mask[sample_position]) {
+                        continue;
+                    }
+                    Allele allele = read_allele(pos, sample_position);
+                    if (allele.alleleType() == AlleleType::MISSING ||  allele.DP() < qc.DP || allele.GQ() < qc.GQ) {
+                        ++missing;
+                    } else {
+                        minor_alleles += (int) allele.alleleType();
+                    }
+                }
+
+                if ((double)missing / (double)samples.size() < qc.min_cr) {
+                    continue;
+                }
+                if (minor_alleles > qc.max_mac || minor_alleles < qc.min_mac) {
+                    continue;
+                }
+
+                double maf = (double)minor_alleles / (2 * double(samples.size() - missing));
+                if (maf < qc.min_maf || maf > qc.max_maf) {
+                    continue;
+                }
+
+                for (size_t sample_position: samples) {
+                    Allele allele = read_allele(pos, sample_position);
+                    if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
+                            if (allele.alleleType() == HOM || allele.alleleType() == HET) {
+                                mask[sample_position] = true;
+                            }
                     }
                 }
             }
-            return std::tuple<int, int, int>{homref, het, hom};
+            return std::count(mask.begin(), mask.end(), true);
+        }
+
+        std::tuple<int, int, int> read(size_t position) const {
+            return {0, 0, 0};
+           // int homref = 0, het = 0, hom = 0;
+           // for (size_t sample_position: samples) {
+           //     Allele allele = read_allele(position, sample_position);
+           //     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
+           //         switch (allele.alleleType()) {
+           //             case HOM:
+           //                 ++hom;
+           //                 break;
+           //             case HET:
+           //                 ++het;
+           //                 break;
+           //             case HOMREF:
+           //                 ++homref;
+           //                 break;
+           //             default:
+           //                 break;
+           //         }
+           //     }
+           // }
+           // return std::tuple<int, int, int>{homref, het, hom};
         }
     };
+
+    std::vector<int> parallel_group_reading(const vector<vector<VariantPos>>& positions,
+                                            const CountsReader& reader) {
+        const int threads = 16;
+
+        cxxpool::thread_pool pool{threads};
+        std::vector<std::future<std::vector<int>>> futures;
+        unsigned jobs_per_thread = (unsigned)ceiling_devision(positions.size(), threads);
+
+        vector<vector<VariantPos>> thread_jobs;
+        for (size_t i = 0; i < positions.size(); i++) {
+            thread_jobs.push_back(positions[i]);
+            if (thread_jobs.size() == jobs_per_thread || i == positions.size() - 1) {
+                futures.push_back(pool.push([thread_jobs, reader]() -> std::vector<int> {
+                    std::vector<int> counts;
+                    for (auto& pos: thread_jobs) {
+                        auto cts = reader.read_group(pos);
+                        counts.push_back(cts);
+                    }
+                    return counts;
+                }));
+                thread_jobs = vector<vector<VariantPos>>();
+            }
+        }
+
+        std::vector<int> counts;
+
+        for (auto& future: futures) {
+            std::vector<int> done = future.get();
+            counts.insert(counts.end(), done.begin(), done.end());
+        }
+        return counts;
+    }
 
     Counts parallel_read(const vector<size_t> &positions, const CountsReader& reader) {
         const int threads = 16;
@@ -319,62 +418,8 @@ namespace {
     }
 }
 
-namespace {
-    List binaryScanResults(const vector<Variant>& variants, const unordered_map<Variant, bool>& requested,
-            const vector<vcf::Range>& ranges, const Counts& counts, double min_maf, double max_maf, double cr,
-            int min_mac, int max_mac, int n, bool report_singletons) {
-        Counts cumulative;
-        vector<string> names;
-        vector<int> n_variants;
-        int curr_range = 0;
-        int range_entry = -1;
-        for (size_t i = 0; i < variants.size(); i++) {
-            if (i % 100 == 0) {
-                Rcpp::checkUserInterrupt();
-            }
-            const Variant& var = variants[i];
-
-            if (!counts.pass(i, min_maf, max_maf, cr, min_mac, max_mac, n, report_singletons)) {
-                continue;
-            }
-
-            bool in_range = curr_range < (long)ranges.size();
-            while (in_range && ranges[curr_range] < var.position()) {
-                ++curr_range;
-                range_entry = -1;
-            }
-
-            if (requested.find(var) != requested.end()) {
-                bool as_is = requested.at(var);
-                if (as_is) {
-                    cumulative.push(counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
-                } else {
-                    cumulative.push(counts.get_alt(i), counts.get_het(i), counts.get_hom(i));
-                }
-                names.push_back(as_is ? (string)var : (string)var.reversed());
-                n_variants.push_back(1);
-            }
-
-            if (in_range && ranges[curr_range].includes(var.position())) {
-                if (range_entry == -1) {
-                    cumulative.push(0, 0, 0);
-                    range_entry = cumulative.size() - 1;
-                    names.push_back((string)ranges[curr_range]);
-                    n_variants.push_back(0);
-                }
-                ++n_variants[range_entry];
-                cumulative.add(range_entry, counts.get_hom(i), counts.get_het(i), counts.get_alt(i));
-            }
-        }
-        List ret = cumulative.get_table();
-        ret["names"] = CharacterVector(names.begin(), names.end());
-        ret["n_variants"] = IntegerVector(n_variants.begin(), n_variants.end());
-        return ret;
-    }
-}
-
 // [[Rcpp::export]]
-List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& regions,
+IntegerVector parse_binary_file(const List& variants, const CharacterVector& samples,
         const CharacterVector& binary_file, const CharacterVector& metafile,
         const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
         const IntegerVector& r_min_mac, const IntegerVector& r_max_mac,
@@ -389,14 +434,6 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         int max_mac = r_max_mac[0];
         bool singletons = report_singletons[0];
         double cr = r_min_cr[0];
-
-        RangeSet rangeSet;
-        vector<vcf::Range> ranges;
-        for (const char* s: regions) {
-            auto r = vcf::Range::parseRange(std::string(s));
-            ranges.push_back(r);
-            rangeSet.insert(r);
-        }
 
         MemoryMappedScanner scanner((string) binary_file[0]);
         ifstream fin(metafile[0]);
@@ -420,30 +457,31 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
             positions.push_back(sample_positions[string(s)]);
         }
 
-        unordered_map<Variant, bool> requested_variants;
-        for (const char* var: variants) {
-            auto variant = Variant::parseVariants(string(var))[0];
-            requested_variants[variant] = true;
-            requested_variants[variant.reversed()] = false;
-        }
-
-        vector<size_t> variant_pos;
-        vector<Variant> found_variants;
-        for (int i = 0; getline(fin, line); i++) {
-            auto var = Variant::parseVariants(line)[0];
-            if (rangeSet.includes(var.position()) || requested_variants.find(var) != requested_variants.end()) {
-                found_variants.push_back(var);
-                variant_pos.push_back(i);
+        unordered_map<Variant, int> requested_variants;
+        for (int i = 0; i < variants.size(); i++) {
+            CharacterVector vars = variants[i];
+            for (const char *var: vars) {
+                auto variant = Variant::parseVariants(string(var))[0];
+                requested_variants[variant] = i;
+                requested_variants.erase(variant.reversed());
             }
         }
 
-        CountsReader reader(positions, scanner, DP, GQ, n);
-        Counts counts = parallel_read(variant_pos, reader);
+        vector<vector<VariantPos>> variant_pos(variants.size());
+        for (size_t i = 0; getline(fin, line); i++) {
+            auto var = Variant::parseVariants(line)[0];
+            if (requested_variants.find(var) != requested_variants.end()) {
+                variant_pos.at(requested_variants[var]).push_back({i, true});
+            }
+            if (requested_variants.find(var.reversed()) != requested_variants.end()) {
+                variant_pos.at(requested_variants[var]).push_back({i, false});
+            }
+        }
 
-        int m = positions.size();
-        List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, min_maf, max_maf, cr,
-                                     min_mac, max_mac, m, singletons);
-        ret["total"] = positions.size();
+        QC qc(min_maf, max_maf, cr, min_mac, max_mac, DP, GQ);
+        CountsReader reader(positions, scanner, qc, n);
+        auto counts = parallel_group_reading(variant_pos, reader);
+        IntegerVector ret(counts.begin(), counts.end());
         return ret;
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());

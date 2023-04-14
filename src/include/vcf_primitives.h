@@ -135,7 +135,7 @@ namespace vcf {
         friend std::ostream& operator<<(std::ostream& os, const BinaryAllele& dt);
         friend std::istream& operator>>(std::istream& in, BinaryAllele& obj);
         static BinaryAllele fromAllele(const Allele& allele);
-        static Allele toAllele(const BinaryAllele& allele);
+        static Allele toAllele(const BinaryAllele& allele, bool as_is);
     };
 }
 
