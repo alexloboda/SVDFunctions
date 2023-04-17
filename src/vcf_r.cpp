@@ -291,8 +291,9 @@ namespace {
             for (VariantPos pos: positions) {
                 int missing = 0;
                 int minor_alleles = 0;
-                for (size_t sample_position: samples) {
-                    if (mask[sample_position]) {
+                for (int i = 0; i < samples.size(); i++) {
+                    size_t sample_position = samples[i];
+                    if (mask[i]) {
                         continue;
                     }
                     Allele allele = read_allele(pos, sample_position);
@@ -315,11 +316,12 @@ namespace {
                     continue;
                 }
 
-                for (size_t sample_position: samples) {
+                for (int i = 0; i < samples.size(); i++) {
+                    size_t sample_position = samples[i];
                     Allele allele = read_allele(pos, sample_position);
                     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
                             if (allele.alleleType() == HOM || allele.alleleType() == HET) {
-                                mask[sample_position] = true;
+                                mask[i] = true;
                             }
                     }
                 }
