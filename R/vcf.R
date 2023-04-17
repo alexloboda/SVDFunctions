@@ -277,7 +277,7 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   variants <- if (is.null(variants)) character(0) else variants  
   regions <- if (is.null(regions)) character(0) else regions
   
-  res <- parse_binary_file(variants, samples, regions, binaryFile, metafile, 
+  res <- parse_binary_file(variants, samples, binaryFile, metafile, 
                            minMAF, maxMAF, minCallRate, minMAC, maxMAC, 
                            reportSingletons,  DP, GQ);
   res
