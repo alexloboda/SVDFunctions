@@ -304,7 +304,7 @@ namespace {
                     }
                 }
 
-                if ((double)missing / (double)samples.size() < qc.min_cr) {
+                if ((double)missing / (double)samples.size() > 1 - qc.min_cr) {
                     continue;
                 }
                 if (minor_alleles > qc.max_mac || minor_alleles < qc.min_mac) {
