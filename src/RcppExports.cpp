@@ -87,7 +87,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_binary_file
-IntegerVector parse_binary_file(const List& variants, const CharacterVector& samples, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons, const IntegerVector& requiredDP, const IntegerVector requiredGQ);
+List parse_binary_file(const List& variants, const CharacterVector& samples, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons, const IntegerVector& requiredDP, const IntegerVector requiredGQ);
 RcppExport SEXP _SVDFunctions_parse_binary_file(SEXP variantsSEXP, SEXP samplesSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

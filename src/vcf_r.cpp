@@ -53,6 +53,14 @@ namespace {
         }
     };
 
+
+    struct GroupRead {
+        int n_variants;
+        int alt_alleles;
+        double mean_cr;
+        int samples_alt;
+    };
+
     class RCallRateHandler: public CallRateHandler {
     public:
         using CallRateHandler::CallRateHandler;
@@ -286,8 +294,12 @@ namespace {
             return BinaryAllele::toAllele(ball, pos.as_is);
         }
 
-        int read_group(const std::vector<VariantPos>& positions) const {
+        GroupRead read_group(const std::vector<VariantPos>& positions) const {
             std::vector<bool> mask(samples.size(), false);
+            int n_variants = 0;
+            int alt_alleles = 0;
+            double mean_cr = 0.0;
+
             for (VariantPos pos: positions) {
                 int missing = 0;
                 int minor_alleles = 0;
@@ -304,18 +316,21 @@ namespace {
                     }
                 }
 
-                if ((double)missing / (double)samples.size() > 1 - qc.min_cr) {
+                double cr = 1.0 - (double)missing / (double)samples.size();
+                if (cr < qc.min_cr) {
                     continue;
                 }
                 if (minor_alleles > qc.max_mac || minor_alleles < qc.min_mac) {
                     continue;
                 }
 
+                mean_cr += cr;
                 double maf = (double)minor_alleles / (2 * double(samples.size() - missing));
                 if (maf < qc.min_maf || maf > qc.max_maf) {
                     continue;
                 }
 
+                ++n_variants;
                 for (int i = 0; i < samples.size(); i++) {
                     size_t sample_position = samples[i];
                     Allele allele = read_allele(pos, sample_position);
@@ -323,10 +338,13 @@ namespace {
                             if (allele.alleleType() == HOM || allele.alleleType() == HET) {
                                 mask[i] = true;
                             }
+                            alt_alleles += allele.alleleType();
                     }
                 }
             }
-            return std::count(mask.begin(), mask.end(), true);
+            mean_cr /= n_variants;
+            int alt_samples = std::count(mask.begin(), mask.end(), true);
+            return {n_variants, alt_alleles, mean_cr, alt_samples};
         }
 
         std::tuple<int, int, int> read(size_t position) const {
@@ -354,20 +372,20 @@ namespace {
         }
     };
 
-    std::vector<int> parallel_group_reading(const vector<vector<VariantPos>>& positions,
+    std::vector<GroupRead> parallel_group_reading(const vector<vector<VariantPos>>& positions,
                                             const CountsReader& reader) {
         const int threads = 16;
 
         cxxpool::thread_pool pool{threads};
-        std::vector<std::future<std::vector<int>>> futures;
+        std::vector<std::future<std::vector<GroupRead>>> futures;
         unsigned jobs_per_thread = (unsigned)ceiling_devision(positions.size(), threads);
 
         vector<vector<VariantPos>> thread_jobs;
         for (size_t i = 0; i < positions.size(); i++) {
             thread_jobs.push_back(positions[i]);
             if (thread_jobs.size() == jobs_per_thread || i == positions.size() - 1) {
-                futures.push_back(pool.push([thread_jobs, reader]() -> std::vector<int> {
-                    std::vector<int> counts;
+                futures.push_back(pool.push([thread_jobs, reader]() -> std::vector<GroupRead> {
+                    std::vector<GroupRead> counts;
                     for (auto& pos: thread_jobs) {
                         auto cts = reader.read_group(pos);
                         counts.push_back(cts);
@@ -378,10 +396,10 @@ namespace {
             }
         }
 
-        std::vector<int> counts;
+        std::vector<GroupRead> counts;
 
         for (auto& future: futures) {
-            std::vector<int> done = future.get();
+            std::vector<GroupRead> done = future.get();
             counts.insert(counts.end(), done.begin(), done.end());
         }
         return counts;
@@ -420,8 +438,26 @@ namespace {
     }
 }
 
+List groupReadToList(const std::vector<GroupRead>& reads) {
+    // TODO: make it better
+    std::vector<int> variants;
+    std::vector<double> call_rates;
+    std::vector<int> alt_alleles;
+    std::vector<int> alt_samples;
+    std::transform(reads.begin(), reads.end(), variants.begin(), [](const GroupRead& r){return r.n_variants; });
+    std::transform(reads.begin(), reads.end(), call_rates.begin(), [](const GroupRead& r){return r.mean_cr; });
+    std::transform(reads.begin(), reads.end(), alt_alleles.begin(), [](const GroupRead& r){return r.alt_alleles; });
+    std::transform(reads.begin(), reads.end(), alt_samples.begin(), [](const GroupRead& r){return r.samples_alt; });
+    List ret;
+    ret["n_variants"] = IntegerVector(variants.begin(), variants.end());
+    ret["cr"] = NumericVector(call_rates.begin(), call_rates.end());
+    ret["alt_alleles"] = IntegerVector(alt_alleles.begin(), alt_alleles.end());
+    ret["alt_samples"] = IntegerVector(alt_samples.begin(), alt_samples.end());
+    return ret;
+}
+
 // [[Rcpp::export]]
-IntegerVector parse_binary_file(const List& variants, const CharacterVector& samples,
+List parse_binary_file(const List& variants, const CharacterVector& samples,
         const CharacterVector& binary_file, const CharacterVector& metafile,
         const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
         const IntegerVector& r_min_mac, const IntegerVector& r_max_mac,
@@ -483,8 +519,7 @@ IntegerVector parse_binary_file(const List& variants, const CharacterVector& sam
         QC qc(min_maf, max_maf, cr, min_mac, max_mac, DP, GQ);
         CountsReader reader(positions, scanner, qc, n);
         auto counts = parallel_group_reading(variant_pos, reader);
-        IntegerVector ret(counts.begin(), counts.end());
-        return ret;
+        return groupReadToList(counts);
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }
