@@ -444,10 +444,10 @@ List groupReadToList(const std::vector<GroupRead>& reads) {
     std::vector<double> call_rates;
     std::vector<int> alt_alleles;
     std::vector<int> alt_samples;
-    std::transform(reads.begin(), reads.end(), variants.begin(), [](const GroupRead& r){return r.n_variants; });
-    std::transform(reads.begin(), reads.end(), call_rates.begin(), [](const GroupRead& r){return r.mean_cr; });
-    std::transform(reads.begin(), reads.end(), alt_alleles.begin(), [](const GroupRead& r){return r.alt_alleles; });
-    std::transform(reads.begin(), reads.end(), alt_samples.begin(), [](const GroupRead& r){return r.samples_alt; });
+    std::transform(reads.begin(), reads.end(), std::back_inserter(variants), [](const GroupRead& r){return r.n_variants; });
+    std::transform(reads.begin(), reads.end(), std::back_inserter(call_rates), [](const GroupRead& r){return r.mean_cr; });
+    std::transform(reads.begin(), reads.end(), std::back_inserter(alt_alleles), [](const GroupRead& r){return r.alt_alleles; });
+    std::transform(reads.begin(), reads.end(), std::back_inserter(alt_samples), [](const GroupRead& r){return r.samples_alt; });
     List ret;
     ret["n_variants"] = IntegerVector(variants.begin(), variants.end());
     ret["cr"] = NumericVector(call_rates.begin(), call_rates.end());
