@@ -1,6 +1,7 @@
 #include "include/vcf_parser.h"
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/math/distributions/beta.hpp>
 #include <fstream>
 
 #include "include/vcf_binary.h"
@@ -58,7 +59,7 @@ namespace {
         int n_variants;
         int alt_alleles;
         double mean_cr;
-        int samples_alt;
+        std::vector<double> sample_scores;
     };
 
     class RCallRateHandler: public CallRateHandler {
@@ -283,9 +284,16 @@ namespace {
         QC qc;
 
         int total_samples;
+        std::vector<double> weights;
     public:
         CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, QC qc, int tot_samples)
-            :samples(samples), scanner(scanner), qc(qc), total_samples(tot_samples)  {}
+            :samples(samples), scanner(scanner), qc(qc), total_samples(tot_samples)  {
+            boost::math::beta_distribution<> mybeta(1, 25);
+            for (int i = 0; i < 2 * total_samples + 1; i++) {
+                double w = pdf(mybeta, (double) i / (2 * total_samples));
+                weights.push_back(w * w);
+            }
+        }
 
         CountsReader(const CountsReader&) = default;
 
@@ -295,7 +303,7 @@ namespace {
         }
 
         GroupRead read_group(const std::vector<VariantPos>& positions) const {
-            std::vector<bool> mask(samples.size(), false);
+            std::vector<double> mask(samples.size(), 0.0);
             int n_variants = 0;
             int alt_alleles = 0;
             double mean_cr = 0.0;
@@ -335,16 +343,13 @@ namespace {
                     size_t sample_position = samples[i];
                     Allele allele = read_allele(pos, sample_position);
                     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
-                            if (allele.alleleType() == HOM || allele.alleleType() == HET) {
-                                mask[i] = true;
-                            }
+                            mask[i] +=  allele.alleleType() * weights[minor_alleles];
                             alt_alleles += allele.alleleType();
                     }
                 }
             }
             mean_cr /= n_variants;
-            int alt_samples = std::count(mask.begin(), mask.end(), true);
-            return {n_variants, alt_alleles, mean_cr, alt_samples};
+            return {n_variants, alt_alleles, mean_cr, mask};
         }
 
         std::tuple<int, int, int> read(size_t position) const {
@@ -438,21 +443,28 @@ namespace {
     }
 }
 
-List groupReadToList(const std::vector<GroupRead>& reads) {
+List groupReadToList(const std::vector<GroupRead>& reads, int samples) {
     // TODO: make it better
     std::vector<int> variants;
     std::vector<double> call_rates;
     std::vector<int> alt_alleles;
-    std::vector<int> alt_samples;
+    std::vector<std::vector<double>> alt_samples;
     std::transform(reads.begin(), reads.end(), std::back_inserter(variants), [](const GroupRead& r){return r.n_variants; });
     std::transform(reads.begin(), reads.end(), std::back_inserter(call_rates), [](const GroupRead& r){return r.mean_cr; });
     std::transform(reads.begin(), reads.end(), std::back_inserter(alt_alleles), [](const GroupRead& r){return r.alt_alleles; });
-    std::transform(reads.begin(), reads.end(), std::back_inserter(alt_samples), [](const GroupRead& r){return r.samples_alt; });
+    std::transform(reads.begin(), reads.end(), std::back_inserter(alt_samples), [](const GroupRead& r){return r.sample_scores; });
     List ret;
     ret["n_variants"] = IntegerVector(variants.begin(), variants.end());
     ret["cr"] = NumericVector(call_rates.begin(), call_rates.end());
     ret["alt_alleles"] = IntegerVector(alt_alleles.begin(), alt_alleles.end());
-    ret["alt_samples"] = IntegerVector(alt_samples.begin(), alt_samples.end());
+    NumericMatrix m(reads.size(), samples);
+    for (int i = 0; i < reads.size(); i++) {
+        const GroupRead& r = reads.at(i);
+        for (int j = 0; j < samples; j++) {
+            m(i, j) = r.sample_scores.at(j);
+        }
+    }
+    ret["alt_samples"] = m;
     return ret;
 }
 
@@ -519,7 +531,7 @@ List parse_binary_file(const List& variants, const CharacterVector& samples,
         QC qc(min_maf, max_maf, cr, min_mac, max_mac, DP, GQ);
         CountsReader reader(positions, scanner, qc, n);
         auto counts = parallel_group_reading(variant_pos, reader);
-        return groupReadToList(counts);
+        return groupReadToList(counts, samples.length());
     } catch (ParserException& e) {
         ::Rf_error(e.get_message().c_str());
     }
