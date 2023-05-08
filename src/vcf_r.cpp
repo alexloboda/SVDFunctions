@@ -346,8 +346,11 @@ namespace {
                     Allele allele = read_allele(pos, sample_position);
                     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
                             if (allele.alleleType() != AlleleType::MISSING) {
-                                minor_alleles = std::min(minor_alleles, major_alleles);
-                                mask[i] += allele.alleleType() * weights[minor_alleles];
+                                if (minor_alleles < major_alleles) {
+                                    mask[i] += allele.alleleType() * weights[minor_alleles];
+                                } else {
+                                    mask[i] += (2 - allele.alleleType()) * weights[major_alleles];
+                                }
                                 alt_alleles += allele.alleleType();
                             }
                     }
