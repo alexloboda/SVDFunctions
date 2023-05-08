@@ -537,7 +537,7 @@ List parse_binary_file(const List& variants, const CharacterVector& samples,
         }
 
         QC qc(min_maf, max_maf, cr, min_mac, max_mac, DP, GQ);
-        CountsReader reader(positions, scanner, qc, n);
+        CountsReader reader(positions, scanner, qc, positions.size());
         auto counts = parallel_group_reading(variant_pos, reader);
         return groupReadToList(counts, samples.length());
     } catch (ParserException& e) {
