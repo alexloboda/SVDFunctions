@@ -343,7 +343,9 @@ namespace {
                     size_t sample_position = samples[i];
                     Allele allele = read_allele(pos, sample_position);
                     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
-                            mask[i] +=  allele.alleleType() * weights[minor_alleles];
+                            if (allele.alleleType() != AlleleType::MISSING) {
+                                mask[i] += allele.alleleType() * weights[minor_alleles];
+                            }
                             alt_alleles += allele.alleleType();
                     }
                 }
