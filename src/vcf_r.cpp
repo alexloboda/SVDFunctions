@@ -311,6 +311,7 @@ namespace {
             for (VariantPos pos: positions) {
                 int missing = 0;
                 int minor_alleles = 0;
+                int major_alleles = 0;
                 for (int i = 0; i < samples.size(); i++) {
                     size_t sample_position = samples[i];
                     if (mask[i]) {
@@ -321,6 +322,7 @@ namespace {
                         ++missing;
                     } else {
                         minor_alleles += (int) allele.alleleType();
+                        major_alleles += 2 - (int) allele.alleleType();
                     }
                 }
 
@@ -344,9 +346,10 @@ namespace {
                     Allele allele = read_allele(pos, sample_position);
                     if (allele.DP() >= qc.DP && allele.GQ() >= qc.GQ) {
                             if (allele.alleleType() != AlleleType::MISSING) {
+                                minor_alleles = std::min(minor_alleles, major_alleles);
                                 mask[i] += allele.alleleType() * weights[minor_alleles];
+                                alt_alleles += allele.alleleType();
                             }
-                            alt_alleles += allele.alleleType();
                     }
                 }
             }
