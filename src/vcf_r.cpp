@@ -289,8 +289,8 @@ namespace {
         CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, QC qc, int tot_samples)
             :samples(samples), scanner(scanner), qc(qc), total_samples(tot_samples)  {
             boost::math::beta_distribution<> mybeta(1, 25);
-            for (int i = 0; i < 2 * total_samples + 1; i++) {
-                double w = pdf(mybeta, (double) i / (2 * total_samples));
+            for (int i = 0; i < 2 * samples.size() + 1; i++) {
+                double w = pdf(mybeta, (double) i / (2 * samples.size()));
                 weights.push_back(w * w);
             }
         }
@@ -537,7 +537,7 @@ List parse_binary_file(const List& variants, const CharacterVector& samples,
         }
 
         QC qc(min_maf, max_maf, cr, min_mac, max_mac, DP, GQ);
-        CountsReader reader(positions, scanner, qc, positions.size());
+        CountsReader reader(positions, scanner, qc, n);
         auto counts = parallel_group_reading(variant_pos, reader);
         return groupReadToList(counts, samples.length());
     } catch (ParserException& e) {
