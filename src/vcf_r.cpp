@@ -289,9 +289,13 @@ namespace {
         CountsReader(const vector<size_t>& samples, const MemoryMappedScanner& scanner, QC qc, int tot_samples)
             :samples(samples), scanner(scanner), qc(qc), total_samples(tot_samples)  {
             boost::math::beta_distribution<> mybeta(1, 25);
+            double ref = pdf(mybeta, (double) 1 / (2 * samples.size()));
+            ref = ref * ref;
             for (int i = 0; i < 2 * samples.size() + 1; i++) {
                 double w = pdf(mybeta, (double) i / (2 * samples.size()));
-                weights.push_back(w * w);
+                w = w * w;
+                w /= ref;
+                weights.push_back(w);
             }
         }
 
