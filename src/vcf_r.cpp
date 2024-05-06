@@ -17,7 +17,8 @@ namespace {
 
     class Parser: public VCFParser {
         void handle_error(const vcf::ParserException& e) override {
-            Rf_warning(e.get_message().c_str());
+            auto msg = e.get_message();
+            Rf_warning(msg.c_str());
         }
     public:
         using VCFParser::VCFParser;
@@ -175,7 +176,8 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         }
         ret["stats"] = ret_stats;
     } catch (ParserException& e) {
-        ::Rf_error(e.get_message().c_str());
+        auto msg = e.get_message();
+        ::Rf_error(msg.c_str());
     }
     return ret;
 }
@@ -446,6 +448,7 @@ List parse_binary_file(const CharacterVector& variants, const CharacterVector& s
         ret["total"] = positions.size();
         return ret;
     } catch (ParserException& e) {
-        ::Rf_error(e.get_message().c_str());
+        auto msg = e.get_message();
+        ::Rf_error(msg.c_str());
     }
 }
