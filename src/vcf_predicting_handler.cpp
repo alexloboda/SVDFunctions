@@ -115,7 +115,7 @@ namespace vcf {
         size_t none = std::numeric_limits<size_t>::max();
         size_t curr_num = none;
         for (size_t i = 0; i < variants.size(); i++) {
-            if (variants[i] == v) {
+            if (variants[i] == v || variants[i] == v.reversed()) {
                 curr_num = i;
             }
         }
