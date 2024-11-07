@@ -41,7 +41,7 @@ namespace vcf {
     public:
         explicit GenotypeMatrixIterator(GenotypeMatrixHandler& gh);
         Variant operator*();
-        void set(std::vector<float>& genotypes);
+        void set(std::vector<float> genotypes);
         GenotypeMatrixIterator& operator++();
         bool dereferencable();
     };

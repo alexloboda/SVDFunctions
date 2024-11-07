@@ -232,12 +232,20 @@ namespace vcf {
         }
     }
 
-    std::vector<AlleleType> AlleleVector::vector() {
+    std::vector<AlleleType> AlleleVector::vector(bool flipped) {
         resolve();
         std::vector<AlleleType> ret;
         ret.reserve(alleles.size());
         for (auto a: alleles) {
-            ret.push_back(a.alleleType());
+            AlleleType type = a.alleleType();
+            if (flipped) {
+                if (type == HOM) {
+                    type = HOMREF;
+                } else if (type == HOMREF) {
+                    type = HOM;
+                }
+            }   
+            ret.push_back(type);
         }
         return ret;
     }

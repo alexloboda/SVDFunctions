@@ -114,19 +114,24 @@ namespace vcf {
         Labels lbls;
         size_t none = std::numeric_limits<size_t>::max();
         size_t curr_num = none;
+        bool flipped = false;
+
         for (size_t i = 0; i < variants.size(); i++) {
             if (variants[i] == v || variants[i] == v.reversed()) {
                 curr_num = i;
+                if (variants[i] == v.reversed()) {
+                    flipped = true;
+                }
             }
         }
         if (curr_num == none) {
             return {};
         }
-        lbls = features[curr_num]->vector();
+        lbls = features[curr_num]->vector(flipped);
         for (size_t i = 0; i < features.size(); i++) {
             if (i != curr_num) {
                 try {
-                    std::vector<AlleleType> row = features[i]->vector();
+                    std::vector<AlleleType> row = features[i]->vector(flipped);
                     fs.push_back(std::move(row));
                 } catch (ParserException& e) {}
             }
