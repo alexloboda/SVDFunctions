@@ -99,6 +99,20 @@ private:
     Counts count_controls(const std::vector<int>& vector, size_t j);
 };
 
+class kronecker_preprocessor {
+    std::shared_ptr<Matrix> matrix;
+    std::vector<std::vector<int>> clusters;
+    std::ofstream fout;
+    std::vector<std::future<std::unique_ptr<std::vector<std::vector<float>>>>> futures;
+
+
+public: 
+    kronecker_preprocessor::kronecker_preprocessor(std::shared_ptr<Matrix> matrix, 
+                                                   std::vector<std::vector<int>> clusters, 
+                                                   std::string filename);
+    }
+}
+
 }
 
 #endif //SRC_MATCHING_H

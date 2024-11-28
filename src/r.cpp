@@ -9,6 +9,7 @@
 #include "include/qchisq.h"
 #include "include/matching.h"
 #include "include/hw.h"
+#include "include/kronecker.h"
 
 using namespace Rcpp;
 using std::vector;
@@ -107,6 +108,37 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
 }
 
 // [[Rcpp::export]]
+List preprocess_dataset_cpp(IntegerMatrix gmatrix_rs, IntegerVector clustering, CharacterVector filename) {
+    auto gm_rs = r_to_cpp(gmatrix_rs);
+    auto clust_vec = r_to_cpp_vector(clustering);
+    std::string file(filename[0]);
+    std::vector<std::vector<int>> clst;
+    for (int i = 0; i < clust_vec.size(); i++) {
+        clst.push_back(clust_vec[i]);
+    }
+
+    if (clust_vec.size() == 0) {
+        Rcpp::stop("Clustering vector must not be empty");
+    }
+
+    // check clusters do not exceed the number of samples
+    int n_samples = gm_rs->rows();
+    int max_cluster = *std::max_element(clust_vec.begin(), clust_vec.end());
+    if (max_cluster >= n_samples) {
+        Rcpp::stop("Cluster index exceeds the number of samples");
+    }
+
+    int min_cluster = *std::min_element(clust_vec.begin(), clust_vec.end());
+    if (min_cluster < 0) {
+        Rcpp::stop("Cluster index must be non-negative");
+    }
+
+    matching::kronecker_preprocessor preprocessor(std::move(gm_rs), clst, file);
+    int thread_pool_size = std::thread::hardware_concurrency() + 1;
+    preprocessor.process(thread_pool_size, 100, 2);
+}
+
+// [[Rcpp::export]]
 List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericMatrix& gmatrix_rs,
                      NumericVector& mean, NumericMatrix& directions,
@@ -115,7 +147,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
                      IntegerVector min, IntegerVector max, IntegerVector step,
-                     IntegerVector sa_iterations, NumericVector min_call_rate) {
+                     IntegerVector sa_iterations, NumericVector min_call_rate, 
+                     CharacterVector preprocessed_data) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 

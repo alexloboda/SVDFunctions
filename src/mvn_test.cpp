@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include "include/third-party/cxxpool.h"
 
+#include "include/kronecker.h"
 #include "include/mvn_test.h"
 
 #undef NDEBUG
@@ -18,7 +19,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         throw std::invalid_argument("Matrix is empty");
     }
 
-    betas = {0.8};
+    betas = {0.3};
 
     pairwise_stat.resize(betas.size(), 0.0);
     center_stat.resize(betas.size(), 0.0);
@@ -76,20 +77,45 @@ const std::vector<size_t>& mvn_test::current_subset() const {
     return subset;
 }
 
-mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta)
-    :mahalanobis_centered(clst.size()),
-     mahalanobis_pairwise() {
-    mahalanobis_pairwise.resize(clst.size());
+
+mvn_stats::mvn_stats(int n_clusters) :mahalanobis_centered(n_clusters), mahalanobis_pairwise(n_clusters) {
+    for (size_t cl = 0; cl < n_clusters; cl++) {
+        mahalanobis_pairwise[cl].resize(n_clusters);
+    }
+}
+
+void mvn_stats::init(mahalanobis_distances distances, const Clustering& clst, double beta) {
     size_t n = clst.size();
 
     double k_center = -(beta * beta / (2 * (1 + beta * beta)));
+
+    for (size_t cl = 0; cl < n; cl++) {
+        for (int el: clst.elements(cl)) {
+            mahalanobis_centered[cl] += std::exp(k_center * distances.distance(el));
+        }
+    }
+}
+
+mvn_stats_approx::mvn_stats_approx(const std::string& _filename, int n_clusters) :mvn_stats(n_clusters), filename(_filename) {}
+
+void mvn_stats_approx::init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) {
+    double k_pw = -(beta * beta) / 2.0;
+
+    auto n = clst.size();
+
+    matching::kronecker_calculator calc(filename);
+    mahalanobis_pairwise = calc.calculate(distances.get_sigma(), k_pw);
+}
+
+void mvn_stats_interpoint::init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) {
+    distances.calculate_interpoint();
+
+    auto n = clst.size();
     double k_pw = -(beta * beta) / 2.0;
 
     for (size_t cl = 0; cl < n; cl++) {
-        mahalanobis_pairwise[cl].resize(clst.size());
-        for (int el: clst.elements(cl)) {
-            mahalanobis_centered[cl] += std::exp(k_center * distances.distance(el));
-            for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
+        for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
+            for (int el: clst.elements(cl)) {
                 for (int pair_el: clst.elements(pair_cl)) {
                     if (cl == pair_cl) {
                         mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
@@ -101,7 +127,7 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
         }
     }
 }
-
+ 
 double mvn_stats::pairwise_stat(size_t i, size_t j) const {
     return mahalanobis_pairwise[i][j];
 }
@@ -224,35 +250,52 @@ size_t Clustering::cluster_size(size_t i) const {
     return clusters.at(i).size();
 }
 
-mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& S, const Vector& mean)
-        :dist(X->cols()) {
-    inter.resize(X->cols());
+Matrix mahalanobis_distances::get_sigma() const {
+    return S_inv;
+}
+
+mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> _X, const Matrix& S, const Vector& mean)
+        :dist(X->cols()), calc_interpoint(false), X(_X) {
     Eigen::FullPivHouseholderQR<Matrix> qr(S);
     if (!qr.isInvertible()) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");
     }
 
-    Matrix S_inv = qr.inverse();
+    S_inv = qr.inverse();
 
     Vector ximu = X->transpose() * S_inv * mean;
     Vector muxi = mean.transpose() * S_inv * *X;
-    Matrix distances = X->transpose() * S_inv * *X;
     double mumu = mean.transpose() * S_inv * mean;
-    std::vector<double> diag(distances.rows());
+
+    diag.resize(X->cols());
 
     for (auto i = 0; i < X->cols(); i++) {
-        diag[i] = distances(i, i);
+        diag[i] = X->col(i).transpose() * S_inv * X->col(i);    
     }
+
+    for (auto i = 0; i < X->cols(); i++) {
+        dist[i] = diag[i] - ximu(i) - muxi(i) + mumu;
+    }
+}
+
+void mahalanobis_distances::calculate_interpoint() {
+    Matrix distances = X->transpose() * S_inv * *X;
+    inter.resize(X->cols());
+
     for (auto i = 0; i < X->cols(); i++) {
         inter[i].resize(X->cols());
-        dist[i] = diag[i] - ximu(i) - muxi(i) + mumu;
         for (auto j = 0; j < X->cols(); j++) {
             inter[i][j] = diag[i] - 2 *  distances(i, j) + diag[j];
         }
     }
+
+    calc_interpoint = true;
 }
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
+    if (!calc_interpoint) {
+        throw std::logic_error("Interpoint distances not calculated");
+    }
     return inter[i][j];
 }
 

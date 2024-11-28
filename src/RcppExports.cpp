@@ -11,6 +11,20 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// sskm_cpp
+Rcpp::IntegerVector sskm_cpp(const Rcpp::NumericMatrix& X, const Rcpp::IntegerVector k, const Rcpp::IntegerVector max_iter, const Rcpp::NumericVector tol);
+RcppExport SEXP _SVDFunctions_sskm_cpp(SEXP XSEXP, SEXP kSEXP, SEXP max_iterSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::NumericMatrix& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector >::type k(kSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::IntegerVector >::type max_iter(max_iterSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::NumericVector >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(sskm_cpp(X, k, max_iter, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
 // quality_control_impl
 LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const NumericVector& maf, const IntegerVector& mac, const NumericVector& chi2boundary);
 RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP, SEXP mafSEXP, SEXP macSEXP, SEXP chi2boundarySEXP) {
@@ -111,6 +125,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_SVDFunctions_sskm_cpp", (DL_FUNC) &_SVDFunctions_sskm_cpp, 4},
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 16},

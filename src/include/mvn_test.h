@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <RcppEigen.h>
+#include "include/third-party/zstr/zstr.hpp"
 
 // [[Rcpp::depends(RcppEigen)]]
 
@@ -59,26 +60,47 @@ public:
 };
 
 class mahalanobis_distances {
-    std::vector<std::vector<double>> inter;
+protected:
     std::vector<double> dist;
-
+    std::vector<std::vector<double>> inter;
+    std::vector<double> diag;
+    std::shared_ptr<const Matrix> X;
+    Matrix S_inv;
+    bool calc_interpoint;
 public:
     mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
+    void calculate_interpoint();
+    Matrix get_sigma() const;
     double distance(unsigned i) const;
     double interpoint_distance(unsigned i, unsigned j) const;
 };
 
 class mvn_stats {
+protected:
     std::vector<double> mahalanobis_centered;
     std::vector<std::vector<double>> mahalanobis_pairwise;
 public:
-    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
+    mvn_stats(int n_clsuters);
     mvn_stats() = default;
 
+    void init(mahalanobis_distances distances, const Clustering& clst, double beta);
+    virtual void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) = 0;
     double pairwise_stat(size_t i, size_t j) const;
     double sum_pairwise(size_t point, const std::vector<size_t>& ss) const;
     double centered_stat(size_t i) const;
-private:
+};
+
+class mvn_stats_interpoint : public mvn_stats {
+public:
+    mvn_stats_interpoint(int n_clusters);
+    void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) override;
+};
+
+class mvn_stats_approx : public mvn_stats {
+    std::string filename;
+public:
+    mvn_stats_approx(const std::string& filename, int n_clusters);
+    void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) override;
 };
 
 class mvn_test {
