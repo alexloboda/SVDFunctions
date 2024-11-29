@@ -79,7 +79,6 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
     return eigen_vector;
 }
 
-
 std::vector<std::vector<int>> r_to_cpp_vector(IntegerMatrix& matrix) {
     std::vector<std::vector<int>> ret(matrix.nrow());
     for (int i = 0; i < matrix.nrow(); i++) {
@@ -108,13 +107,20 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
 }
 
 // [[Rcpp::export]]
-List preprocess_dataset_cpp(IntegerMatrix gmatrix_rs, IntegerVector clustering, CharacterVector filename) {
+List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector& clustering, CharacterVector filename) {
     auto gm_rs = r_to_cpp(gmatrix_rs);
-    auto clust_vec = r_to_cpp_vector(clustering);
+    std::vector<int> clust_vec(clustering.begin(), clustering.end());
     std::string file(filename[0]);
     std::vector<std::vector<int>> clst;
     for (int i = 0; i < clust_vec.size(); i++) {
-        clst.push_back(clust_vec[i]);
+        --clust_vec[i];
+        if (clust_vec[i] < 0) {
+            Rcpp::stop("Cluster index must be positive");
+        }
+        if (clust_vec[i] >= clst.size()) {
+            Rcpp::stop("Cluster index exceeds the number of clusters");
+        }
+        clst[clust_vec[i]].push_back(i);
     }
 
     if (clust_vec.size() == 0) {
@@ -123,17 +129,8 @@ List preprocess_dataset_cpp(IntegerMatrix gmatrix_rs, IntegerVector clustering, 
 
     // check clusters do not exceed the number of samples
     int n_samples = gm_rs->rows();
-    int max_cluster = *std::max_element(clust_vec.begin(), clust_vec.end());
-    if (max_cluster >= n_samples) {
-        Rcpp::stop("Cluster index exceeds the number of samples");
-    }
 
-    int min_cluster = *std::min_element(clust_vec.begin(), clust_vec.end());
-    if (min_cluster < 0) {
-        Rcpp::stop("Cluster index must be non-negative");
-    }
-
-    matching::kronecker_preprocessor preprocessor(std::move(gm_rs), clst, file);
+    matching::kronecker_preprocessor preprocessor(gm_rs, clst, file);
     int thread_pool_size = std::thread::hardware_concurrency() + 1;
     preprocessor.process(thread_pool_size, 100, 2);
 }
@@ -147,8 +144,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
                      IntegerVector min, IntegerVector max, IntegerVector step,
-                     IntegerVector sa_iterations, NumericVector min_call_rate, 
-                     CharacterVector preprocessed_data) {
+                     IntegerVector sa_iterations, NumericVector min_call_rate) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 

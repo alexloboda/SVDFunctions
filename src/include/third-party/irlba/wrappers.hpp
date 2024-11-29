@@ -2,7 +2,7 @@
 #define IRLBA_WRAPPERS_HPP
 
 #include "utils.hpp"
-#include "eigen3/Eigen/Dense"
+#include "RcppEigen.h"
 #include <type_traits>
 
 /**

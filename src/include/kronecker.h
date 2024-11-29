@@ -1,15 +1,14 @@
-#ifndef SRC_MATCHING_H
-#define SRC_MATCHING_H
+#ifndef SRC_KRON_H
+#define SRC_KRON_H
 
-#include "include/third-party/cxxpool.h"
+#include "third-party/cxxpool.h"
+#include "third-party/zstr/zstr.hpp"
 
 #include <vector>
 #include <fstream>
 #include <memory>
 
-#include <eigen3/Eigen/Dense>
-#include <eigen3/unsupported/Eigen/KroneckerProduct>
-//#include <RcppEigen.h>
+#include <RcppEigen.h>
 
 namespace matching {
 
@@ -66,6 +65,8 @@ public:
 class kronecker_preprocessor {
     std::shared_ptr<Eigen::MatrixXd> matrix;
     std::vector<std::vector<int>> clusters;
+    // interruptions checker
+
     zstr::ofstream fout;
     std::vector<std::future<std::unique_ptr<impl::kronecker_approximation>>> futures;
 

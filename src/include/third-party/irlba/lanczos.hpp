@@ -1,7 +1,7 @@
 #ifndef IRLBA_LANCZOS_HPP
 #define IRLBA_LANCZOS_HPP
 
-#include "Eigen/Dense"
+#include "RcppEigen.h"
 #include "utils.hpp"
 #include "wrappers.hpp"
 #include "Options.hpp"

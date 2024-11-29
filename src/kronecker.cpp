@@ -68,27 +68,7 @@ nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
     return {B, C};
 }
 
-std::vector<Matrix> preprocess(const Matrix& lhs, const Matrix& rhs, int n) {
-    Matrix ds(lhs.rows() * rhs.rows(), lhs.cols());
-    for (int i = 0; i < lhs.rows(); i++) {
-        for (int j = 0; j < rhs.rows(); j++) {
-            ds.row(i * rhs.rows() + j) = lhs.row(i) - rhs.row(j);
-        }
-    }
-
-    std::vector<Matrix> ret;
-
-    Matrix prod = ds;
-    for (int i = 0; i < n - 1; i++) {
-        prod = Eigen::kroneckerProduct(prod, ds).eval();
-    }
-
-
-}
-}
-
-namespace {
-using Eigen::placeholders::all;
+using Eigen::all;
 
 template<class Derived>
 void write_binary(std::ostream &os, const Eigen::PlainObjectBase<Derived> &matrix)
@@ -142,7 +122,7 @@ kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix
     m = A.cols();
     for (int t = 0; t < max_degree; t++) {
         // zero matrix of necessary size
-        Matrix outer_sum = Matrix::Zero(A.cols() * A.cols());
+        Matrix outer_sum = Matrix::Zero(m, m);
         auto original = outer_sum;
         for (int i = 0; i < t; i++) {
             outer_sum = Eigen::KroneckerProduct(outer_sum, original);
@@ -236,6 +216,8 @@ std::ostream& operator<<(std::ostream& os, const one_spot_approximation& spot) {
         os.write("MATX", 4);
         write_binary(os, matrix);
     }
+
+    return os;
 }
 
 std::istream& operator>>(std::istream& is, one_spot_approximation& spot) {
@@ -272,6 +254,8 @@ std::istream& operator>>(std::istream& is, one_spot_approximation& spot) {
     if(spot.matrices.size() != spot.k) {
         throw std::runtime_error("Invalid number of matrices");
     }
+
+    return is;
 }
 
 std::ostream& operator<<(std::ostream& os, const one_degree_approximation& spot) {
@@ -288,6 +272,8 @@ std::ostream& operator<<(std::ostream& os, const one_degree_approximation& spot)
     for (const auto& spot: spot.spots) {
         os << spot;
     }
+
+    return os;
 }
 
 double one_degree_approximation::calculate(const matrix_t& sigma, double c_e) const {
@@ -318,6 +304,8 @@ std::istream& operator>>(std::istream& is, one_degree_approximation& obj) {
         is >> spot;
         obj.spots.push_back(spot);
     }
+    
+    return is;
 }
 
 std::ostream& operator<<(std::ostream& os, const kronecker_approximation& spot) {
@@ -341,6 +329,8 @@ std::ostream& operator<<(std::ostream& os, const kronecker_approximation& spot) 
     for (const auto& degree: spot.degrees) {
         os << degree;
     }
+
+    return os;
 }
 
 double kronecker_approximation::calculate(const matrix_t& sigma, double c_e) const {
@@ -384,6 +374,8 @@ std::istream& operator>>(std::istream& is, kronecker_approximation& obj) {
         is >> degree;
         obj.degrees.push_back(degree);
     }
+
+    return is;
 }
 
 matrix_t one_spot_approximation::get_approximation() const {
@@ -394,7 +386,7 @@ matrix_t one_spot_approximation::get_approximation() const {
     return result;
 }
 
-}
+} // namespace impl
 
 kronecker_calculator::kronecker_calculator(std::string filename) :fin(filename, std::ios::binary) {
     if (!fin) {
@@ -451,7 +443,7 @@ void kronecker_preprocessor::process(unsigned threads, unsigned batch_size, unsi
     auto n = clusters.size();
     int curr_in_batch = 0;
     for (size_t i = 0; i < n; i++) {
-        Rcpp::checkUserInterrupt();
+        //Rcpp::checkUserInterrupt();
         // Threading
         for (size_t j = i; j < n; j++) {
             futures.push_back(pool.push([this, i, j, max_degree]() -> std::unique_ptr<impl::kronecker_approximation> {

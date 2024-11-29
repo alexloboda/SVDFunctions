@@ -4,7 +4,7 @@
 #include <vector>
 #include <memory>
 #include <RcppEigen.h>
-#include "include/third-party/zstr/zstr.hpp"
+#include "third-party/zstr/zstr.hpp"
 
 // [[Rcpp::depends(RcppEigen)]]
 

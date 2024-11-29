@@ -1,7 +1,7 @@
 #ifndef IRLBA_COMPUTE_HPP
 #define IRLBA_COMPUTE_HPP
 
-#include "Eigen/Dense"
+#include <RcppEigen.h>
 #include "utils.hpp"
 #include "lanczos.hpp"
 

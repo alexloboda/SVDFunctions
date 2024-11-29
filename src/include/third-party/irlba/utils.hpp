@@ -1,7 +1,7 @@
 #ifndef IRLBA_UTILS_HPP
 #define IRLBA_UTILS_HPP
 
-#include "Eigen/Dense"
+#include "RcppEigen.h"
 #include <random>
 #include <utility>
 #include "aarand/aarand.hpp"

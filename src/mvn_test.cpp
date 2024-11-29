@@ -37,7 +37,9 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
     for (double beta: betas) {
         futures.push_back(pool.push([this, clst, beta]() -> std::shared_ptr<mvn_stats> {
-            return std::make_shared<mvn_stats>(*distances, clst, beta);
+            std::shared_ptr<mvn_stats> ret = std::make_shared<mvn_stats_interpoint>(n);
+            ret->init_pairwise(*distances, clst, beta);
+            return ret;
         }));
     }
     for (int i = 0; i < betas.size(); i++) {
@@ -106,6 +108,8 @@ void mvn_stats_approx::init_pairwise(mahalanobis_distances distances, const Clus
     matching::kronecker_calculator calc(filename);
     mahalanobis_pairwise = calc.calculate(distances.get_sigma(), k_pw);
 }
+
+mvn_stats_interpoint::mvn_stats_interpoint(int n_clusters) :mvn_stats(n_clusters) {}
 
 void mvn_stats_interpoint::init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) {
     distances.calculate_interpoint();
