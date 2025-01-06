@@ -37,6 +37,7 @@ public:
     one_degree_approximation(const matrix_t& outer, int m, int k);
     one_degree_approximation(int m, int k);
     double calculate(const matrix_t& sigma, double c_e) const;
+    int n_spots() const;
     friend std::ostream& operator<<(std::ostream& os, const one_degree_approximation& spot);
     friend std::istream& operator>>(std::istream& is, one_degree_approximation& spot);
 };
@@ -47,6 +48,7 @@ class kronecker_approximation {
 public:
     kronecker_approximation(const matrix_t& A, const matrix_t& B, int max_degree);
     kronecker_approximation();
+    double compression() const;
     double calculate(const matrix_t& sigma, double c_e) const;
     friend std::ostream& operator<<(std::ostream& os, const kronecker_approximation& spot);
     friend std::istream& operator>>(std::istream& is, kronecker_approximation& spot);
@@ -65,7 +67,6 @@ public:
 class kronecker_preprocessor {
     std::shared_ptr<Eigen::MatrixXd> matrix;
     std::vector<std::vector<int>> clusters;
-    // interruptions checker
 
     zstr::ofstream fout;
     std::vector<std::future<std::unique_ptr<impl::kronecker_approximation>>> futures;

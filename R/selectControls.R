@@ -26,6 +26,32 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   quality_control_impl(countsMatrix, maf, mac, chisq_threshold)
 }
 
+#' Performs 
+#' @export
+preprocess_controls <- function (genotypeMatrix, SVDReference, controlsMean, 
+                                controlsClustering, filename, 
+                                threads = 1L, degree = 4L) {
+  stopifnot(is.matrix(genotypeMatrix))
+  mode(genotypeMatrix) <- "numeric"
+  stopifnot(all(!is.na(genotypeMatrix)))
+  cl <- controlsClustering
+  cl <- as.integer(as.factor(cl)) - 1
+  stopifnot(all(!is.na(cl)))
+  
+  names(controlsMean) <- rownames(SVDReference)
+  controlsMean <- controlsMean[rownames(genotypeMatrix)]
+  SVDReference <- SVDReference[rownames(genotypeMatrix), ]
+  transition <- pracma::pinv(SVDReference)
+  rm(SVDReference)
+  
+  genotypeMatrix <- genotypeMatrix - controlsMean
+  genotypeMatrix <- transition %*% genotypeMatrix
+  
+  preprocess_dataset_cpp(t(genotypeMatrix), cl, filename, as.integer(threads), 
+                         as.integer(degree))
+}
+
+
 #' Select a set of controls that matches to a set of cases.
 #' 
 #' Finds an optimal set of controls satisfying 

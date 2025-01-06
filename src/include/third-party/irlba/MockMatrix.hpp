@@ -1,7 +1,7 @@
 #ifndef IRLBA_MOCK_MATRIX_HPP
 #define IRLBA_MOCK_MATRIX_HPP
 
-#include "Eigen/Dense"
+#include "eigen3/Eigen/Dense"
 
 /**
  * @file MockMatrix.hpp

@@ -16,6 +16,29 @@ checkTree <- function(t, cs) {
   }
 }
 
+#' Function implements clustering algorithm for controls 
+#' based on the same size k-means algorithm.
+#' @param gmatrix Genotype matrix.
+#' @param k cluster size
+#' @param max_iter maximum number of iterations
+#' @param tol tolerance for convergence
+#' @return vector of cluster ids for each sample.
+#' @export
+sameSizeKMeans <- function(gmatrix, k, max_iter = 10000, tol = 1e-4) {
+    n <- ncol(gmatrix)
+    n_clusters <- ceiling(n / k)
+    gmatrix <- gmatrix - rowMeans(gmatrix)
+    svd <- RSpectra::svds(gmatrix, k = 10)
+
+    scaled <- svd$v %*% diag(svd$d)
+    rownames(scaled) <- colnames(gmatrix)
+    colnames(scaled) <- paste0("PC", 1:10)
+    
+    clusters <- sskm_cpp(scaled, n_clusters, max_iter, tol)
+    list(clusters = clusters, pca = scaled)
+}
+
+
 deletionName <- "###____toDelete____$$$"
 
 cats <- function(file, depth, ...) {

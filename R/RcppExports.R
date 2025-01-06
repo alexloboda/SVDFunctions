@@ -13,8 +13,8 @@ subsample_mvn <- function(matrix, size, mean, cov) {
     .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, size, mean, cov)
 }
 
-preprocess_dataset_cpp <- function(gmatrix_rs, clustering, filename) {
-    .Call('_SVDFunctions_preprocess_dataset_cpp', PACKAGE = 'SVDFunctions', gmatrix_rs, clustering, filename)
+preprocess_dataset_cpp <- function(gmatrix_rs, clustering, filename, threads, degree) {
+    .Call('_SVDFunctions_preprocess_dataset_cpp', PACKAGE = 'SVDFunctions', gmatrix_rs, clustering, filename, threads, degree)
 }
 
 select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate) {

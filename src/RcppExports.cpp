@@ -54,15 +54,17 @@ BEGIN_RCPP
 END_RCPP
 }
 // preprocess_dataset_cpp
-List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector& clustering, CharacterVector filename);
-RcppExport SEXP _SVDFunctions_preprocess_dataset_cpp(SEXP gmatrix_rsSEXP, SEXP clusteringSEXP, SEXP filenameSEXP) {
+List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector& clustering, CharacterVector filename, IntegerVector threads, IntegerVector degree);
+RcppExport SEXP _SVDFunctions_preprocess_dataset_cpp(SEXP gmatrix_rsSEXP, SEXP clusteringSEXP, SEXP filenameSEXP, SEXP threadsSEXP, SEXP degreeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericMatrix& >::type gmatrix_rs(gmatrix_rsSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type clustering(clusteringSEXP);
     Rcpp::traits::input_parameter< CharacterVector >::type filename(filenameSEXP);
-    rcpp_result_gen = Rcpp::wrap(preprocess_dataset_cpp(gmatrix_rs, clustering, filename));
+    Rcpp::traits::input_parameter< IntegerVector >::type threads(threadsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type degree(degreeSEXP);
+    rcpp_result_gen = Rcpp::wrap(preprocess_dataset_cpp(gmatrix_rs, clustering, filename, threads, degree));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -141,7 +143,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_sskm_cpp", (DL_FUNC) &_SVDFunctions_sskm_cpp, 4},
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
-    {"_SVDFunctions_preprocess_dataset_cpp", (DL_FUNC) &_SVDFunctions_preprocess_dataset_cpp, 3},
+    {"_SVDFunctions_preprocess_dataset_cpp", (DL_FUNC) &_SVDFunctions_preprocess_dataset_cpp, 5},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 16},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 11},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},

@@ -226,24 +226,23 @@ void SameSizeKMeans::k_means(const std::vector<std::vector<double>>& X, int k) {
         std::priority_queue<Point> points_order;
         std::vector<double> best_dist(n, 0);
         for (int i = 0; i < n; i++) {
-            for (int cluster = 0; cluster < k; cluster++) {
-                std::vector<double> dists(k);
-                
-                int min_idx = -1;
-                for (int j = 0; j < k; j++) {
-                    dists[j] = euclidean_distance(X[i], centroids[j]);
-                    if (j != cluster) {
-                        if (min_idx == -1 || dists[j] < dists[min_idx]) {
-                            min_idx = j;
-                        }
+            int cluster = labels[i];
+            std::vector<double> dists(k);
+            
+            int min_idx = -1;
+            for (int j = 0; j < k; j++) {
+                dists[j] = euclidean_distance(X[i], centroids[j]);
+                if (j != cluster) {
+                    if (min_idx == -1 || dists[j] < dists[min_idx]) {
+                        min_idx = j;
                     }
                 }
-
-                best_dist[i] = dists[min_idx];
-                double priority = dists[labels[i]] - dists[min_idx];
-                Point p(i, cluster, priority);   
-                points_order.push(p);
             }
+
+            best_dist[i] = dists[min_idx];
+            double priority = dists[labels[i]] - dists[min_idx];
+            Point p(i, cluster, priority);   
+            points_order.push(p);
         }
 
         double total_gain = 0;

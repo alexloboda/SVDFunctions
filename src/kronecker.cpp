@@ -1,10 +1,13 @@
 #include "include/kronecker.h"
 
+#include <cmath>
 #include <fstream>
 #include "include/third-party/cxxpool.h"
 #include "include/third-party/irlba/irlba.hpp"
+#include <chrono>
 
 #include "include/third-party/zstr/zstr.hpp"
+#include <Rcpp.h>
 
 namespace {
 using Matrix = Eigen::MatrixXd;
@@ -18,37 +21,65 @@ struct nkp_result {
     Matrix C;
 };
 
-nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
-    int n = A.rows();
-    int m = A.cols();
+Eigen::MatrixXd reshapeAndPermute(const Eigen::MatrixXd& A, int n1, int m1, int n2, int m2) {
+    // Step 1: Reshape A into a 4D tensor of size [m2, m1, n2, n1]
+    Eigen::MatrixXd reshaped = Eigen::Map<const Eigen::MatrixXd>(A.data(), m2 * m1, n2 * n1);
     
-    assert(n1 == m1);
-    assert(n2 == m2);
+    // Step 2: Permute the dimensions to [m1, n1, m2, n2]
+    Eigen::MatrixXd permuted(m1 * n1, m2 * n2);
+    for (int i = 0; i < m1; ++i) {
+        for (int j = 0; j < n1; ++j) {
+            for (int k = 0; k < m2; ++k) {
+                for (int l = 0; l < n2; ++l) {
+                    // Original indices in the reshaped matrix
+                    int originalRow = k + i * m2;
+                    int originalCol = l + j * n2;
 
-    Matrix A_mod = 0.5 * (A + A.transpose());
+                    // New indices in the permuted matrix
+                    int newRow = i + j * m1;
+                    int newCol = k + l * m2;
 
-    Matrix R(n1 * m1, n2 * m2);
-    for (int i = 0; i < n1; ++i) {
-        for (int j = 0; j < m1; ++j) {
-            for (int k = 0; k < n2; ++k) {
-                for (int l = 0; l < m2; ++l) {
-                    R(i * m1 + j, k * m2 + l) = A_mod(k * n1 + i, l * m1 + j);
+                    permuted(newRow, newCol) = reshaped(originalRow, originalCol);
                 }
             }
         }
     }
+    return permuted;
+}
+
+nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
+    int n = A.rows();
+    int m = A.cols();
+
+    assert(n1 == m1);
+    assert(n2 == m2);
+
+    Matrix A_mod = (0.5 * A + 0.5 * A.transpose()).eval();
+
+    // normalize A_mod so abs max is 1
+    double abs_max = A_mod.cwiseAbs().maxCoeff();
+    A_mod /= abs_max;
+
+    Matrix R = reshapeAndPermute(A_mod, n1, m1, n2, m2);
 
     // SVD
 
     irlba::Options opt;
+    opt.max_iterations = 10000;
     opt.extra_work = 20;
-    opt.max_iterations = 50;
-    auto svd = irlba::compute(R, 1, opt);;
 
+    //auto svd = Eigen::BDCSVD<Matrix>(R, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    //Matrix B = svd.matrixU();
+    //B = B.leftCols(1).eval();
+    //double S = svd.singularValues()(0);
+    //Matrix C = svd.matrixV();
+    //C = C.leftCols(1).eval();
+
+    auto svd = irlba::compute(R, 1, opt);
     Matrix B = svd.U;
-    double S = svd.D(0, 0);
+    double S = svd.D(0);
     Matrix C = svd.V;
-
+    
     double SqrtS = std::sqrt(S);
 
     B = B * SqrtS;
@@ -57,13 +88,11 @@ nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
     B.resize(n1, m1);
     C.resize(n2, m2);
 
-    B = 0.5 * (B + B.transpose());
-    C = 0.5 * (C + C.transpose());
+    B = (0.5 * B + 0.5 * B.transpose()).eval();
+    C = (0.5 * C + 0.5 * C.transpose()).eval();
 
-    if ((B.diagonal().array() < 0).all() && (C.diagonal().array() < 0).all()) {
-        B = -B;
-        C = -C;
-    }
+    B *= std::sqrt(abs_max);
+    C *= std::sqrt(abs_max);
 
     return {B, C};
 }
@@ -117,7 +146,6 @@ namespace matching {
 namespace impl {
 kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix_t& B, int max_degree) {
     // first element is 1 and it's constant
-    --max_degree;
     
     m = A.cols();
     for (int t = 0; t < max_degree; t++) {
@@ -125,19 +153,19 @@ kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix
         Matrix outer_sum = Matrix::Zero(m, m);
         auto original = outer_sum;
         for (int i = 0; i < t; i++) {
-            outer_sum = Eigen::KroneckerProduct(outer_sum, original);
+            outer_sum = Eigen::KroneckerProduct(outer_sum, original).eval();
         }
 
         // sum of outer products of distances
         for (int i = 0; i < A.rows(); i++) {
             for (int j = 0; j < B.rows(); j++) {
-                Eigen::VectorXd d = A(i, all) - B(j, all);
+                Eigen::MatrixXd d = A(i, all) - B(j, all);
                 matrix_t term = d.transpose() * d;  
                 auto original_term = term;
                 for (int k = 0; k < t; k++) {
-                    term = Eigen::KroneckerProduct(term ,original_term);
+                    term = Eigen::KroneckerProduct(term ,original_term).eval();
                 }
-                outer_sum = outer_sum + term;
+                outer_sum = (outer_sum + term).eval();
             }
         }
         degrees.emplace_back(outer_sum, m, t + 1);
@@ -149,23 +177,34 @@ kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix
 // Also includes a stop condition for the approximation.
 one_degree_approximation::one_degree_approximation(const matrix_t& outer, int m, int k) :m(m), k(k) {
     double init_frob = outer.squaredNorm();
-    double tol = 1e-6;
+    double tol = 1e-4;
 
-    matrix_t sum_of_effects = matrix_t::Zero(outer.rows(), outer.cols());
     matrix_t residual = outer;
     while (true) {
-        auto spot = one_spot_approximation(outer, m, k);
+        auto spot = one_spot_approximation(residual, m, k);
         spots.push_back(spot);
 
-        residual = residual - spot.get_approximation();
+        residual = (residual - spot.get_approximation()).eval();
         double curr_frob = residual.squaredNorm();
-        if (curr_frob / init_frob < tol) {
+        double ratio = curr_frob / init_frob;
+        if (ratio < tol) {
             break;
         }
     }
 }
 
-one_spot_approximation::one_spot_approximation(const matrix_t& outer, int m, int k) {
+int one_degree_approximation::n_spots() const {
+    return spots.size();
+}
+
+double kronecker_approximation::compression() const {
+    int spots = degrees[degrees.size() - 1].n_spots();
+    int degrees = this->degrees.size();
+    double expected_spots = std::pow(m * m, degrees - 1);
+    return spots / expected_spots;
+}
+
+one_spot_approximation::one_spot_approximation(const matrix_t& outer, int _m, int _k) :k(_k), m(_m) {
     // k means kronecker's degree, m - dimensions of the matrix
     int dim = outer.cols();
     matrix_t resid = outer;
@@ -200,10 +239,6 @@ one_degree_approximation::one_degree_approximation(int m, int k) :m(m), k(k) {}
 kronecker_approximation::kronecker_approximation() {}
 
 std::ostream& operator<<(std::ostream& os, const one_spot_approximation& spot) {
-    if (!(os.flags() & std::ios::binary)) {
-        throw std::runtime_error("Output stream must be in binary mode");
-    }
-
     os.write("SPOT", 4);
 
     uint32_t n = spot.matrices.size();
@@ -221,10 +256,6 @@ std::ostream& operator<<(std::ostream& os, const one_spot_approximation& spot) {
 }
 
 std::istream& operator>>(std::istream& is, one_spot_approximation& spot) {
-    if (!(is.flags() & std::ios::binary)) {
-        throw std::runtime_error("Input stream must be in binary mode");
-    }
-
     char buf[4];
     is.read(buf, 4);
     if (std::string(buf, 4) != "SPOT") {
@@ -259,10 +290,6 @@ std::istream& operator>>(std::istream& is, one_spot_approximation& spot) {
 }
 
 std::ostream& operator<<(std::ostream& os, const one_degree_approximation& spot) {
-    if (!(os.flags() & std::ios::binary)) {
-        throw std::runtime_error("Output stream must be in binary mode");
-    }
-
     os.write("DEGR", 4);
 
     // write the number of spots
@@ -285,10 +312,6 @@ double one_degree_approximation::calculate(const matrix_t& sigma, double c_e) co
 }
 
 std::istream& operator>>(std::istream& is, one_degree_approximation& obj) {
-    if (!(is.flags() & std::ios::binary)) {
-        throw std::runtime_error("Input stream must be in binary mode");
-    }
-
     char buf[4];
     is.read(buf, 4);
     if (std::string(buf, 4) != "DEGR") {
@@ -309,10 +332,6 @@ std::istream& operator>>(std::istream& is, one_degree_approximation& obj) {
 }
 
 std::ostream& operator<<(std::ostream& os, const kronecker_approximation& spot) {
-    if (!(os.flags() & std::ios::binary)) {
-        throw std::runtime_error("Output stream must be in binary mode");
-    }
-
     os.write("KRON", 4);
 
     // write a constant number to check endianess
@@ -345,10 +364,6 @@ double kronecker_approximation::calculate(const matrix_t& sigma, double c_e) con
 }
 
 std::istream& operator>>(std::istream& is, kronecker_approximation& obj) {
-    if (!(is.flags() & std::ios::binary)) {
-        throw std::runtime_error("Input stream must be in binary mode");
-    }
-
     char buf[4];
     is.read(buf, 4);
     if (std::string(buf, 4) != "KRON") {
@@ -381,7 +396,7 @@ std::istream& operator>>(std::istream& is, kronecker_approximation& obj) {
 matrix_t one_spot_approximation::get_approximation() const {
     matrix_t result = matrices[0];
     for (size_t i = 1; i < matrices.size(); i++) {
-        result = Eigen::KroneckerProduct(result, matrices[i]);
+        result = Eigen::KroneckerProduct(result, matrices[i]).eval();
     }
     return result;
 }
@@ -443,7 +458,7 @@ void kronecker_preprocessor::process(unsigned threads, unsigned batch_size, unsi
     auto n = clusters.size();
     int curr_in_batch = 0;
     for (size_t i = 0; i < n; i++) {
-        //Rcpp::checkUserInterrupt();
+        Rcpp::checkUserInterrupt();
         // Threading
         for (size_t j = i; j < n; j++) {
             futures.push_back(pool.push([this, i, j, max_degree]() -> std::unique_ptr<impl::kronecker_approximation> {
@@ -452,17 +467,23 @@ void kronecker_preprocessor::process(unsigned threads, unsigned batch_size, unsi
             }));
             if (futures.size() == batch_size || (i == n - 1 && j == n - 1)) {
                 write_futures();
+                Rcpp::Rcerr << "Processed " << i << " out of " << n << " clusters." << std::endl;
             }
         }
     }
 }
 
 void kronecker_preprocessor::write_futures() {
+    double mean_compression = 0.0;
     for (auto& future: futures) {
         auto approx = future.get();
+        mean_compression += approx->compression();
         fout << *approx;
     }
+    mean_compression /= futures.size();
+    fout.flush();
     futures.clear();
+    Rcpp::Rcerr << "Mean compression: " << mean_compression << std::endl;
 }       
 
 }

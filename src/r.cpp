@@ -107,18 +107,19 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
 }
 
 // [[Rcpp::export]]
-List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector& clustering, CharacterVector filename) {
+List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector& clustering, CharacterVector filename, 
+                            IntegerVector threads, IntegerVector degree) {
     auto gm_rs = r_to_cpp(gmatrix_rs);
     std::vector<int> clust_vec(clustering.begin(), clustering.end());
     std::string file(filename[0]);
     std::vector<std::vector<int>> clst;
+    
+    int max_clust = *std::max_element(clust_vec.begin(), clust_vec.end());
+    clst.resize(max_clust + 1);
+
     for (int i = 0; i < clust_vec.size(); i++) {
-        --clust_vec[i];
         if (clust_vec[i] < 0) {
             Rcpp::stop("Cluster index must be positive");
-        }
-        if (clust_vec[i] >= clst.size()) {
-            Rcpp::stop("Cluster index exceeds the number of clusters");
         }
         clst[clust_vec[i]].push_back(i);
     }
@@ -127,12 +128,28 @@ List preprocess_dataset_cpp(const NumericMatrix& gmatrix_rs, const IntegerVector
         Rcpp::stop("Clustering vector must not be empty");
     }
 
-    // check clusters do not exceed the number of samples
+    for (int i = 0; i < clst.size(); i++) {
+        if (clst[i].empty()) {
+            Rcpp::stop("Cluster " + std::to_string(i) + " is empty");
+        }
+    }
+
     int n_samples = gm_rs->rows();
 
+    for (int i = 0; i < clst.size(); i++) {
+        for (int j = 0; j < clst[i].size(); j++) {
+            if (clst[i][j] < 0 || clst[i][j] >= n_samples) {
+                Rcpp::stop("Cluster " + std::to_string(i) + " contains invalid index " + std::to_string(clst[i][j]));
+            }
+        }   
+    }   
+
     matching::kronecker_preprocessor preprocessor(gm_rs, clst, file);
-    int thread_pool_size = std::thread::hardware_concurrency() + 1;
-    preprocessor.process(thread_pool_size, 100, 2);
+    int thread_pool_size = threads[0];
+    int degr = degree[0];
+    preprocessor.process(thread_pool_size, thread_pool_size * 2, degr);
+    Rcpp::List ret;
+    return ret;
 }
 
 // [[Rcpp::export]]
