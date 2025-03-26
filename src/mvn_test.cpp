@@ -15,6 +15,17 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
          clustering(std::make_shared<Clustering>(clst)),
          wheel(std::random_device()()) {
+    initialize_common(X, clst, S, mean, std::nullopt);
+}
+
+mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean, const std::string& filename)
+        :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
+         clustering(std::make_shared<Clustering>(clst)),
+         wheel(std::random_device()()) {
+    initialize_common(X, clst, S, mean, filename);
+}
+
+void mvn_test::initialize_common(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean, std::optional<std::string> filename) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
     }
@@ -33,17 +44,15 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         throw std::logic_error("Too few points.");
     }
 
-    cxxpool::thread_pool pool(std::thread::hardware_concurrency());
-    std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
     for (double beta: betas) {
-        futures.push_back(pool.push([this, clst, beta]() -> std::shared_ptr<mvn_stats> {
-            std::shared_ptr<mvn_stats> ret = std::make_shared<mvn_stats_interpoint>(n);
-            ret->init_pairwise(*distances, clst, beta);
-            return ret;
-        }));
-    }
-    for (int i = 0; i < betas.size(); i++) {
-        stats.push_back(futures[i].get());
+        std::shared_ptr<mvn_stats> stat;
+        if (filename.has_value()) {
+            stat = std::make_shared<mvn_stats_approx>(filename.value(), n);
+        } else {
+            stat = std::make_shared<mvn_stats_interpoint>(n);
+        }
+        stat->init_pairwise(*distances, clst, beta);
+        stats.push_back(stat);
     }
 
     std::vector<double> lls;

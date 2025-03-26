@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <optional>
 #include <RcppEigen.h>
 #include "third-party/zstr/zstr.hpp"
 
@@ -127,6 +128,7 @@ protected:
 
 public:
     mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean, const std::string& filename);
     mvn_test(const mvn_test&);
 
     size_t dimensions() const;
@@ -149,6 +151,9 @@ protected:
     void add(unsigned i);
 
     mvn_test() = default;
+
+private:
+    void initialize_common(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean, std::optional<std::string> filename);
 };
 
 }
