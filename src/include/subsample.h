@@ -16,6 +16,7 @@ class subsample {
 public:
     subsample();
     subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov);
+    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov, const std::string& filename);
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 

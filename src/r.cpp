@@ -5,7 +5,7 @@
 // [[Rcpp::depends(RcppEigen)]]
 
 #include <thread>
-
+#include <optional>
 #include "include/qchisq.h"
 #include "include/matching.h"
 #include "include/hw.h"
@@ -161,7 +161,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector min_lambda, NumericVector lb_lambda,
                      NumericVector max_lambda, NumericVector ub_lambda,
                      IntegerVector min, IntegerVector max, IntegerVector step,
-                     IntegerVector sa_iterations, NumericVector min_call_rate) {
+                     IntegerVector sa_iterations, NumericVector min_call_rate,
+                     CharacterVector filename) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -183,8 +184,16 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
     matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
-    matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters, iterations);
+
+    if (filename.size() > 0 && filename[0] != NA_STRING) {
+        matcher.process_mvn(*principal_directions, r_to_cpp(mean),
+                            std::thread::hardware_concurrency(), min_controls, max_controls, step_clusters, iterations,
+                            Rcpp::as<std::string>(filename[0]));
+    } else {
+        matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
+                            min_controls, max_controls, step_clusters, iterations);
+    }
+
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);

@@ -70,6 +70,7 @@ preprocess_controls <- function (genotypeMatrix, SVDReference, controlsMean,
 #' @param SVDReference reference basis of the left singular vectors.
 #' @param controlsMean mean value of the reference genotypes.
 #' @param caseCounts matrix with summary genotype counts from cases.
+#' @param binary_cache path to the binary cache procused by preprocess_controls function.
 #' @param controlsClustering cluster names for controls.
 #' @param minLambda minimum possible lambda.
 #' @param softMinLambda desirable minimum for lambda.
@@ -83,7 +84,7 @@ preprocess_controls <- function (genotypeMatrix, SVDReference, controlsMean,
 #' size.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
-                            casesMean, SVDReference, controlsMean, caseCounts, 
+                            casesMean, SVDReference, controlsMean, caseCounts, binary_cache = NULL, 
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
                             min = 500, max = 1000, step = 50, iterations = 100000, 
@@ -129,7 +130,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 stats::qchisq(stats::ppoints(1e+07), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step, iterations, minCallRate)
+                                max, step, iterations, minCallRate, binary_cache)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }

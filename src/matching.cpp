@@ -128,17 +128,24 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 }
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
-                           int threads, int start, int ub, int step, int iterations) {
+                           int threads, int start, int size_ub, int step, int iterations,
+                           const std::optional<std::string>& filename) {
     const double EPS = 1e-18;
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
     Matrix rs_cov = directions * directions.transpose();
 
-    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
+    if (filename.has_value()) {
+        Rcpp::Rcerr << "Using filename: " << filename.value() << std::endl;
+        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, filename.value());
+    } else {
+        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
+    }
+
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     double c = std::pow(EPS, 1.0 / (double)iterations);
-    subsampling.run(iterations, 4, 1.0 , c, threads, start, ub, step);
+    subsampling.run(iterations, 4, 1.0, c, threads, start, size_ub, step);
 }
 
 Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {

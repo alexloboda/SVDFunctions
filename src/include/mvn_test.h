@@ -6,6 +6,9 @@
 #include <optional>
 #include <RcppEigen.h>
 #include "third-party/zstr/zstr.hpp"
+#include "mvn_stats.h"
+#include "mvn_clst.h" 
+#include "RandomSampler.h"
 
 // [[Rcpp::depends(RcppEigen)]]
 
@@ -15,94 +18,6 @@ namespace mvn {
 
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
-
-class RandomSampler {
-    std::uniform_real_distribution<double> runif;
-    mutable std::mt19937 wheel;
-    std::vector<double> original;
-    std::vector<double> segment_tree;
-    std::vector<size_t> active_tree;
-
-    size_t size;
-public:
-    RandomSampler();
-    RandomSampler(const std::vector<double>& logscale, long seed);
-    RandomSampler(RandomSampler&&) = default;
-    RandomSampler(const RandomSampler& other);
-    RandomSampler& operator=(RandomSampler&&);
-
-    void disable(size_t n);
-    void enable(size_t n);
-    size_t sample();
-    size_t n_active() const;
-private:
-    std::pair<size_t, size_t> children(size_t node) const;
-    static bool is_root(size_t node);
-    bool is_leaf(size_t node) const;
-    bool is_active(size_t node) const;
-    size_t el_pos(size_t el) const;
-    static size_t parent(size_t node);
-
-    static double sum_log(double l, double r);
-
-    void update_inner_node(size_t node);
-    void update(size_t node);
-};
-
-class Clustering {
-    std::vector<int> cluster_sizes;
-    std::vector<std::vector<int>> clusters;
-public:
-    explicit Clustering(const std::vector<int>& clustering);
-    Clustering() = default;
-    const std::vector<int>& elements(size_t i) const;
-    size_t size() const;
-    size_t cluster_size(size_t i) const;
-};
-
-class mahalanobis_distances {
-protected:
-    std::vector<double> dist;
-    std::vector<std::vector<double>> inter;
-    std::vector<double> diag;
-    std::shared_ptr<const Matrix> X;
-    Matrix S_inv;
-    bool calc_interpoint;
-public:
-    mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
-    void calculate_interpoint();
-    Matrix get_sigma() const;
-    double distance(unsigned i) const;
-    double interpoint_distance(unsigned i, unsigned j) const;
-};
-
-class mvn_stats {
-protected:
-    std::vector<double> mahalanobis_centered;
-    std::vector<std::vector<double>> mahalanobis_pairwise;
-public:
-    mvn_stats(int n_clsuters);
-    mvn_stats() = default;
-
-    void init(mahalanobis_distances distances, const Clustering& clst, double beta);
-    virtual void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) = 0;
-    double pairwise_stat(size_t i, size_t j) const;
-    double sum_pairwise(size_t point, const std::vector<size_t>& ss) const;
-    double centered_stat(size_t i) const;
-};
-
-class mvn_stats_interpoint : public mvn_stats {
-public:
-    mvn_stats_interpoint(int n_clusters);
-    void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) override;
-};
-
-class mvn_stats_approx : public mvn_stats {
-    std::string filename;
-public:
-    mvn_stats_approx(const std::string& filename, int n_clusters);
-    void init_pairwise(mahalanobis_distances distances, const Clustering& clst, double beta) override;
-};
 
 class mvn_test {
 protected:
@@ -147,13 +62,18 @@ public:
     std::unique_ptr<mvn_test> clone();
 
 protected:
-    void remove(unsigned i);
-    void add(unsigned i);
+    void remove(unsigned point); // Updated parameter name for clarity
+    void add(unsigned point);    // Updated parameter name for clarity
 
     mvn_test() = default;
 
 private:
     void initialize_common(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean, std::optional<std::string> filename);
+    void initialize_stats(const Clustering& clst, std::optional<std::string> filename); // Updated method name for consistency
+    std::vector<double> compute_loglikelihoods(const Clustering& clst) const;          // Added missing declaration
+    void update_stats(unsigned point, bool is_addition);                               // Added missing declaration
+    void validate_input(std::shared_ptr<const Matrix> X, const Clustering& clst);
+    void initialize_sampler(const Clustering& clst);
 };
 
 }

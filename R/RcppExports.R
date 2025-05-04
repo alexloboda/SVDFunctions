@@ -17,8 +17,8 @@ preprocess_dataset_cpp <- function(gmatrix_rs, clustering, filename, threads, de
     .Call('_SVDFunctions_preprocess_dataset_cpp', PACKAGE = 'SVDFunctions', gmatrix_rs, clustering, filename, threads, degree)
 }
 
-select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate) {
-    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate)
+select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, filename) {
+    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, filename)
 }
 
 parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold) {

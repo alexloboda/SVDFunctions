@@ -16,6 +16,13 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
           wheel(std::random_device()()) {
 }
 
+subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& clst, const mvn::Vector& mean,
+                     const mvn::Matrix& cov, const std::string& filename)
+        : test{std::make_shared<mvn_test>(mvn_test(X, clst, cov, mean, filename))},
+          clst(clst),
+          wheel(std::random_device()()) {
+}
+
 namespace {
 
 template <class T>
