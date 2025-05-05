@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <memory>
-#include <eigen3/Eigen/Dense>
+#include <RcppEigen.h>
 
 namespace mvn {
 

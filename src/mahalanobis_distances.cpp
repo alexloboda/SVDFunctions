@@ -1,5 +1,4 @@
 #include "include/mahalanobis_distances.h"
-#include <Eigen/QR>
 #include <stdexcept>
 #include <cmath>
 
