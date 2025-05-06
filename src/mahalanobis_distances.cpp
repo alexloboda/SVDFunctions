@@ -5,7 +5,7 @@
 namespace mvn{
 
 mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> _X, const Matrix& S, const Vector& mean)
-        :dist(X->cols()), calc_interpoint(false), X(_X) {
+        :dist(_X->cols()), calc_interpoint(false), X(_X) {
     Eigen::FullPivHouseholderQR<Matrix> qr(S);
     if (!qr.isInvertible()) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");

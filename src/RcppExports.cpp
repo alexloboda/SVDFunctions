@@ -25,6 +25,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// rcpp_run_mvn_stats_tests_combined
+Rcpp::List rcpp_run_mvn_stats_tests_combined(const Eigen::MatrixXd& S, const Eigen::VectorXd& mean, const Eigen::MatrixXd& matrix, const std::vector<int>& clustering);
+RcppExport SEXP _SVDFunctions_rcpp_run_mvn_stats_tests_combined(SEXP SSEXP, SEXP meanSEXP, SEXP matrixSEXP, SEXP clusteringSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type S(SSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< const Eigen::MatrixXd& >::type matrix(matrixSEXP);
+    Rcpp::traits::input_parameter< const std::vector<int>& >::type clustering(clusteringSEXP);
+    rcpp_result_gen = Rcpp::wrap(rcpp_run_mvn_stats_tests_combined(S, mean, matrix, clustering));
+    return rcpp_result_gen;
+END_RCPP
+}
 // quality_control_impl
 LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const NumericVector& maf, const IntegerVector& mac, const NumericVector& chi2boundary);
 RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP, SEXP mafSEXP, SEXP macSEXP, SEXP chi2boundarySEXP) {
@@ -142,6 +156,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_sskm_cpp", (DL_FUNC) &_SVDFunctions_sskm_cpp, 4},
+    {"_SVDFunctions_rcpp_run_mvn_stats_tests_combined", (DL_FUNC) &_SVDFunctions_rcpp_run_mvn_stats_tests_combined, 4},
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
     {"_SVDFunctions_preprocess_dataset_cpp", (DL_FUNC) &_SVDFunctions_preprocess_dataset_cpp, 5},

@@ -5,6 +5,10 @@ sskm_cpp <- function(X, k, max_iter, tol) {
     .Call('_SVDFunctions_sskm_cpp', PACKAGE = 'SVDFunctions', X, k, max_iter, tol)
 }
 
+rcpp_run_mvn_stats_tests_combined <- function(S, mean, matrix, clustering) {
+    .Call('_SVDFunctions_rcpp_run_mvn_stats_tests_combined', PACKAGE = 'SVDFunctions', S, mean, matrix, clustering)
+}
+
 quality_control_impl <- function(case_counts, maf, mac, chi2boundary) {
     .Call('_SVDFunctions_quality_control_impl', PACKAGE = 'SVDFunctions', case_counts, maf, mac, chi2boundary)
 }

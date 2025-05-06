@@ -19,6 +19,10 @@ void mvn_stats::init(mahalanobis_distances distances, const Clustering& clst, do
     }
 }
 
+double mvn_stats::pairwise_stat(size_t i, size_t j) const {
+    return mahalanobis_pairwise[i][j];
+}
+
 double mvn_stats::centered_stat(size_t i) const {
     return mahalanobis_centered[i];
 }

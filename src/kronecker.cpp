@@ -12,9 +12,6 @@
 namespace {
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
-}
-
-namespace {
     
 struct nkp_result {
     Matrix B;
@@ -232,7 +229,7 @@ double one_spot_approximation::calculate(const matrix_t& sigma, double c_e) cons
     return res;
 }
 
-one_spot_approximation::one_spot_approximation(int k, int m) :k(k), m(m) {}
+one_spot_approximation::one_spot_approximation(int m, int k) :k(k), m(m) {}
 
 one_degree_approximation::one_degree_approximation(int m, int k) :m(m), k(k) {}
 
@@ -264,6 +261,13 @@ std::istream& operator>>(std::istream& is, one_spot_approximation& spot) {
 
     uint32_t n;
     is.read(reinterpret_cast<char*>(&n), sizeof(n));
+
+    uint32_t k;
+    is.read(reinterpret_cast<char*>(&k), sizeof(k));
+
+    if (k != n) {
+        throw std::runtime_error("Invalid number of matrices");
+    }
 
     spot.matrices.clear();
     for (size_t i = 0; i < n; i++) {
@@ -382,6 +386,7 @@ std::istream& operator>>(std::istream& is, kronecker_approximation& obj) {
 
     uint32_t m;
     is.read(reinterpret_cast<char*>(&m), sizeof(m));
+    obj.m = m;
 
     obj.degrees.clear();
     for (size_t i = 0; i < n; i++) {
