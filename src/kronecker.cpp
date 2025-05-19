@@ -5,6 +5,7 @@
 #include "include/third-party/cxxpool.h"
 #include "include/third-party/irlba/irlba.hpp"
 #include <chrono>
+#include <iostream>
 
 #include "include/third-party/zstr/zstr.hpp"
 #include <Rcpp.h>
@@ -20,7 +21,7 @@ struct nkp_result {
 
 Eigen::MatrixXd reshapeAndPermute(const Eigen::MatrixXd& A, int n1, int m1, int n2, int m2) {
     // Step 1: Reshape A into a 4D tensor of size [m2, m1, n2, n1]
-    Eigen::MatrixXd reshaped = Eigen::Map<const Eigen::MatrixXd>(A.data(), m2 * m1, n2 * n1);
+    Eigen::MatrixXd reshaped = Eigen::Map<const Eigen::MatrixXd>(A.data(), m2 * m1, n2 * n1).eval();
     
     // Step 2: Permute the dimensions to [m1, n1, m2, n2]
     Eigen::MatrixXd permuted(m1 * n1, m2 * n2);
@@ -41,7 +42,7 @@ Eigen::MatrixXd reshapeAndPermute(const Eigen::MatrixXd& A, int n1, int m1, int 
             }
         }
     }
-    return permuted;
+    return permuted.eval(); 
 }
 
 nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
@@ -57,7 +58,7 @@ nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
     double abs_max = A_mod.cwiseAbs().maxCoeff();
     A_mod /= abs_max;
 
-    Matrix R = reshapeAndPermute(A_mod, n1, m1, n2, m2);
+    Matrix R = reshapeAndPermute(A_mod, n1, m1, n2, m2).eval();
 
     // SVD
 
@@ -91,7 +92,7 @@ nkp_result nkp(const Matrix& A, int n1, int m1, int n2, int m2) {
     B *= std::sqrt(abs_max);
     C *= std::sqrt(abs_max);
 
-    return {B, C};
+    return {B.eval(), C.eval()}; 
 }
 
 using Eigen::all;
@@ -174,9 +175,9 @@ kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix
 // Also includes a stop condition for the approximation.
 one_degree_approximation::one_degree_approximation(const matrix_t& outer, int m, int k) :m(m), k(k) {
     double init_frob = outer.squaredNorm();
-    double tol = 1e-4;
+    double tol = 1e-6;
 
-    matrix_t residual = outer;
+    matrix_t residual = outer.eval(); 
     while (true) {
         auto spot = one_spot_approximation(residual, m, k);
         spots.push_back(spot);
@@ -204,14 +205,14 @@ double kronecker_approximation::compression() const {
 one_spot_approximation::one_spot_approximation(const matrix_t& outer, int _m, int _k) :k(_k), m(_m) {
     // k means kronecker's degree, m - dimensions of the matrix
     int dim = outer.cols();
-    matrix_t resid = outer;
+    matrix_t resid = outer.eval(); 
     for (int i = 0; i < k - 1; i++) {
         dim = dim / m;   
         auto result = nkp(resid, m, m, dim, dim);
         matrices.push_back(result.B);
-        resid = result.C;
+        resid = result.C.eval(); 
     }
-    matrices.push_back(resid);
+    matrices.push_back(resid.eval()); 
 }
 
 double one_spot_approximation::calculate(const matrix_t& sigma, double c_e) const {
@@ -445,9 +446,6 @@ std::vector<std::vector<double>> kronecker_calculator::calculate(Eigen::MatrixXd
             impl::kronecker_approximation approx;
             fin >> approx;
             double value = approx.calculate(sigma, c_e);
-            if (i != j) {
-                value *= 0.5;
-            }
             result[i][j] = value;
             result[j][i] = value;
         }

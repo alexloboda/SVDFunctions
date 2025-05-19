@@ -34,7 +34,7 @@ std::vector<std::vector<int>> convert_clustering(const Clustering& clst) {
 
 void preprocess(const Eigen::MatrixXd& matrix, const Clustering& clst, const std::string& filename) {
     kronecker_preprocessor preprocessor(std::make_shared<Eigen::MatrixXd>(matrix), convert_clustering(clst), filename);
-    preprocessor.process(1, 1, 5);
+    preprocessor.process(1, 1, 4);
 }
 
 // Helper function to process stats
@@ -56,7 +56,7 @@ Rcpp::List process_stats(const Eigen::MatrixXd& matrix, const Eigen::MatrixXd& S
     std::string filename = "kronecker_data.bin";
     preprocess(matrix, clst, filename);
 
-    double beta = 0.4;
+    double beta = 0.3;
 
     mvn_stats_interpoint interpoint_stats(clst.size());
     interpoint_stats.init(distances_interpoint, clst, beta);

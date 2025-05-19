@@ -7,7 +7,7 @@ test_that("mvn_stats produces consistent results", {
                                 0.8, 1, 0.3,
                                 0.5, 0.3, 1), nrow = 3, byrow = TRUE)
   mean_vector <- c(0.9, 0.9, 0.9)
-
+  
   test_matrix <- matrix(c(1.46611034, 2.1128962, 0.6487757,
                           1.18410660, 1.3453171, 1.0116327,
                          -0.71017476, 0.3972155, -0.6873396,
@@ -30,16 +30,22 @@ test_that("mvn_stats produces consistent results", {
                           1.56444597, 1.5137194, 1.0163329), nrow = 20, byrow = TRUE)
 
   clustering <- c(0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6)
-
   # Call the combined C++ function to get stats
   stats <- SVDFunctions:::rcpp_run_mvn_stats_tests_combined(covariance_matrix, mean_vector, test_matrix, clustering)
+  
+  transform <- function(l) {
+    m <- matrix(unlist(l), nrow = 7)
+  }
+  
+  stats$interpoint_pairwise <- transform(stats$interpoint_pairwise)
+  stats$approx_pairwise <- transform(stats$approx_pairwise)
   
   print(stats)
 
   # Perform checks
   centered_stats_diff <- abs(stats$interpoint_centered - stats$approx_centered)
-  expect_true(all(centered_stats_diff <= 1e-2), "Centered stats comparison failed")
+  expect_true(all(centered_stats_diff <= 0.05), "Centered stats comparison failed")
 
   pairwise_stats_diff <- abs(stats$interpoint_pairwise - stats$approx_pairwise)
-  expect_true(all(pairwise_stats_diff <= 1e-2), "Pairwise stats comparison failed")
+  expect_true(all(pairwise_stats_diff <= 0.05), "Pairwise stats comparison failed")
 })

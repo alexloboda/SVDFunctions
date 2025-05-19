@@ -18,7 +18,8 @@ void mvn_stats_interpoint::init_pairwise(mahalanobis_distances distances, const 
             for (int pair_el : clst.elements(pair_cl)) {
                 double distance = distances.interpoint_distance(el, pair_el);
                 double weight = (cl == pair_cl) ? 0.5 : 1.0;
-                contribution += weight * std::exp(k_pw * distance);
+                double additive = std::exp(k_pw * distance);
+                contribution += weight * additive;
             }
         }
         return contribution;
