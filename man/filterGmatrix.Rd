@@ -14,7 +14,7 @@ filterGmatrix(
 \arguments{
 \item{gmatrix}{gmatrix with imputed missing values.}
 
-\item{imputationResults}{matrix of the same dimensions as \code{gmatrix} 
+\item{imputationResults}{matrix of the same dimensions as \code{gmatrix}
 filled with values TRUE/FALSE indicating which genotypes were imputed.}
 
 \item{minVariantCallRate}{minimal variant call rate.}

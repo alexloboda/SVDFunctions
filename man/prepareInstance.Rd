@@ -15,19 +15,20 @@ prepareInstance(
   MAC = 10,
   MAF = 0.01,
   knn_drop = 0.05,
-  normalize_drop = 0.05
+  normalize_drop = 0.05,
+  keptSamplesFile = paste0(format(Sys.time(), "\%Y\%m\%d_\%H\%M\%S"), ".samples.RDS")
 )
 }
 \arguments{
 \item{gmatrix}{gmatrix with imputed missing values.}
 
-\item{imputationResults}{matrix of the same dimensions as \code{gmatrix} 
+\item{imputationResults}{matrix of the same dimensions as \code{gmatrix}
 filled with values TRUE/FALSE indicating which genotypes were imputed.}
 
 \item{controlsU}{Reference U matrix from SVD decomposition of centered
 genotype matrix of control dataset or joint dataset.}
 
-\item{meanControl}{numeric vector representing mean per-variant genotype, 
+\item{meanControl}{numeric vector representing mean per-variant genotype,
 that were taken as a center while costructing \code{controlsU} matrix.}
 
 \item{outputFileName}{name of the YAML file to output.}
@@ -41,11 +42,15 @@ that were taken as a center while costructing \code{controlsU} matrix.}
 \item{MAF}{minor allele frequency used for QC.}
 
 \item{knn_drop}{fraction of samples that would be excluded from dataset at
-each level of hierarchy clustering by applying knn anomaly detection algorithm.}
+each level of hierarchy clustering by applying knn anomaly
+detection algorithm.}
 
 \item{normalize_drop}{fraction of samples to be excluded from dataset at
-each level of hierarchy clustering by applying function \code{normal_subsample} 
+each level of hierarchy clustering by applying
+function \code{normal_subsample}
 from the package.}
+
+\item{keptSamplesFile}{Optional. File to save the names of kept samples.}
 }
 \description{
 Prepare instance and write yaml file from QC-ed gmatrix.
