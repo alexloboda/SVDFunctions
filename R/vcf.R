@@ -144,6 +144,7 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' @param binaryPathPrefix the path prefix for binary file prefix_bin and 
 #' metadata file prefix_meta. If not NULL corresponding files will be generated.
 #' @param verbose logical 
+#' @param seed integer: seed for random number generator (for reproducible imputation). Default is 42.
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested.
 #' @export
@@ -152,41 +153,41 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
-                    verbose = FALSE) {
+                    verbose = FALSE, seed = NULL) {
   vcf <- normalizePath(vcf)
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
   DP <- as.integer(DP)
   GQ <- as.integer(GQ)
-  stopifnot(!is.na(DP[0]))
-  stopifnot(!is.na(GQ[0]))
-  
+  stopifnot(!is.na(DP[1]))
+  stopifnot(!is.na(GQ[1]))
   stopifnot(file.exists(vcf))
-  
   tbi <- paste0(vcf, ".tbi")
-  
-  if (!is.null(binaryPathPrefix) | !file.exists(tbi)) {
+  if (!is.null(binaryPathPrefix) || !file.exists(tbi)) {
     tbi <- NULL
   } else {
-    if ((returnGenotypeMatrix && length(variants) != 0 && !predictMissing) |
+    if ((returnGenotypeMatrix && length(variants) != 0 && !predictMissing) ||
         length(regions) != 0) {
       vcf <- createVCFFromTabixIndex(vcf, variants, regions, verbose)
     } else {
       tbi <- NULL
     }
   }
-  
   fixChar <- function(x) if(is.null(x)) character(0) else x
   samples <- fixChar(samples)
   bannedPositions <- fixChar(bannedPositions)
   variants <- fixChar(variants)
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
-  
+
+  if (is.null(seed)) {
+    seed <- as.integer(runif(1, 0, .Machine$integer.max))
+  }
+
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing), regions, 
-                     binaryPathPrefix, missingRateThreshold),
+                     binaryPathPrefix, missingRateThreshold, seed),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {
@@ -195,13 +196,12 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                 "the temp file for more information about the error.\n")
       }
       stop(paste0(conditionMessage(c), "\n", suffix))
-  })
-  
+    }
+  )
   if (verbose) {
     print(data.frame(stat = names(res$stats), value = unlist(res$stats), 
                      row.names = NULL))
   }
-  
   if (!is.null(res$genotype)) {
       colnames(res$genotype$genotype) <- res$samples
   }

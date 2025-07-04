@@ -115,14 +115,15 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const CharacterVector& bad_positions, const CharacterVector& variants,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
-               const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold) {
+               const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold,
+               Rcpp::Nullable<int> seed) {
     List ret;
+    unsigned int random_seed = Rcpp::as<int>(seed);
     try {
         const char *name = filename[0];
         unique_ptr<std::istream> in(new zstr::ifstream(name));
 
         VCFFilterStats stats;
-
         Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]), stats);
         parser.parse_header();
         auto ss = parser.sample_names();
@@ -140,7 +141,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100, random_seed);
                 parser.register_handler(predicting_handler, 2);
             }
         }

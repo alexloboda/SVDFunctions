@@ -16,7 +16,8 @@ scanVCF(
   missingRateThreshold = 0.1,
   regions = NULL,
   binaryPathPrefix = NULL,
-  verbose = FALSE
+  verbose = FALSE,
+  seed = NULL
 )
 }
 \arguments{
@@ -52,6 +53,8 @@ region call rate will be calculated and corresponding matrix will be returned.}
 metadata file prefix_meta. If not NULL corresponding files will be generated.}
 
 \item{verbose}{logical}
+
+\item{seed}{integer: seed for random number generator (for reproducible imputation). Default is 42.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

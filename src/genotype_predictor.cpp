@@ -435,12 +435,12 @@ namespace vcf {
         }
     }
 
-    RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees) {
+    RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees, unsigned int seed) {
         std::vector<std::future<DecisionTree>> futures;
         for (size_t i = 0; i < ntrees; i++) {
-            int seed = rand();
-            futures.push_back(pool.push([seed, &treeBuilder]() -> DecisionTree {
-                Random random(seed);
+            int tree_seed = seed + i;
+            futures.push_back(pool.push([tree_seed, &treeBuilder]() -> DecisionTree {
+                Random random(tree_seed);
                 return treeBuilder.build_a_tree(random);
             }));
         }

@@ -8,10 +8,11 @@ namespace {
 
 namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                         int window_size_kb, int window_size)
+                                         int window_size_kb, int window_size, unsigned int seed)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
                                           window(window_size),
-                                          thread_pool(std::thread::hardware_concurrency()) {
+                                          thread_pool(std::thread::hardware_concurrency()),
+                                          random_seed(seed) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
         for (const Variant& v : variants) {
@@ -79,7 +80,7 @@ namespace vcf {
             return;
         }
         TreeBuilder tree_builder = make_tree_builder(dataset);
-        RandomForest forest{tree_builder, thread_pool};
+        RandomForest forest{tree_builder, thread_pool, /*ntrees=*/100, random_seed};
         std::vector<float> labels;
         for (size_t i = 0; i < dataset.second.size(); i++) {
             AlleleType curr = dataset.second[i];

@@ -26,11 +26,12 @@ namespace vcf {
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;
+        unsigned int random_seed; // добавлено поле для seed
 
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size);
+                                   int window_size_kb, int window_size, unsigned int seed = 42); 
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
