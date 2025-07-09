@@ -247,15 +247,15 @@ drop <- function(pca, knn_rate, mvn_rate) {
   if (knn_n + mvn_n > n - nrow(pca)) {
     stop("Drop rates are too high.")
   }
-  
+
   ids <- 1:n
-  
+
   if (knn_n > 0) {
     knn_drop <- adamethods::do_knno(t(pca), 5, knn_n)  
     pca <- pca[, -knn_drop]
     ids <- ids[-knn_drop]
   }
-  
+
   if (mvn_n > 0) {
     ids <- ids[normal_subsample(pca, n - knn_n - mvn_n)$points]
   }
@@ -284,20 +284,29 @@ drop <- function(pca, knn_rate, mvn_rate) {
 #' function \code{normal_subsample}
 #' from the package.
 #' @param keptSamplesFile Optional. File to save the names of kept samples.
+#' @param seed integer random seed for reproducibility. In case of 
+#' normalize_drop != 0 the seed doesn't garantee reproducibility.
 #' @import mclust
 #' @export
 prepareInstance <- function(
   gmatrix, imputationResults, controlsU, meanControl,
-  outputFileName, clusters = NULL, 
-  title = "DNAScoreInput", MAC = 10, MAF = 0.01, 
+  outputFileName, clusters = NULL,
+  title = "DNAScoreInput", MAC = 10, MAF = 0.01,
   knn_drop = 0.05, normalize_drop = 0.05,
-  keptSamplesFile = paste0(format(Sys.time(), "%Y%m%d_%H%M%S"), ".samples.RDS")
+  keptSamplesFile = paste0(format(Sys.time(), "%Y%m%d_%H%M%S"), ".samples.RDS"),
+  seed = NULL
 ) {
+  if (is.null(seed)) {
+    seed <- as.integer(runif(1, 1, .Machine$integer.max))
+  }
+  set.seed(seed)
+
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
-    clusters <- clustering(setNames(classes, colnames(gmatrix)), 
+    clusters <- clustering(setNames(classes, colnames(gmatrix)),
                            "Main")
   }
+
   stopifnot("clustering" %in% class(clusters))
   gmatrixForCounts <- gmatrix
   gmatrixForCounts[which(imputationResults, arr.ind = TRUE)] <- NA
@@ -319,15 +328,15 @@ prepareInstance <- function(
   }
   gmatrix <- gmatrix[passVariants, ]
   gmatrixForCounts <- gmatrixForCounts[passVariants, ]
-  
+
   names(meanControl) <- rownames(controlsU)
   controlsU <- controlsU[rownames(gmatrix), ]
   controlsU <- pracma::pinv(controlsU)
   meanControl <- meanControl[rownames(gmatrix)]
-  
+
   numberOfClusters <- 2 * length(clusters$classes) - 1
   clusterResults <- vector("list", numberOfClusters)
-  
+
   cluster_ids <- list()
   gm_names <- c()
   if (is.null(colnames(gmatrix))) {

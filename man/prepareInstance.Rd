@@ -16,7 +16,8 @@ prepareInstance(
   MAF = 0.01,
   knn_drop = 0.05,
   normalize_drop = 0.05,
-  keptSamplesFile = paste0(format(Sys.time(), "\%Y\%m\%d_\%H\%M\%S"), ".samples.RDS")
+  keptSamplesFile = paste0(format(Sys.time(), "\%Y\%m\%d_\%H\%M\%S"), ".samples.RDS"),
+  seed = NULL
 )
 }
 \arguments{
@@ -51,6 +52,9 @@ function \code{normal_subsample}
 from the package.}
 
 \item{keptSamplesFile}{Optional. File to save the names of kept samples.}
+
+\item{seed}{integer random seed for reproducibility. In case of 
+normalize_drop != 0 the seed doesn't garantee reproducibility.}
 }
 \description{
 Prepare instance and write yaml file from QC-ed gmatrix.

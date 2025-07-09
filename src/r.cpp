@@ -112,10 +112,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericVector& mean, NumericMatrix& directions,
                      IntegerMatrix& cc, IntegerVector& clustering,
                      NumericVector& chi2fn,
-                     NumericVector min_lambda, NumericVector lb_lambda,
-                     NumericVector max_lambda, NumericVector ub_lambda,
-                     IntegerVector min, IntegerVector max, IntegerVector step,
-                     IntegerVector sa_iterations, NumericVector min_call_rate) {
+                     double min_lambda, double lb_lambda,
+                     double max_lambda, double ub_lambda,
+                     int min, int max, int step,
+                     int sa_iterations, double min_call_rate) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -126,17 +126,17 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
 
-    int min_controls = min[0];
-    int max_controls = max[0];
-    int step_clusters = step[0];
-    int iterations = sa_iterations[0];
-    double mcr = min_call_rate[0];
+    int min_controls = min;
+    int max_controls = max;
+    int step_clusters = step;
+    int iterations = sa_iterations;
+    double mcr = min_call_rate;
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
     matcher.set_qchi_sq_function(q.function());
-    matcher.set_soft_threshold({lb_lambda[0], ub_lambda[0]});
-    matcher.set_hard_threshold({min_lambda[0], max_lambda[0]});
+    matcher.set_soft_threshold({lb_lambda, ub_lambda});
+    matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
                         min_controls, max_controls, step_clusters, iterations);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });

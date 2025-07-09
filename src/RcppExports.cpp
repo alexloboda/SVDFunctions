@@ -40,7 +40,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // select_controls_cpp
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, NumericVector min_lambda, NumericVector lb_lambda, NumericVector max_lambda, NumericVector ub_lambda, IntegerVector min, IntegerVector max, IntegerVector step, IntegerVector sa_iterations, NumericVector min_call_rate);
+List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min, int max, int step, int sa_iterations, double min_call_rate);
 RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP sa_iterationsSEXP, SEXP min_call_rateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -52,15 +52,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< IntegerMatrix& >::type cc(ccSEXP);
     Rcpp::traits::input_parameter< IntegerVector& >::type clustering(clusteringSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type chi2fn(chi2fnSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type min_lambda(min_lambdaSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type lb_lambda(lb_lambdaSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type max_lambda(max_lambdaSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type ub_lambda(ub_lambdaSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type min(minSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type max(maxSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type step(stepSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type sa_iterations(sa_iterationsSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type min_call_rate(min_call_rateSEXP);
+    Rcpp::traits::input_parameter< double >::type min_lambda(min_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type lb_lambda(lb_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type max_lambda(max_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type ub_lambda(ub_lambdaSEXP);
+    Rcpp::traits::input_parameter< int >::type min(minSEXP);
+    Rcpp::traits::input_parameter< int >::type max(maxSEXP);
+    Rcpp::traits::input_parameter< int >::type step(stepSEXP);
+    Rcpp::traits::input_parameter< int >::type sa_iterations(sa_iterationsSEXP);
+    Rcpp::traits::input_parameter< double >::type min_call_rate(min_call_rateSEXP);
     rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate));
     return rcpp_result_gen;
 END_RCPP
