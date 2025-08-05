@@ -175,7 +175,8 @@ kronecker_approximation::kronecker_approximation(const matrix_t& A, const matrix
 // Also includes a stop condition for the approximation.
 one_degree_approximation::one_degree_approximation(const matrix_t& outer, int m, int k) :m(m), k(k) {
     double init_frob = outer.squaredNorm();
-    double tol = 1e-6;
+    double matrix_size = outer.rows() * outer.cols();
+    double tol = 1e-6 * matrix_size; // Tolerance based on matrix size
 
     matrix_t residual = outer.eval(); 
     while (true) {
@@ -460,33 +461,64 @@ void kronecker_preprocessor::process(unsigned threads, unsigned batch_size, unsi
     
     auto n = clusters.size();
     int curr_in_batch = 0;
+    auto start_time = std::chrono::steady_clock::now();
+    size_t total = n * (n + 1) / 2;
+    size_t done = 0;
     for (size_t i = 0; i < n; i++) {
         Rcpp::checkUserInterrupt();
-        // Threading
         for (size_t j = i; j < n; j++) {
             futures.push_back(pool.push([this, i, j, max_degree]() -> std::unique_ptr<impl::kronecker_approximation> {
                 int k = matrix->cols();
                 return std::make_unique<impl::kronecker_approximation>((*matrix)(clusters[i], all), (*matrix)(clusters[j], all), max_degree);
             }));
+            done++;
             if (futures.size() == batch_size || (i == n - 1 && j == n - 1)) {
-                write_futures();
-                Rcpp::Rcerr << "Processed " << i << " out of " << n << " clusters." << std::endl;
+                double mean_compression = write_futures();
+                // Progress bar with percent, ETA, and mean compression on one line
+                auto now = std::chrono::steady_clock::now();
+                double percent = 100.0 * done / total;
+                double elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start_time).count();
+                double eta = (percent > 0) ? elapsed * (100.0 - percent) / percent : 0;
+                int eta_h = static_cast<int>(eta) / 3600;
+                int eta_m = (static_cast<int>(eta) % 3600) / 60;
+                int eta_s = static_cast<int>(eta) % 60;
+                int barWidth = 40;
+                int pos = static_cast<int>(barWidth * percent / 100.0);
+                Rcpp::Rcerr << "\r[";
+                for (int k = 0; k < barWidth; ++k) {
+                    if (k < pos) Rcpp::Rcerr << "=";
+                    else if (k == pos) Rcpp::Rcerr << ">";
+                    else Rcpp::Rcerr << " ";
+                }
+                Rcpp::Rcerr << "] ";
+                Rcpp::Rcerr << std::fixed << std::setprecision(1) << percent << "% ";
+                Rcpp::Rcerr << "ETA: " << eta_h << "h " << eta_m << "m " << eta_s << "s ";
+                Rcpp::Rcerr << "Mean compression: " << std::setprecision(4) << mean_compression;
+                if (done == total) {
+                    Rcpp::Rcerr << std::endl;
+                } else {
+                    Rcpp::Rcerr << "\r";
+                }
+                Rcpp::Rcerr.flush();
             }
         }
     }
 }
 
-void kronecker_preprocessor::write_futures() {
+// Return mean compression instead of printing, so it can be included in the progress bar line
+double kronecker_preprocessor::write_futures() {
     double mean_compression = 0.0;
     for (auto& future: futures) {
         auto approx = future.get();
         mean_compression += approx->compression();
         fout << *approx;
     }
-    mean_compression /= futures.size();
+    if (!futures.empty()) {
+        mean_compression /= futures.size();
+    }
     fout.flush();
     futures.clear();
-    Rcpp::Rcerr << "Mean compression: " << mean_compression << std::endl;
-}       
-
+    return mean_compression;
 }
+
+} // namespace matching

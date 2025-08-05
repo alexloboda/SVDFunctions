@@ -34,7 +34,7 @@ std::vector<std::vector<int>> convert_clustering(const Clustering& clst) {
 
 void preprocess(const Eigen::MatrixXd& matrix, const Clustering& clst, const std::string& filename) {
     kronecker_preprocessor preprocessor(std::make_shared<Eigen::MatrixXd>(matrix), convert_clustering(clst), filename);
-    preprocessor.process(1, 1, 4);
+    preprocessor.process(6, 6, 4);
 }
 
 // Helper function to process stats
@@ -43,20 +43,12 @@ Rcpp::List process_stats(const Eigen::MatrixXd& matrix, const Eigen::MatrixXd& S
     auto [distances_interpoint, distances_approx] = create_mahalanobis_distances(matrix_transposed, S, mean);
     distances_interpoint.calculate_interpoint();
 
-    for (size_t i = 0; i < matrix.rows() ; ++i) {
-        for (size_t j = 0; j < matrix.rows(); ++j) {
-            Rcpp::Rcout << distances_interpoint.interpoint_distance(i, j) << " ";
-
-        }
-        Rcpp::Rcout << std::endl;
-    }
-
     auto clusters = convert_clustering(clst);
 
     std::string filename = "kronecker_data.bin";
     preprocess(matrix, clst, filename);
 
-    double beta = 0.3;
+    double beta = 0.2;
 
     mvn_stats_interpoint interpoint_stats(clst.size());
     interpoint_stats.init(distances_interpoint, clst, beta);

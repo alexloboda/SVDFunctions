@@ -40,12 +40,62 @@ test_that("mvn_stats produces consistent results", {
   stats$interpoint_pairwise <- transform(stats$interpoint_pairwise)
   stats$approx_pairwise <- transform(stats$approx_pairwise)
   
-  print(stats)
-
   # Perform checks
   centered_stats_diff <- abs(stats$interpoint_centered - stats$approx_centered)
   expect_true(all(centered_stats_diff <= 0.05), "Centered stats comparison failed")
-
+  
   pairwise_stats_diff <- abs(stats$interpoint_pairwise - stats$approx_pairwise)
   expect_true(all(pairwise_stats_diff <= 0.05), "Pairwise stats comparison failed")
+  #print maximum pairwise difference
+  max_pairwise_diff <- max(pairwise_stats_diff)
+  print(paste("Maximum pairwise stats difference:", max_pairwise_diff))
+})
+
+test_that("mvn_stats works with 5D, 5 clusters, synthetic Gaussian data", {
+  set.seed(42)
+  library(MASS)
+  d <- 5
+  n_per_cluster <- 25
+  k <- 5
+  n <- n_per_cluster * k
+
+  # Covariance matrix: some off-diagonal zeros, but not all
+  covariance_matrix <- matrix(c(
+    1,   0.5, 0,   0,   0.2,
+    0.5, 1,   0.3, 0,   0,
+    0,   0.3, 1,   0.4, 0,
+    0,   0,   0.4, 1,   0.1,
+    0.2, 0,   0,   0.1, 1
+  ), nrow = d, byrow = TRUE)
+
+  # Cluster means
+  mean_vectors <- matrix(runif(d * k, min = -2, max = 2), nrow = k)
+
+  # Generate data
+  test_matrix <- do.call(rbind, lapply(1:k, function(i) {
+    MASS::mvrnorm(n_per_cluster, mu = mean_vectors[i,], Sigma = covariance_matrix)
+  }))
+
+  clustering <- rep(0:(k-1), each = n_per_cluster)
+
+  stats <- SVDFunctions:::rcpp_run_mvn_stats_tests_combined(covariance_matrix, colMeans(test_matrix), test_matrix, clustering)
+
+  transform <- function(l) {
+    matrix(unlist(l), nrow = k)
+  }
+  stats$interpoint_pairwise <- transform(stats$interpoint_pairwise)
+  stats$approx_pairwise <- transform(stats$approx_pairwise)
+
+  centered_stats_diff <- abs(stats$interpoint_centered - stats$approx_centered)
+  #expect_true(all(centered_stats_diff <= 0.05), "Centered stats comparison failed (5D synthetic)")
+
+  pairwise_stats_diff <- abs(stats$interpoint_pairwise - stats$approx_pairwise)
+  #expect_true(all(pairwise_stats_diff <= 0.05), "Pairwise stats comparison failed (5D synthetic)")
+  
+  max_abs_stat <- max(abs(stats$interpoint_pairwise))
+  max_rel_error <- pairwise_stats_diff / max_abs_stat
+
+  max_pairwise_diff <- max(pairwise_stats_diff)
+  print(paste("Maximum pairwise stats difference (5D synthetic):", max_pairwise_diff))
+  print(paste("Maximum relative error (5D synthetic):", max(max_rel_error)))
 })

@@ -77,7 +77,7 @@ public:
                            std::string filename);
 
     void process(unsigned threads, unsigned batch_size, unsigned max_degree);
-    void write_futures();
+    double write_futures();
 private:
 
 };
