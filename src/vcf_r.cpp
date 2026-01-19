@@ -28,8 +28,13 @@ namespace {
         double last_value = -1.0;
         std::string last_label;
     public:
-        ProgressBar(bool enable, std::streamoff total, const std::shared_ptr<strict_fstream::ifstream>& file_in)
-            : enabled(enable && total > 0 && file_in), file(file_in), total_bytes(total) {
+                ProgressBar(bool enable, std::streamoff total, const std::shared_ptr<strict_fstream::ifstream>& file_in)
+                        : enabled(enable && total > 0 && file_in),
+                            file(file_in),
+                            total_bytes(total),
+                            set_txt_progress(R_NilValue),
+                            close_fn(R_NilValue),
+                            bar(R_NilValue) {
             if (!enabled) {
                 return;
             }
