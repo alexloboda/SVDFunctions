@@ -184,6 +184,9 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
     seed <- as.integer(runif(1, 0, .Machine$integer.max))
   }
 
+  progress_opts <- options(svdf.progress = isTRUE(verbose))
+  on.exit(options(progress_opts), add = TRUE)
+
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing), regions, 

@@ -2,6 +2,8 @@
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
 #include <fstream>
+#include <chrono>
+#include <cmath>
 
 #include "include/vcf_binary.h"
 #include "include/third-party/zstr/zstr.hpp"
@@ -14,6 +16,90 @@ namespace {
     using namespace vcf;
     using namespace std;
     using boost::algorithm::ends_with;
+
+    class ProgressBar {
+        bool enabled = false;
+        std::shared_ptr<strict_fstream::ifstream> file;
+        std::streamoff total_bytes = 0;
+        Rcpp::Function set_txt_progress;
+        Rcpp::Function close_fn;
+        Rcpp::RObject bar;
+        std::chrono::steady_clock::time_point last_update;
+        double last_value = -1.0;
+        std::string last_label;
+    public:
+        ProgressBar(bool enable, std::streamoff total, const std::shared_ptr<strict_fstream::ifstream>& file_in)
+            : enabled(enable && total > 0 && file_in), file(file_in), total_bytes(total) {
+            if (!enabled) {
+                return;
+            }
+            Rcpp::Environment base = Rcpp::Environment::base_env();
+            Rcpp::Environment utils = Rcpp::Environment::namespace_env("utils");
+            Rcpp::Function stderr_fn = base["stderr"];
+            Rcpp::Function txtpb = utils["txtProgressBar"];
+            set_txt_progress = utils["setTxtProgressBar"];
+            close_fn = base["close"];
+            bar = txtpb(Rcpp::_["min"] = 0,
+                        Rcpp::_["max"] = 100,
+                        Rcpp::_["initial"] = 0,
+                        Rcpp::_["title"] = "scanVCF",
+                        Rcpp::_["style"] = 3,
+                        Rcpp::_["file"] = stderr_fn());
+            last_update = std::chrono::steady_clock::now();
+        }
+
+        void tick(const std::string& label) {
+            if (!enabled) {
+                return;
+            }
+            auto now = std::chrono::steady_clock::now();
+            if (now - last_update < std::chrono::milliseconds(250)) {
+                return;
+            }
+            last_update = now;
+            std::streampos pos = file->tellg();
+            if (pos < 0) {
+                return;
+            }
+            double value = 100.0 * static_cast<double>(pos) / static_cast<double>(total_bytes);
+            if (value > 100.0) {
+                value = 100.0;
+            }
+            if (value < 0.0) {
+                value = 0.0;
+            }
+            if (std::abs(value - last_value) < 0.1 && label == last_label) {
+                return;
+            }
+            last_value = value;
+            last_label = label;
+            if (label.empty()) {
+                set_txt_progress(bar, value);
+            } else {
+                set_txt_progress(bar, value, Rcpp::Named("label") = label);
+            }
+        }
+
+        void finish() {
+            if (!enabled) {
+                return;
+            }
+            set_txt_progress(bar, 100.0);
+            close_fn(bar);
+            enabled = false;
+        }
+
+        ~ProgressBar() {
+            if (!enabled) {
+                return;
+            }
+            try {
+                set_txt_progress(bar, 100.0);
+                close_fn(bar);
+            } catch (...) {
+            }
+        }
+    };
 
     class Parser: public VCFParser {
         void handle_error(const vcf::ParserException& e) override {
@@ -121,7 +207,15 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     unsigned int random_seed = Rcpp::as<int>(seed);
     try {
         const char *name = filename[0];
-        unique_ptr<std::istream> in(new zstr::ifstream(name));
+    auto file = std::make_shared<strict_fstream::ifstream>(name, std::ios::in | std::ios::binary);
+    file->seekg(0, std::ios::end);
+    std::streamoff total_bytes = file->tellg();
+    file->seekg(0, std::ios::beg);
+    file->clear();
+
+    auto zbuf = std::make_shared<zstr::istreambuf>(file->rdbuf());
+    std::unique_ptr<std::istream> in(new std::istream(zbuf.get()));
+    in->exceptions(std::ios_base::badbit);
 
         VCFFilterStats stats;
         Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]), stats);
@@ -131,6 +225,16 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
         shared_ptr<PredictingHandler> predicting_handler;
+
+        Rcpp::Environment base = Rcpp::Environment::base_env();
+        Rcpp::Function getOption = base["getOption"];
+        Rcpp::Function interactive = base["interactive"];
+        bool show_progress = Rcpp::as<bool>(getOption("svdf.progress", false));
+        bool is_interactive = Rcpp::as<bool>(interactive());
+
+        ProgressBar progress(show_progress && is_interactive, total_bytes, file);
+        parser.set_progress_callback([&progress](const std::string& label) { progress.tick(label); }, 2000);
+        parser.set_interrupt_every(2000);
 
         if (gmatrix[0]) {
             vector<Variant> vs;
@@ -160,6 +264,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
         if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
             parser.parse_genotypes();
         }
+        progress.finish();
         ret["samples"] = CharacterVector(ss.begin(), ss.end());
         if (gmatrix[0]) {
             if (predictMissing[0]) {

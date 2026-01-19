@@ -254,6 +254,15 @@ namespace vcf {
         handlers.emplace_back(handler, order);
     }
 
+    void VCFParser::set_progress_callback(std::function<void(const std::string&)> callback, std::size_t every_n_lines) {
+        progress_callback = std::move(callback);
+        progress_every = every_n_lines;
+    }
+
+    void VCFParser::set_interrupt_every(std::size_t every_n_lines) {
+        interrupt_every = every_n_lines;
+    }
+
     VCFParser::VCFParser(std::istream& input, const VCFFilter& filter, VCFFilterStats& stats) :filter(filter),
                          input(input), line_num(0), stats(stats){}
 
@@ -321,9 +330,18 @@ namespace vcf {
         std::shared_ptr<std::vector<size_t>> sample_indices = std::make_shared<std::vector<size_t>>(filtered_samples);
         std::shared_ptr<VCFFilter> vcf_filter = std::make_shared<VCFFilter>(filter);
 
+        std::string last_position;
+        if (progress_callback && progress_every > 0) {
+            progress_callback(last_position);
+        }
         while (getline(input, line)) {
-            Rcpp::checkUserInterrupt();
             ++line_num;
+            if (interrupt_every > 0 && line_num % interrupt_every == 0) {
+                Rcpp::checkUserInterrupt();
+            }
+            if (progress_callback && progress_every > 0 && line_num % progress_every == 0) {
+                progress_callback(last_position);
+            }
             if (line.empty() || std::all_of(line.begin(),line.end(),isspace)) {
                 continue;
             }
@@ -333,6 +351,7 @@ namespace vcf {
                     throw ParserException("The row is too short");
                 }
                 Position position = parse_position(tokens);
+                last_position = tokens[CHROM] + ":" + tokens[POS];
                 vector<Variant> variants = parse_variants(tokens, position);
                 stats.add(Stat::OVERALL, variants.size());
 
@@ -363,6 +382,10 @@ namespace vcf {
                 ParserException exception(e.get_message(), line_num);
                 handle_error(exception);
             }
+        }
+
+        if (progress_callback && progress_every > 0) {
+            progress_callback(last_position);
         }
     }
 }

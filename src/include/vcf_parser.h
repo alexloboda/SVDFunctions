@@ -5,6 +5,7 @@
 #include "vcf_filter.h"
 #include "vcf_handlers.h"
 #include "vcf_stats.h"
+#include <functional>
 
 namespace vcf {
     enum Field {
@@ -71,6 +72,10 @@ namespace vcf {
 
         VCFFilterStats& stats;
 
+        std::function<void(const std::string&)> progress_callback;
+        std::size_t progress_every = 0;
+        std::size_t interrupt_every = 1000;
+
         std::vector<Variant> parse_variants(const std::vector<std::string>& tokens, const Position& position);
         virtual void handle_error(const ParserException& e) = 0;
         bool is_of_interest(const Variant& var);
@@ -82,6 +87,9 @@ namespace vcf {
         void parse_header();
         void parse_genotypes();
         void register_handler(std::shared_ptr<VariantsHandler> handler, int order);
+
+        void set_progress_callback(std::function<void(const std::string&)> callback, std::size_t every_n_lines = 10000);
+        void set_interrupt_every(std::size_t every_n_lines);
 
         std::vector<std::string> sample_names();
 };
