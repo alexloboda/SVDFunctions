@@ -1,11 +1,22 @@
 #ifndef SRC_VCF_PREDICTING_HANDLER_H
 #define SRC_VCF_PREDICTING_HANDLER_H
 
+#include <string>
+
 #include "vcf_handlers.h"
 #include "genotype_predictor.h"
 #include "vcf_parser.h"
 
 namespace vcf {
+    struct ImputationLooRow {
+        std::string variant;
+        std::size_t n_observed;
+        std::size_t n_missing;
+        double oob_mae;
+        double oob_rmse;
+        double rounded_acc;
+    };
+
     class Window {
         std::deque<std::shared_ptr<AlleleVector>> features;
         std::deque<Variant> variants;
@@ -28,6 +39,8 @@ namespace vcf {
         cxxpool::thread_pool thread_pool;
         unsigned int random_seed; 
 
+        std::vector<ImputationLooRow> loo_rows;
+
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
@@ -35,7 +48,10 @@ namespace vcf {
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
-        void fix_labels(const std::pair<Features, Labels>& dataset);
+
+        void fix_labels(const Variant& variant, const std::pair<Features, Labels>& dataset);
+
+        const std::vector<ImputationLooRow>& imputation_loo() const { return loo_rows; }
     };
 }
 
