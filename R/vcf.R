@@ -152,8 +152,11 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #'   \item \code{genotype}: numeric matrix with missing values replaced by predictions
 #'   \item \code{predicted}: logical matrix indicating which entries were originally missing
 #'   \item \code{loo}: data.frame with per-variant imputation QC based on out-of-bag
-#'     (leave-one-out-like) predictions on observed genotypes (columns: \code{variant},
-#'     \code{n_observed}, \code{n_missing}, \code{oob_mae}, \code{oob_rmse}, \code{rounded_acc})
+#'     (leave-one-out-like) predictions on observed genotypes. Columns include
+#'     random-forest OOB metrics (\code{oob_mae}, \code{oob_rmse}, \code{rounded_acc})
+#'     and additional baselines computed on a bounded subsample of observed samples:
+#'     ridge regression LOOCV (\code{ridge_loo_mae}, \code{ridge_loo_rmse}, \code{ridge_rounded_acc})
+#'     and kNN leave-one-out (\code{knn_loo_mae}, \code{knn_loo_rmse}, \code{knn_rounded_acc}).
 #' }
 #' @export
 scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
