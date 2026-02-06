@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <exception>
 #include <cmath>
+#include <utility>
 
 #include "vcf_primitives.h"
 #include "third-party/cxxpool.h"
@@ -59,6 +60,11 @@ namespace vcf {
     public:
         TreeBuilder(const Features&, const Labels& labels, std::size_t max_features);
         DecisionTree build_a_tree(Random& random, bool bagging = true) const;
+
+        // Builds a tree and also returns an in-bag mask (1 if sample was selected
+        // into the bootstrap bag for this tree, else 0). Mask size equals number
+        // of labels in the original dataset.
+        std::pair<DecisionTree, std::vector<unsigned char>> build_a_tree_with_inbag(Random& random, bool bagging = true) const;
     private:
         NodePtr buildSubtree(const Bags& bags, Random& random) const;
 
@@ -66,9 +72,15 @@ namespace vcf {
 
     class RandomForest {
         std::vector<DecisionTree> predictors;
+        std::vector<std::vector<unsigned char>> inbag_masks;
     public:
         RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& thread_pool, std::size_t trees = 12, unsigned int seed = 42);
         double predict(std::vector<AlleleType>& features);
+
+        // Out-of-bag (OOB) prediction for a given sample index.
+        // Uses only trees where this sample was NOT selected into bootstrap bag.
+        // Falls back to full-forest prediction if no OOB trees are available.
+        double predict_oob(std::vector<AlleleType>& features, std::size_t sample_index);
     };
 }
 

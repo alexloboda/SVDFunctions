@@ -52,6 +52,23 @@ test_that("inversed variants are read correctly", {
   expect_equal(expected, vcf)
 })
 
+test_that("predictMissing returns imputation QC table", {
+  samples <- sampleNamesVCF(file)[1:20]
+
+  # Get a small set of variants to keep runtime reasonable.
+  base_gt <- genotypeMatrixVCF(file, DP = DP, GQ = 0, samples = samples)
+  vars <- rownames(base_gt)[1:min(5, nrow(base_gt))]
+
+  res <- genotypeMatrixVCF(file, DP = DP, GQ = 0, samples = samples,
+                           variants = vars, predictMissing = TRUE, seed = 42)
+
+  expect_true(is.list(res))
+  expect_true(all(c("genotype", "predicted", "loo") %in% names(res)))
+  expect_s3_class(res$loo, "data.frame")
+  expect_true(all(c("variant", "n_observed", "n_missing",
+                    "oob_mae", "oob_rmse", "rounded_acc") %in% colnames(res$loo)))
+})
+
 test_that("callrates are calculated correctly", {
   regions <- data.frame(chr = c("1", "1", "20"), 
                         from = c("1108138", "40000000", "33521213"), 

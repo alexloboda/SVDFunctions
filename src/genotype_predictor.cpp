@@ -370,34 +370,54 @@ namespace vcf {
     TreeBuilder::TreeBuilder(const Features& features, const Labels& labels, size_t max_features)
         :features(features), values(labels), max_features(max_features) {}
 
-    DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
+    std::pair<DecisionTree, std::vector<unsigned char>> TreeBuilder::build_a_tree_with_inbag(Random& random, bool bagging) const {
         Bags tmp;
         for (size_t i = 0; i < values.size(); i++) {
             if (values[i] != MISSING) {
-                tmp.add(i, 1.0);
+                tmp.add((int)i, 1.0);
             }
         }
+
         Bags bags;
         for (size_t i = 0; i < values.size(); i++) {
-                switch(values[i]) {
-                    case HOMREF: case HET: case HOM:
-                        bags.add(i, 1.0);
-                        break;
-                    default:
-                        continue;
-                }
+            switch(values[i]) {
+                case HOMREF: case HET: case HOM:
+                    bags.add((int)i, 1.0);
+                    break;
+                default:
+                    continue;
+            }
         }
+
+        std::vector<unsigned char> inbag(values.size(), 0);
 
         if (features.empty()) {
             auto cts = counts(tmp, values);
             std::vector<double> weights{cts.ref(), cts.het(), cts.alt()};
-            return DecisionTree(std::make_shared<LeafNode>(std::move(weights)));
+            return {DecisionTree(std::make_shared<LeafNode>(std::move(weights))), std::move(inbag)};
         }
+
         if (bagging) {
             Bags randomBags(bags, random);
-            return DecisionTree(buildSubtree(randomBags, random));
+            for (const auto& s : randomBags.list()) {
+                if (s.sample() >= 0 && (size_t)s.sample() < inbag.size()) {
+                    inbag[(size_t)s.sample()] = 1;
+                }
+            }
+            return {DecisionTree(buildSubtree(randomBags, random)), std::move(inbag)};
         }
-        return DecisionTree(buildSubtree(bags, random));
+
+        // No bagging: mark all eligible samples as in-bag.
+        for (const auto& s : bags.list()) {
+            if (s.sample() >= 0 && (size_t)s.sample() < inbag.size()) {
+                inbag[(size_t)s.sample()] = 1;
+            }
+        }
+        return {DecisionTree(buildSubtree(bags, random)), std::move(inbag)};
+    }
+
+    DecisionTree TreeBuilder::build_a_tree(Random& random, bool bagging) const {
+        return build_a_tree_with_inbag(random, bagging).first;
     }
 
     NodePtr TreeBuilder::buildSubtree(const Bags& bags, Random& random) const {
@@ -436,19 +456,21 @@ namespace vcf {
     }
 
     RandomForest::RandomForest(const TreeBuilder& treeBuilder, cxxpool::thread_pool& pool, size_t ntrees, unsigned int seed) {
-        std::vector<std::future<DecisionTree>> futures;
+        std::vector<std::future<std::pair<DecisionTree, std::vector<unsigned char>>>> futures;
         for (size_t i = 0; i < ntrees; i++) {
             int tree_seed = seed + i;
-            futures.push_back(pool.push([tree_seed, &treeBuilder]() -> DecisionTree {
+            futures.push_back(pool.push([tree_seed, &treeBuilder]() -> std::pair<DecisionTree, std::vector<unsigned char>> {
                 Random random(tree_seed);
-                return treeBuilder.build_a_tree(random);
+                return treeBuilder.build_a_tree_with_inbag(random);
             }));
         }
         for (size_t i = 0; i < ntrees; i++) {
             futures[i].wait();
         }
         for (size_t i = 0; i < ntrees; i++) {
-            predictors.push_back(futures[i].get());
+            auto built = futures[i].get();
+            predictors.push_back(std::move(built.first));
+            inbag_masks.push_back(std::move(built.second));
         }
     }
 
@@ -458,5 +480,29 @@ namespace vcf {
             sum += tree.predict(features);
         }
         return sum / predictors.size();
+    }
+
+    double RandomForest::predict_oob(std::vector<AlleleType>& features, std::size_t sample_index) {
+        if (predictors.empty()) {
+            throw std::logic_error("Error: random forest has no predictors");
+        }
+        double sum = 0.0;
+        std::size_t cnt = 0;
+        for (std::size_t t = 0; t < predictors.size(); t++) {
+            if (t >= inbag_masks.size()) {
+                break;
+            }
+            if (sample_index >= inbag_masks[t].size()) {
+                break;
+            }
+            if (inbag_masks[t][sample_index] == 0) {
+                sum += predictors[t].predict(features);
+                ++cnt;
+            }
+        }
+        if (cnt == 0) {
+            return predict(features);
+        }
+        return sum / (double)cnt;
     }
 }

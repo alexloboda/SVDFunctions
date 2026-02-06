@@ -275,7 +275,35 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             if (predictMissing[0]) {
                 predicting_handler->cleanup();
             }
-            ret["genotype"] = gmatrix_handler->result();
+            List geno = gmatrix_handler->result();
+            if (predictMissing[0]) {
+                const auto& rows = predicting_handler->imputation_loo();
+                CharacterVector variant(rows.size());
+                IntegerVector n_observed(rows.size());
+                IntegerVector n_missing(rows.size());
+                NumericVector oob_mae(rows.size());
+                NumericVector oob_rmse(rows.size());
+                NumericVector rounded_acc(rows.size());
+                for (size_t i = 0; i < rows.size(); i++) {
+                    variant[i] = rows[i].variant;
+                    n_observed[i] = (int)rows[i].n_observed;
+                    n_missing[i] = (int)rows[i].n_missing;
+                    oob_mae[i] = rows[i].oob_mae;
+                    oob_rmse[i] = rows[i].oob_rmse;
+                    rounded_acc[i] = rows[i].rounded_acc;
+                }
+                DataFrame loo = DataFrame::create(
+                        _["variant"] = variant,
+                        _["n_observed"] = n_observed,
+                        _["n_missing"] = n_missing,
+                        _["oob_mae"] = oob_mae,
+                        _["oob_rmse"] = oob_rmse,
+                        _["rounded_acc"] = rounded_acc,
+                        _["stringsAsFactors"] = false
+                );
+                geno["loo"] = loo;
+            }
+            ret["genotype"] = geno;
         }
         if (regions.length() > 0) {
             ret["callrate"] = callrate_handler->result();

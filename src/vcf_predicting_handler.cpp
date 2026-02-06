@@ -1,3 +1,6 @@
+#include <cmath>
+#include <limits>
+
 #include "include/vcf_predicting_handler.h"
 #include "include/genotype_predictor.h"
 #include "include/vcf_parser.h"
@@ -51,7 +54,8 @@ namespace vcf {
                 if (dataset.second.empty()) {
                     return;
                 }
-                fix_labels(dataset);
+                Variant v = *iterator;
+                fix_labels(v, dataset);
                 ++iterator;
             }
         }
@@ -64,12 +68,12 @@ namespace vcf {
             if (dataset.second.empty()) {
                 break;
             }
-            fix_labels(dataset);
+            fix_labels(var, dataset);
         }
         window.clear();
     }
 
-    void PredictingHandler::fix_labels(const std::pair<Features, Labels>& dataset) {
+    void PredictingHandler::fix_labels(const Variant& variant, const std::pair<Features, Labels>& dataset) {
         bool missing = false;
         for (auto l: dataset.second) {
             if (l == MISSING) {
@@ -81,20 +85,69 @@ namespace vcf {
         }
         TreeBuilder tree_builder = make_tree_builder(dataset);
         RandomForest forest{tree_builder, thread_pool, /*ntrees=*/100, random_seed};
+
+        // Leave-one-out-like evaluation via out-of-bag (OOB) predictions.
+        // Evaluate only on observed (non-missing) genotypes for this variant.
+        std::size_t n_observed = 0;
+        std::size_t n_missing = 0;
+        std::size_t n_eval = 0;
+        std::size_t n_correct = 0;
+        double sum_abs = 0.0;
+        double sum_sq = 0.0;
+
         std::vector<float> labels;
         for (size_t i = 0; i < dataset.second.size(); i++) {
             AlleleType curr = dataset.second[i];
             if (curr == MISSING) {
+                ++n_missing;
                 std::vector<AlleleType> features;
                 for (size_t j = 0; j < dataset.first.size(); j++) {
                     features.push_back(dataset.first[j][i]);
                 }
                 labels.push_back(forest.predict(features));
             } else {
+                ++n_observed;
+
+                // OOB prediction for evaluation.
+                std::vector<AlleleType> features;
+                for (size_t j = 0; j < dataset.first.size(); j++) {
+                    features.push_back(dataset.first[j][i]);
+                }
+                double pred = forest.predict_oob(features, i);
+                double truth = (double)to_int(curr);
+                double err = pred - truth;
+                sum_abs += std::abs(err);
+                sum_sq += err * err;
+                ++n_eval;
+                int rounded = (int)std::llround(pred);
+                if (rounded < 0) {
+                    rounded = 0;
+                } else if (rounded > 2) {
+                    rounded = 2;
+                }
+                if ((double)rounded == truth) {
+                    ++n_correct;
+                }
+
                 labels.push_back(to_int(curr));
             }
         }
         iterator.set(labels);
+
+        ImputationLooRow row;
+        row.variant = (std::string)variant;
+        row.n_observed = n_observed;
+        row.n_missing = n_missing;
+        if (n_eval == 0) {
+            row.oob_mae = std::numeric_limits<double>::quiet_NaN();
+            row.oob_rmse = std::numeric_limits<double>::quiet_NaN();
+            row.rounded_acc = std::numeric_limits<double>::quiet_NaN();
+        } else {
+            row.oob_mae = sum_abs / (double)n_eval;
+            row.oob_rmse = std::sqrt(sum_sq / (double)n_eval);
+            row.rounded_acc = (double)n_correct / (double)n_eval;
+        }
+        loo_rows.push_back(std::move(row));
     }
 
     TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset) {
