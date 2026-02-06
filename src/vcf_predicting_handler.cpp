@@ -389,7 +389,7 @@ namespace vcf {
                     ridge_accum = eval_ridge_range(0, eval_n);
                 }
 
-                size_t used_r = ridge_accum.count;
+                used_r = ridge_accum.count;
                 sum_abs_r = ridge_accum.sum_abs;
                 sum_sq_r = ridge_accum.sum_sq;
                 correct_r = ridge_accum.correct;
