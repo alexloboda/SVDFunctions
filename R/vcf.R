@@ -209,7 +209,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                 "only necessary regions has been created(", vcf, "). See ",
                 "the temp file for more information about the error.\n")
       }
-      stop(paste0(conditionMessage(c), "\n", suffix))
+      base::stop(paste0(base::conditionMessage(c), "\n", suffix), call. = FALSE)
     }
   )
   if (verbose) {
