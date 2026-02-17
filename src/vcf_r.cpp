@@ -32,18 +32,29 @@ namespace {
                         : enabled(enable && total > 0 && file_in),
                             file(file_in),
                             total_bytes(total),
-                            set_txt_progress(R_NilValue),
-                            close_fn(R_NilValue),
+                            set_txt_progress(Rcpp::Environment::base_env()["invisible"]),
+                            close_fn(Rcpp::Environment::base_env()["invisible"]),
                             bar(R_NilValue) {
             if (!enabled) {
                 return;
             }
             Rcpp::Environment base = Rcpp::Environment::base_env();
             Rcpp::Environment utils = Rcpp::Environment::namespace_env("utils");
-            Rcpp::Function stderr_fn = base["stderr"];
-            Rcpp::Function txtpb = utils["txtProgressBar"];
-            set_txt_progress = utils["setTxtProgressBar"];
-            close_fn = base["close"];
+
+            Rcpp::RObject stderr_obj = base["stderr"];
+            Rcpp::RObject close_obj = base["close"];
+            Rcpp::RObject txtpb_obj = utils["txtProgressBar"];
+            Rcpp::RObject setpb_obj = utils["setTxtProgressBar"];
+
+            if (stderr_obj.isNULL() || close_obj.isNULL() || txtpb_obj.isNULL() || setpb_obj.isNULL()) {
+                enabled = false;
+                return;
+            }
+
+            Rcpp::Function stderr_fn(stderr_obj);
+            Rcpp::Function txtpb(txtpb_obj);
+            set_txt_progress = Rcpp::Function(setpb_obj);
+            close_fn = Rcpp::Function(close_obj);
             bar = txtpb(Rcpp::_["min"] = 0,
                         Rcpp::_["max"] = 100,
                         Rcpp::_["initial"] = 0,
@@ -207,9 +218,16 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold,
-               Rcpp::Nullable<int> seed) {
+               Rcpp::Nullable<int> seed, const IntegerVector& window_size) {
     List ret;
     unsigned int random_seed = Rcpp::as<int>(seed);
+    int ws = 100;
+    if (window_size.length() > 0) {
+        ws = window_size[0];
+    }
+    if (ws < 3) {
+        Rcpp::stop("window_size must be >= 3");
+    }
     try {
         const char *name = filename[0];
     auto file = std::make_shared<strict_fstream::ifstream>(name, std::ios::in | std::ios::binary);
@@ -250,7 +268,7 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, 100, random_seed);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, ws, random_seed);
                 parser.register_handler(predicting_handler, 2);
             }
         }

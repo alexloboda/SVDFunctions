@@ -145,6 +145,8 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' metadata file prefix_meta. If not NULL corresponding files will be generated.
 #' @param verbose logical 
 #' @param seed integer: seed for random number generator (for reproducible imputation). Default is 42.
+#' @param window_size integer: number of variants in the sliding window used for
+#' RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 100.
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested. If 
 #' \code{predictMissing = TRUE}, the \code{genotype} element is a list with:
@@ -164,7 +166,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     returnGenotypeMatrix = TRUE, predictMissing = FALSE, 
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
-                    verbose = FALSE, seed = NULL) {
+                    verbose = FALSE, seed = NULL, window_size = 100L) {
   vcf <- normalizePath(vcf)
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
@@ -172,6 +174,10 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   GQ <- as.integer(GQ)
   stopifnot(!is.na(DP[1]))
   stopifnot(!is.na(GQ[1]))
+  window_size <- as.integer(window_size)
+  stopifnot(length(window_size) > 0)
+  stopifnot(!is.na(window_size[1]))
+  stopifnot(window_size[1] >= 3)
   stopifnot(file.exists(vcf))
   tbi <- paste0(vcf, ".tbi")
   if (!is.null(binaryPathPrefix) || !file.exists(tbi)) {
@@ -201,7 +207,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   tryCatch( 
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing), regions, 
-                     binaryPathPrefix, missingRateThreshold, seed),
+                     binaryPathPrefix, missingRateThreshold, seed, window_size[1]),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {
