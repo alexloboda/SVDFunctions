@@ -15,14 +15,6 @@ namespace vcf {
         double oob_mae;
         double oob_rmse;
         double rounded_acc;
-
-        // Additional evaluation baselines (computed on observed genotypes only)
-        double ridge_loo_mae;
-        double ridge_loo_rmse;
-        double ridge_rounded_acc;
-        double knn_loo_mae;
-        double knn_loo_rmse;
-        double knn_rounded_acc;
     };
 
     class Window {

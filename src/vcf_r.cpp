@@ -302,12 +302,6 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                 NumericVector oob_mae(rows.size());
                 NumericVector oob_rmse(rows.size());
                 NumericVector rounded_acc(rows.size());
-                NumericVector ridge_loo_mae(rows.size());
-                NumericVector ridge_loo_rmse(rows.size());
-                NumericVector ridge_rounded_acc(rows.size());
-                NumericVector knn_loo_mae(rows.size());
-                NumericVector knn_loo_rmse(rows.size());
-                NumericVector knn_rounded_acc(rows.size());
                 for (size_t i = 0; i < rows.size(); i++) {
                     variant[i] = rows[i].variant;
                     n_observed[i] = (int)rows[i].n_observed;
@@ -315,12 +309,6 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                     oob_mae[i] = rows[i].oob_mae;
                     oob_rmse[i] = rows[i].oob_rmse;
                     rounded_acc[i] = rows[i].rounded_acc;
-                    ridge_loo_mae[i] = rows[i].ridge_loo_mae;
-                    ridge_loo_rmse[i] = rows[i].ridge_loo_rmse;
-                    ridge_rounded_acc[i] = rows[i].ridge_rounded_acc;
-                    knn_loo_mae[i] = rows[i].knn_loo_mae;
-                    knn_loo_rmse[i] = rows[i].knn_loo_rmse;
-                    knn_rounded_acc[i] = rows[i].knn_rounded_acc;
                 }
                 DataFrame loo = DataFrame::create(
                         _["variant"] = variant,
@@ -329,12 +317,6 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                         _["oob_mae"] = oob_mae,
                         _["oob_rmse"] = oob_rmse,
                         _["rounded_acc"] = rounded_acc,
-                        _["ridge_loo_mae"] = ridge_loo_mae,
-                        _["ridge_loo_rmse"] = ridge_loo_rmse,
-                        _["ridge_rounded_acc"] = ridge_rounded_acc,
-                        _["knn_loo_mae"] = knn_loo_mae,
-                        _["knn_loo_rmse"] = knn_loo_rmse,
-                        _["knn_rounded_acc"] = knn_rounded_acc,
                         _["stringsAsFactors"] = false
                 );
                 geno["loo"] = loo;
