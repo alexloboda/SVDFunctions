@@ -299,8 +299,61 @@ mvn_test_rff::mvn_test_rff(const mvn_test_rff& other)
      n(other.n),
      effect_size(other.effect_size),
      latest_subset_point(other.latest_subset_point),
-     wheel{other.wheel()},
+     // NOTE: don't read other's RNG state here; copy/clone may run in parallel.
+     wheel{std::random_device()()},
      subset(other.subset) {}
+
+mvn_test_rff::mvn_test_rff(const mvn_test_rff& other, fresh_rff_clone_tag)
+    :sampler(other.sampler),
+     pairwise_stat(other.betas.size(), 0.0),
+     center_stat(other.betas.size(), 0.0),
+     betas(other.betas),
+     rff_dim(other.rff_dim),
+     rff(nullptr),
+     subset_rff_sum(),
+     cluster_rff_cache(),
+     cluster_center_cache(),
+     clustering(other.clustering),
+     p(other.p),
+     n(other.n),
+     effect_size(0),
+     latest_subset_point(other.latest_subset_point),
+     wheel{std::random_device()()},
+     subset(other.subset) {
+    // Fresh RFF parameters per clone/restart: same whitening, new (W, b).
+    auto params = std::make_shared<RFFParams>();
+    params->X = other.rff->X;
+    params->A = other.rff->A;
+    params->mean_whitened = other.rff->mean_whitened;
+    params->scale = other.rff->scale;
+
+    std::normal_distribution<double> normal(0.0, 1.0);
+    std::uniform_real_distribution<double> unif(0.0, 2.0 * M_PI);
+    params->W.resize((Eigen::Index)rff_dim, (Eigen::Index)p);
+    params->b.resize((Eigen::Index)rff_dim);
+    for (Eigen::Index i = 0; i < params->W.rows(); i++) {
+        for (Eigen::Index j = 0; j < params->W.cols(); j++) {
+            params->W(i, j) = normal(wheel);
+        }
+        params->b(i) = unif(wheel);
+    }
+    rff = std::move(params);
+
+    // Fresh caches/statistics for the new feature map.
+    subset_rff_sum.clear();
+    subset_rff_sum.reserve(betas.size());
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        subset_rff_sum.emplace_back(Eigen::VectorXd::Zero((Eigen::Index)rff_dim));
+    }
+    cluster_rff_cache.assign(betas.size(), {});
+    cluster_center_cache.assign(betas.size(), {});
+
+    // Recompute effect size and stats for the existing subset.
+    for (size_t point : subset) {
+        effect_size += clustering->cluster_size(point);
+        add(static_cast<unsigned>(point));
+    }
+}
 
 Clustering::Clustering(const std::vector<int>& clustering) {
     if (clustering.empty()) {
@@ -348,7 +401,9 @@ void mvn_test_rff::add(unsigned int point) {
 }
 
 std::shared_ptr<mvn_test_base> mvn_test_rff::clone() const {
-    return std::make_shared<mvn_test_rff>(*this);
+    // Used to create independent restarts in parallel: must be thread-safe.
+    // We also intentionally resample (W, b) so each restart gets a fresh RFF map.
+    return std::shared_ptr<mvn_test_base>(new mvn_test_rff(*this, fresh_rff_clone_tag{}));
 }
 
 RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :runif(0.0, 1.0), wheel(seed), original(logscale),
@@ -496,7 +551,9 @@ void RandomSampler::update(size_t node) {
 
 RandomSampler::RandomSampler() :runif(0.0, 1.0), wheel(0), size(0) {}
 
-RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel(other.wheel()),
+RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0),
+                                                          // NOTE: don't read other's RNG state here; copy/clone may run in parallel.
+                                                          wheel(std::random_device()()),
                                                           original(other.original), segment_tree(other.segment_tree),
                                                           active_tree(other.active_tree), size(other.size) {}
 

@@ -219,7 +219,8 @@ mvn_test_exact::mvn_test_exact(const mvn_test_exact& other)
      n(other.n),
      effect_size(other.effect_size),
      latest_subset_point(other.latest_subset_point),
-     wheel{other.wheel()},
+    // NOTE: don't read other's RNG state here; copy/clone may run in parallel.
+    wheel{std::random_device()()},
      subset(other.subset) {}
 
 size_t mvn_test_exact::dimensions() const {

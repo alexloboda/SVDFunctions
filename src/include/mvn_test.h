@@ -188,6 +188,11 @@ public:
     std::shared_ptr<mvn_test_base> clone() const override;
 
 private:
+    struct fresh_rff_clone_tag {
+    };
+
+    mvn_test_rff(const mvn_test_rff& other, fresh_rff_clone_tag);
+
     void remove(unsigned i);
     void add(unsigned i);
     void ensure_cluster_cached(size_t cluster_id);
