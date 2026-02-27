@@ -77,7 +77,11 @@ static void validate_cluster_id(size_t cluster_id, size_t n_clusters) {
     }
 }
 
-mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
+mvn_test_rff::mvn_test_rff(std::shared_ptr<const Matrix> X,
+                           const Clustering& clst,
+                           const Matrix& S,
+                           const Vector& mean,
+                           size_t requested_rff_dim)
         :clustering(std::make_shared<Clustering>(clst)),
          wheel(std::random_device()()) {
     if (X->cols() == 0 || X->rows() == 0) {
@@ -110,7 +114,10 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         throw std::logic_error("Too few points.");
     }
 
-    rff_dim = choose_rff_dim(p, n);
+    rff_dim = requested_rff_dim == 0 ? choose_rff_dim(p, n) : requested_rff_dim;
+    if (rff_dim == 0) {
+        throw std::invalid_argument("RFF dimension must be positive");
+    }
 
     // Precompute whitening and shared RFF parameters. Per-cluster values are computed lazily.
     auto params = std::make_shared<RFFParams>();
@@ -152,7 +159,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     }
 }
 
-void mvn_test::ensure_cluster_cached(size_t cluster_id) {
+void mvn_test_rff::ensure_cluster_cached(size_t cluster_id) {
     validate_cluster_id(cluster_id, n);
     if (betas.empty()) {
         throw std::logic_error("No betas configured");
@@ -198,7 +205,7 @@ void mvn_test::ensure_cluster_cached(size_t cluster_id) {
     }
 }
 
-double mvn_test::get_normality_statistic() {
+double mvn_test_rff::get_normality_statistic() {
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
     }
@@ -213,23 +220,23 @@ double mvn_test::get_normality_statistic() {
     return max_stat;
 }
 
-const std::vector<size_t>& mvn_test::current_subset() const {
+const std::vector<size_t>& mvn_test_rff::current_subset() const {
     return subset;
 }
 
-size_t mvn_test::dimensions() const {
+size_t mvn_test_rff::dimensions() const {
     return p;
 }
 
-size_t mvn_test::subsample_size() const {
+size_t mvn_test_rff::subsample_size() const {
     return subset.size();
 }
 
-size_t mvn_test::sample_size() const {
+size_t mvn_test_rff::sample_size() const {
     return n;
 }
 
-void mvn_test::swap_once(bool reject_last) {
+void mvn_test_rff::swap_once(bool reject_last) {
     if (subset.empty() || sampler.n_active() == 0) {
         throw std::logic_error("Unable to swap points.");
     }
@@ -263,7 +270,7 @@ void mvn_test::swap_once(bool reject_last) {
     add(replacing_point);
 }
 
-void mvn_test::add_one() {
+void mvn_test_rff::add_one() {
     if (sampler.n_active() == 0) {
         throw std::logic_error("Can't add point to the model.");
     }
@@ -277,20 +284,16 @@ void mvn_test::add_one() {
     add(point);
 }
 
-bool operator<(mvn_test& lhs, mvn_test& rhs) {
-    return lhs.get_normality_statistic() < rhs.get_normality_statistic();
-}
-
-mvn_test::mvn_test(const mvn_test& other)
+mvn_test_rff::mvn_test_rff(const mvn_test_rff& other)
     :sampler(other.sampler),
      pairwise_stat(other.pairwise_stat),
      center_stat(other.center_stat),
      betas(other.betas),
      rff_dim(other.rff_dim),
-    rff(other.rff),
+     rff(other.rff),
      subset_rff_sum(other.subset_rff_sum),
-    cluster_rff_cache(other.cluster_rff_cache),
-    cluster_center_cache(other.cluster_center_cache),
+     cluster_rff_cache(other.cluster_rff_cache),
+     cluster_center_cache(other.cluster_center_cache),
      clustering(other.clustering),
      p(other.p),
      n(other.n),
@@ -326,7 +329,7 @@ size_t Clustering::cluster_size(size_t i) const {
     return clusters.at(i).size();
 }
 
-void mvn_test::remove(unsigned point) {
+void mvn_test_rff::remove(unsigned point) {
     ensure_cluster_cached(point);
     for (size_t bi = 0; bi < betas.size(); bi++) {
         subset_rff_sum[bi] -= cluster_rff_cache[bi].at(point).cast<double>();
@@ -335,7 +338,7 @@ void mvn_test::remove(unsigned point) {
     }
 }
 
-void mvn_test::add(unsigned int point) {
+void mvn_test_rff::add(unsigned int point) {
     ensure_cluster_cached(point);
     for (size_t bi = 0; bi < betas.size(); bi++) {
         subset_rff_sum[bi] += cluster_rff_cache[bi].at(point).cast<double>();
@@ -344,8 +347,8 @@ void mvn_test::add(unsigned int point) {
     }
 }
 
-std::unique_ptr<mvn_test> mvn_test::clone() {
-    return std::make_unique<mvn_test>(*this);
+std::shared_ptr<mvn_test_base> mvn_test_rff::clone() const {
+    return std::make_shared<mvn_test_rff>(*this);
 }
 
 RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :runif(0.0, 1.0), wheel(seed), original(logscale),

@@ -1,14 +1,15 @@
 #ifndef SRC_MVN_TEST_H
 #define SRC_MVN_TEST_H
 
-#include <vector>
 #include <memory>
+#include <random>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include <RcppEigen.h>
 
 // [[Rcpp::depends(RcppEigen)]]
-
-#include <random>
-#include <unordered_map>
 
 namespace mvn {
 
@@ -59,17 +60,88 @@ public:
     size_t cluster_size(size_t i) const;
 };
 
-class mvn_test {
-protected:
+enum class mvn_test_method {
+    exact,
+    rff,
+};
+
+mvn_test_method parse_mvn_test_method(const std::string& method);
+
+class mvn_test_base {
+public:
+    virtual ~mvn_test_base() = default;
+
+    virtual size_t dimensions() const = 0;
+    virtual size_t sample_size() const = 0;
+    virtual size_t subsample_size() const = 0;
+
+    virtual void add_one() = 0;
+    virtual void swap_once(bool reject_last = false) = 0;
+
+    virtual const std::vector<size_t>& current_subset() const = 0;
+    virtual double get_normality_statistic() = 0;
+
+    virtual std::shared_ptr<mvn_test_base> clone() const = 0;
+};
+
+inline bool operator<(mvn_test_base& lhs, mvn_test_base& rhs) {
+    return lhs.get_normality_statistic() < rhs.get_normality_statistic();
+}
+
+class mvn_test_exact final : public mvn_test_base {
+    class mahalanobis_distances;
+    class mvn_stats;
+
+    std::shared_ptr<mahalanobis_distances> distances;
+    std::vector<std::shared_ptr<mvn_stats>> stats;
     RandomSampler sampler;
 
     std::vector<double> pairwise_stat;
     std::vector<double> center_stat;
     std::vector<double> betas;
 
-    // Random Fourier Features approximation of the Gaussian kernel with Mahalanobis metric.
-    // To scale to very large numbers of clusters, features are computed lazily per-cluster
-    // and cached only for clusters that are actually visited by the optimizer.
+    std::shared_ptr<Clustering> clustering;
+
+    size_t p;
+    size_t n;
+
+    size_t effect_size;
+    int latest_subset_point;
+
+    mutable std::mt19937 wheel;
+
+    std::vector<size_t> subset;
+
+public:
+    mvn_test_exact(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& cov, const Vector& mean);
+    mvn_test_exact(const mvn_test_exact&);
+
+    size_t dimensions() const override;
+    size_t sample_size() const override;
+    size_t subsample_size() const override;
+
+    void add_one() override;
+    void swap_once(bool reject_last = false) override;
+
+    const std::vector<size_t>& current_subset() const override;
+    double get_normality_statistic() override;
+
+    std::shared_ptr<mvn_test_base> clone() const override;
+
+private:
+    std::vector<double> loglikelihood(const std::vector<int>& ids) const;
+
+    void remove(unsigned i);
+    void add(unsigned i);
+};
+
+class mvn_test_rff final : public mvn_test_base {
+    RandomSampler sampler;
+
+    std::vector<double> pairwise_stat;
+    std::vector<double> center_stat;
+    std::vector<double> betas;
+
     struct RFFParams {
         std::shared_ptr<const Matrix> X;
         Matrix A;               // whitening: y = A * x
@@ -82,10 +154,7 @@ protected:
     size_t rff_dim;
     std::shared_ptr<const RFFParams> rff;
 
-    // Running sum of features for current subset.
     std::vector<Eigen::VectorXd> subset_rff_sum; // [beta] : rff_dim
-
-    // Lazy per-cluster caches.
     std::vector<std::unordered_map<size_t, Eigen::VectorXf>> cluster_rff_cache; // [beta]
     std::vector<std::unordered_map<size_t, float>> cluster_center_cache;        // [beta]
 
@@ -102,32 +171,35 @@ protected:
     std::vector<size_t> subset;
 
 public:
-    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
-    mvn_test(const mvn_test&);
+    // rff_dim == 0 means "auto" heuristic.
+    mvn_test_rff(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& cov, const Vector& mean, size_t rff_dim);
+    mvn_test_rff(const mvn_test_rff&);
 
-    size_t dimensions() const;
-    size_t sample_size() const;
-    size_t subsample_size() const;
+    size_t dimensions() const override;
+    size_t sample_size() const override;
+    size_t subsample_size() const override;
 
-    void add_one();
-    void swap_once(bool reject_last = false);
+    void add_one() override;
+    void swap_once(bool reject_last = false) override;
 
-    const std::vector<size_t>& current_subset() const;
+    const std::vector<size_t>& current_subset() const override;
+    double get_normality_statistic() override;
 
-    double get_normality_statistic();
+    std::shared_ptr<mvn_test_base> clone() const override;
 
-    friend bool operator<(mvn_test& lhs, mvn_test& rhs);
-    std::unique_ptr<mvn_test> clone();
-
-protected:
+private:
     void remove(unsigned i);
     void add(unsigned i);
-
     void ensure_cluster_cached(size_t cluster_id);
-
-    mvn_test() = default;
 };
+
+std::shared_ptr<mvn_test_base> make_mvn_test(std::shared_ptr<const Matrix> X,
+                                            const Clustering& clst,
+                                            const Vector& mean,
+                                            const Matrix& cov,
+                                            mvn_test_method method,
+                                            size_t rff_dim);
 
 }
 
-#endif //SRC_MVN_TEST_H
+#endif // SRC_MVN_TEST_H

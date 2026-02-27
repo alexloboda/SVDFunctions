@@ -6,7 +6,7 @@
 namespace mvn {
 
 class subsample {
-    std::shared_ptr<mvn_test> test;
+    std::shared_ptr<mvn_test_base> test;
 
     std::vector<std::vector<size_t>> best;
     std::vector<double> best_stat;
@@ -15,7 +15,12 @@ class subsample {
     std::mt19937 wheel;
 public:
     subsample();
-    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov);
+    subsample(std::shared_ptr<const Matrix> X,
+              const Clustering& clst,
+              const Vector& mean,
+              const Matrix& cov,
+              mvn_test_method method = mvn_test_method::exact,
+              size_t rff_dim = 0);
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 

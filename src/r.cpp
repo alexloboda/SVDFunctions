@@ -115,7 +115,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      double min_lambda, double lb_lambda,
                      double max_lambda, double ub_lambda,
                      int min, int max, int step,
-                     int sa_iterations, double min_call_rate) {
+                     int sa_iterations, double min_call_rate,
+                     std::string mvn_method, int rff_dim) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -133,12 +134,18 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     double mcr = min_call_rate;
     mvn::Clustering cl(clust_vec);
 
+    if (rff_dim < 0) {
+        throw std::invalid_argument("rff_dim must be non-negative");
+    }
+    const mvn::mvn_test_method method = mvn::parse_mvn_test_method(mvn_method);
+
     matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters, iterations);
+                        min_controls, max_controls, step_clusters, iterations,
+                        method, static_cast<size_t>(rff_dim));
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);

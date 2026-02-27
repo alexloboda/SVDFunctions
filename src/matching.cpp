@@ -150,14 +150,15 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 }
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
-                           int threads, int start, int ub, int step, int iterations) {
+                           int threads, int start, int ub, int step, int iterations,
+                           mvn::mvn_test_method method, size_t rff_dim) {
     const double EPS = 1e-18;
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
     Matrix rs_cov = directions * directions.transpose();
 
-    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov);
+    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, method, rff_dim);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     double c = std::pow(EPS, 1.0 / (double)iterations);
     subsampling.run(iterations, 4, 1.0 , c, threads, start, ub, step);

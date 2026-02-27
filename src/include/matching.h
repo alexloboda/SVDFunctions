@@ -83,7 +83,9 @@ class matching {
 public:
     matching(std::vector<std::vector<int>>&& controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
-                     int threads, int start, int size_ub, int step, int iterations);
+                     int threads, int start, int size_ub, int step, int iterations,
+                     mvn::mvn_test_method method = mvn::mvn_test_method::exact,
+                     size_t rff_dim = 0);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);
 

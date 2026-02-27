@@ -9,11 +9,15 @@
 
 namespace mvn {
 
-subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& clst, const mvn::Vector& mean,
-                     const mvn::Matrix& cov)
-        : test{std::make_shared<mvn_test>(mvn_test(X, clst, cov, mean))},
-          clst(clst),
-          wheel(std::random_device()()) {
+subsample::subsample(std::shared_ptr<const mvn::Matrix> X,
+                                         const Clustering& clst,
+                                         const mvn::Vector& mean,
+                                         const mvn::Matrix& cov,
+                                         mvn_test_method method,
+                                         size_t rff_dim)
+                : test{make_mvn_test(std::move(X), clst, mean, cov, method, rff_dim)},
+                    clst(clst),
+                    wheel(std::random_device()()) {
 }
 
 namespace {
@@ -39,13 +43,13 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
     while (curr_size <= size_ub) {
         Rcpp::checkUserInterrupt();
-        std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
+        std::vector<std::future<std::shared_ptr<mvn_test_base>>> thread_solutions;
         for (size_t t = 0; t < restarts; t++) {
             thread_solutions.push_back(pool.push([test = const_ref(test), iterations, t_start, curr_size, c,
-                                                         seed = wheel()]() -> std::shared_ptr<mvn_test> {
+                                                         seed = wheel()]() -> std::shared_ptr<mvn_test_base> {
                 double t = t_start;
                 std::mt19937 mersenne_wheel(seed);
-                std::shared_ptr<mvn_test> local_test = test->clone();
+                std::shared_ptr<mvn_test_base> local_test = test->clone();
                 while (local_test->subsample_size() < curr_size) {
                     local_test->add_one();
                 }
@@ -72,7 +76,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
         for (size_t i = 0; i < thread_solutions.size(); i++) {
             auto& future = thread_solutions[i];
-            std::shared_ptr<mvn_test> thread = future.get();
+            std::shared_ptr<mvn_test_base> thread = future.get();
             if (i == 0) {
                 test = thread;
             } else if (*thread < *test) {
