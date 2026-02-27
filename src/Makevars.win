@@ -1,3 +1,4 @@
 PKG_LIBS = -lz
+PKG_CXXFLAGS = -Wno-ignored-attributes
 
 CXX_STD = CXX11

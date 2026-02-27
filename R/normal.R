@@ -10,5 +10,5 @@
 #' @param size the number of points to be subsetted.
 #' @export
 normal_subsample <- function(matrix, size) {
-  subsample_mvn(matrix, size, colMeans(matrix), stats::cov(t(matrix)))
+  subsample_mvn(matrix, size, rowMeans(matrix), stats::cov(t(matrix)))
 }
