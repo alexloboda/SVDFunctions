@@ -8,6 +8,7 @@
 // [[Rcpp::depends(RcppEigen)]]
 
 #include <random>
+#include <unordered_map>
 
 namespace mvn {
 
@@ -58,38 +59,35 @@ public:
     size_t cluster_size(size_t i) const;
 };
 
-class mahalanobis_distances {
-    std::vector<std::vector<double>> inter;
-    std::vector<double> dist;
-
-public:
-    mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
-    double distance(unsigned i) const;
-    double interpoint_distance(unsigned i, unsigned j) const;
-};
-
-class mvn_stats {
-    std::vector<double> mahalanobis_centered;
-    std::vector<std::vector<double>> mahalanobis_pairwise;
-public:
-    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
-    mvn_stats() = default;
-
-    double pairwise_stat(size_t i, size_t j) const;
-    double sum_pairwise(size_t point, const std::vector<size_t>& ss) const;
-    double centered_stat(size_t i) const;
-private:
-};
-
 class mvn_test {
 protected:
-    std::shared_ptr<mahalanobis_distances> distances;
-    std::vector<std::shared_ptr<mvn_stats>> stats;
     RandomSampler sampler;
 
     std::vector<double> pairwise_stat;
     std::vector<double> center_stat;
     std::vector<double> betas;
+
+    // Random Fourier Features approximation of the Gaussian kernel with Mahalanobis metric.
+    // To scale to very large numbers of clusters, features are computed lazily per-cluster
+    // and cached only for clusters that are actually visited by the optimizer.
+    struct RFFParams {
+        std::shared_ptr<const Matrix> X;
+        Matrix A;               // whitening: y = A * x
+        Vector mean_whitened;   // A * mean
+        Matrix W;               // rff_dim x p
+        Vector b;               // rff_dim
+        double scale;           // sqrt(2/rff_dim)
+    };
+
+    size_t rff_dim;
+    std::shared_ptr<const RFFParams> rff;
+
+    // Running sum of features for current subset.
+    std::vector<Eigen::VectorXd> subset_rff_sum; // [beta] : rff_dim
+
+    // Lazy per-cluster caches.
+    std::vector<std::unordered_map<size_t, Eigen::VectorXf>> cluster_rff_cache; // [beta]
+    std::vector<std::unordered_map<size_t, float>> cluster_center_cache;        // [beta]
 
     std::shared_ptr<Clustering> clustering;
 
@@ -119,12 +117,13 @@ public:
     double get_normality_statistic();
 
     friend bool operator<(mvn_test& lhs, mvn_test& rhs);
-    std::vector<double> loglikelihood(const std::vector<int>& ids) const;
     std::unique_ptr<mvn_test> clone();
 
 protected:
     void remove(unsigned i);
     void add(unsigned i);
+
+    void ensure_cluster_cached(size_t cluster_id);
 
     mvn_test() = default;
 };

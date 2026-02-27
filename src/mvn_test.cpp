@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <unordered_set>
+#include <limits>
 #include "include/third-party/cxxpool.h"
 
 #include "include/mvn_test.h"
@@ -10,9 +11,74 @@
 
 namespace mvn {
 
+namespace {
+
+using Matrix = Eigen::MatrixXd;
+using Vector = Eigen::VectorXd;
+
+Matrix invert_matrix_or_throw(const Matrix& m) {
+    Eigen::FullPivHouseholderQR<Matrix> qr(m);
+    if (!qr.isInvertible()) {
+        throw std::logic_error("Non-invertible matrix");
+    }
+    return qr.inverse();
+}
+
+// Returns A such that A.transpose() * A == spd (up to numerical tolerance).
+Matrix sqrt_factor_of_spd(const Matrix& spd) {
+    Eigen::LLT<Matrix> llt(spd);
+    if (llt.info() == Eigen::Success) {
+        // U^T U = spd
+        return llt.matrixU();
+    }
+
+    // Fallback: eigen-decomposition (robust when LLT fails due to numerical issues)
+    Matrix sym = 0.5 * (spd + spd.transpose());
+    Eigen::SelfAdjointEigenSolver<Matrix> es(sym);
+    if (es.info() != Eigen::Success) {
+        throw std::logic_error("Unable to factorize covariance inverse");
+    }
+    Vector eval = es.eigenvalues();
+    Matrix evec = es.eigenvectors();
+
+    // Clamp tiny negatives from numerical noise
+    for (int i = 0; i < eval.size(); i++) {
+        if (eval(i) < 0 && eval(i) > -1e-12) {
+            eval(i) = 0;
+        }
+        if (eval(i) < 0) {
+            throw std::logic_error("Covariance inverse is not positive semidefinite");
+        }
+    }
+    Vector sqrt_eval = eval.array().sqrt();
+    return sqrt_eval.asDiagonal() * evec.transpose();
+}
+
+size_t choose_rff_dim(size_t p, size_t n_clusters) {
+    // Heuristic: enough features to approximate kernel while keeping memory bounded.
+    // The output influences memory as O(rff_dim * n_clusters).
+    size_t dim = std::max<size_t>(128, 16 * p);
+    dim = std::min<size_t>(512, dim);
+    // When clusters are extremely many, keep dim smaller to reduce RAM.
+    if (n_clusters > 200000) {
+        dim = std::min<size_t>(dim, 256);
+    }
+    if (n_clusters > 1000000) {
+        dim = std::min<size_t>(dim, 128);
+    }
+    return dim;
+}
+
+}
+
+static void validate_cluster_id(size_t cluster_id, size_t n_clusters) {
+    if (cluster_id >= n_clusters) {
+        throw std::out_of_range("Cluster id is out of range");
+    }
+}
+
 mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
-        :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
-         clustering(std::make_shared<Clustering>(clst)),
+        :clustering(std::make_shared<Clustering>(clst)),
          wheel(std::random_device()()) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
@@ -20,11 +86,23 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
 
     betas = {0.8};
 
-    pairwise_stat.resize(betas.size(), 0.0);
-    center_stat.resize(betas.size(), 0.0);
-
     n = clst.size();
     p = X->rows();
+    if (n == 0) {
+        throw std::invalid_argument("Clustering is empty");
+    }
+    if (p == 0) {
+        throw std::invalid_argument("Matrix has zero rows");
+    }
+    if (mean.size() != static_cast<Eigen::Index>(p)) {
+        throw std::invalid_argument("Mean vector dimension mismatch");
+    }
+    if (S.rows() != static_cast<Eigen::Index>(p) || S.cols() != static_cast<Eigen::Index>(p)) {
+        throw std::invalid_argument("Covariance dimension mismatch");
+    }
+
+    pairwise_stat.resize(betas.size(), 0.0);
+    center_stat.resize(betas.size(), 0.0);
     effect_size = 0;
     latest_subset_point = -1;
 
@@ -32,28 +110,91 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         throw std::logic_error("Too few points.");
     }
 
-    cxxpool::thread_pool pool(std::thread::hardware_concurrency());
-    std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
-    for (double beta: betas) {
-        futures.push_back(pool.push([this, clst, beta]() -> std::shared_ptr<mvn_stats> {
-            return std::make_shared<mvn_stats>(*distances, clst, beta);
-        }));
+    rff_dim = choose_rff_dim(p, n);
+
+    // Precompute whitening and shared RFF parameters. Per-cluster values are computed lazily.
+    auto params = std::make_shared<RFFParams>();
+    params->X = std::move(X);
+    params->A = sqrt_factor_of_spd(invert_matrix_or_throw(S));
+    params->mean_whitened = params->A * mean;
+    params->scale = std::sqrt(2.0 / static_cast<double>(rff_dim));
+
+    // Shared RFF base frequencies and phases; beta is applied as a scalar multiplier.
+    std::normal_distribution<double> normal(0.0, 1.0);
+    std::uniform_real_distribution<double> unif(0.0, 2.0 * M_PI);
+    params->W.resize((Eigen::Index)rff_dim, (Eigen::Index)p);
+    params->b.resize((Eigen::Index)rff_dim);
+    for (Eigen::Index i = 0; i < params->W.rows(); i++) {
+        for (Eigen::Index j = 0; j < params->W.cols(); j++) {
+            params->W(i, j) = normal(wheel);
+        }
+        params->b(i) = unif(wheel);
     }
-    for (int i = 0; i < betas.size(); i++) {
-        stats.push_back(futures[i].get());
+    rff = std::move(params);
+
+    subset_rff_sum.clear();
+    subset_rff_sum.reserve(betas.size());
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        subset_rff_sum.emplace_back(Eigen::VectorXd::Zero((Eigen::Index)rff_dim));
     }
 
-    std::vector<double> lls;
-    for (size_t i = 0; i < n; i++) {
-        auto ids = clst.elements(i);
-        auto loglikelihoods = loglikelihood(ids);
-        lls.push_back(0.0);
-    }
+    cluster_rff_cache.clear();
+    cluster_center_cache.clear();
+    cluster_rff_cache.resize(betas.size());
+    cluster_center_cache.resize(betas.size());
 
+    // Uniform sampler over clusters (log-weights all zero).
+    std::vector<double> lls(n, 0.0);
     sampler = RandomSampler(lls, wheel());
 
     while (effect_size < p + 1) {
         add_one();
+    }
+}
+
+void mvn_test::ensure_cluster_cached(size_t cluster_id) {
+    validate_cluster_id(cluster_id, n);
+    if (betas.empty()) {
+        throw std::logic_error("No betas configured");
+    }
+    // If already cached for the first beta, assume cached for all.
+    if (cluster_rff_cache[0].find(cluster_id) != cluster_rff_cache[0].end()) {
+        return;
+    }
+
+    std::vector<Eigen::VectorXf> phi_sums;
+    std::vector<float> center_sums;
+    phi_sums.reserve(betas.size());
+    center_sums.reserve(betas.size());
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        phi_sums.emplace_back(Eigen::VectorXf::Zero((Eigen::Index)rff_dim));
+        center_sums.emplace_back(0.0f);
+    }
+
+    for (int el : clustering->elements(cluster_id)) {
+        if (el < 0 || el >= rff->X->cols()) {
+            throw std::out_of_range("Cluster element index is out of range");
+        }
+        Vector y = rff->A * rff->X->col(el);
+        Vector proj = rff->W * y; // rff_dim
+        Vector y_centered = y - rff->mean_whitened;
+        const double d2_to_mean = y_centered.squaredNorm();
+
+        for (size_t bi = 0; bi < betas.size(); bi++) {
+            const double beta = betas[bi];
+            const double k_center = -(beta * beta / (2.0 * (1.0 + beta * beta)));
+            center_sums[bi] += (float)std::exp(k_center * d2_to_mean);
+
+            auto& phi = phi_sums[bi];
+            for (Eigen::Index d = 0; d < (Eigen::Index)rff_dim; d++) {
+                phi(d) += (float)(rff->scale * std::cos(beta * proj(d) + rff->b(d)));
+            }
+        }
+    }
+
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        cluster_rff_cache[bi].emplace(cluster_id, std::move(phi_sums[bi]));
+        cluster_center_cache[bi].emplace(cluster_id, center_sums[bi]);
     }
 }
 
@@ -74,48 +215,6 @@ double mvn_test::get_normality_statistic() {
 
 const std::vector<size_t>& mvn_test::current_subset() const {
     return subset;
-}
-
-mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta)
-    :mahalanobis_centered(clst.size()),
-     mahalanobis_pairwise() {
-    mahalanobis_pairwise.resize(clst.size());
-    size_t n = clst.size();
-
-    double k_center = -(beta * beta / (2 * (1 + beta * beta)));
-    double k_pw = -(beta * beta) / 2.0;
-
-    for (size_t cl = 0; cl < n; cl++) {
-        mahalanobis_pairwise[cl].resize(clst.size());
-        for (int el: clst.elements(cl)) {
-            mahalanobis_centered[cl] += std::exp(k_center * distances.distance(el));
-            for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
-                for (int pair_el: clst.elements(pair_cl)) {
-                    if (cl == pair_cl) {
-                        mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                    } else {
-                        mahalanobis_pairwise[cl][pair_cl] += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                    }
-                }
-            }
-        }
-    }
-}
-
-double mvn_stats::pairwise_stat(size_t i, size_t j) const {
-    return mahalanobis_pairwise[i][j];
-}
-
-double mvn_stats::centered_stat(size_t i) const {
-    return mahalanobis_centered[i];
-}
-
-double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) const {
-    double ret = 0.0;
-    for (auto s: ss) {
-        ret += mahalanobis_pairwise[point][s];
-    }
-    return ret;
 }
 
 size_t mvn_test::dimensions() const {
@@ -183,12 +282,15 @@ bool operator<(mvn_test& lhs, mvn_test& rhs) {
 }
 
 mvn_test::mvn_test(const mvn_test& other)
-    :distances(other.distances),
-     stats(other.stats),
-     sampler(other.sampler),
+    :sampler(other.sampler),
      pairwise_stat(other.pairwise_stat),
      center_stat(other.center_stat),
      betas(other.betas),
+     rff_dim(other.rff_dim),
+    rff(other.rff),
+     subset_rff_sum(other.subset_rff_sum),
+    cluster_rff_cache(other.cluster_rff_cache),
+    cluster_center_cache(other.cluster_center_cache),
      clustering(other.clustering),
      p(other.p),
      n(other.n),
@@ -224,77 +326,26 @@ size_t Clustering::cluster_size(size_t i) const {
     return clusters.at(i).size();
 }
 
-mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& S, const Vector& mean)
-        :dist(X->cols()) {
-    inter.resize(X->cols());
-    Eigen::FullPivHouseholderQR<Matrix> qr(S);
-    if (!qr.isInvertible()) {
-        throw std::logic_error("Non-invertible matrix. Must not happen.");
-    }
-
-    Matrix S_inv = qr.inverse();
-
-    Vector ximu = X->transpose() * S_inv * mean;
-    Vector muxi = mean.transpose() * S_inv * *X;
-    Matrix distances = X->transpose() * S_inv * *X;
-    double mumu = mean.transpose() * S_inv * mean;
-    std::vector<double> diag(distances.rows());
-
-    for (auto i = 0; i < X->cols(); i++) {
-        diag[i] = distances(i, i);
-    }
-    for (auto i = 0; i < X->cols(); i++) {
-        inter[i].resize(X->cols());
-        dist[i] = diag[i] - ximu(i) - muxi(i) + mumu;
-        for (auto j = 0; j < X->cols(); j++) {
-            inter[i][j] = diag[i] - 2 *  distances(i, j) + diag[j];
-        }
-    }
-}
-
-double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
-    return inter[i][j];
-}
-
-double mahalanobis_distances::distance(unsigned el) const {
-    return dist[el];
-}
-
 void mvn_test::remove(unsigned point) {
-    for (size_t i = 0; i < stats.size(); i++) {
-        pairwise_stat[i] -= 2 * stats[i]->sum_pairwise(point, subset);
-    }
-
-    for (size_t i = 0; i < stats.size(); i++) {
-        center_stat[i] -= stats[i]->centered_stat(point);
+    ensure_cluster_cached(point);
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        subset_rff_sum[bi] -= cluster_rff_cache[bi].at(point).cast<double>();
+        pairwise_stat[bi] = subset_rff_sum[bi].squaredNorm();
+        center_stat[bi] -= (double)cluster_center_cache[bi].at(point);
     }
 }
 
 void mvn_test::add(unsigned int point) {
-    for (size_t i = 0; i < stats.size(); i++) {
-        pairwise_stat[i] += 2 * stats[i]->sum_pairwise(point, subset);
-    }
-    for (size_t i = 0; i < stats.size(); i++) {
-        center_stat[i] += stats[i]->centered_stat(point);
+    ensure_cluster_cached(point);
+    for (size_t bi = 0; bi < betas.size(); bi++) {
+        subset_rff_sum[bi] += cluster_rff_cache[bi].at(point).cast<double>();
+        pairwise_stat[bi] = subset_rff_sum[bi].squaredNorm();
+        center_stat[bi] += (double)cluster_center_cache[bi].at(point);
     }
 }
 
 std::unique_ptr<mvn_test> mvn_test::clone() {
     return std::make_unique<mvn_test>(*this);
-}
-
-std::vector<double> mvn_test::loglikelihood(const std::vector<int>& ids) const {
-    std::vector<double> ret;
-    for (int id: ids) {
-        double dist = std::sqrt(distances->distance(id));
-        if (dist > 1) {
-            dist = 1.0 / (dist * dist);
-        } else {
-            dist = 1;
-        }
-        ret.push_back(std::log(dist));
-    }
-    return ret;
 }
 
 RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :runif(0.0, 1.0), wheel(seed), original(logscale),
