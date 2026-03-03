@@ -1,18 +1,75 @@
 #include <iostream>
 #include <cmath>
 #include <unordered_set>
+#include <numeric>
+#include <algorithm>
 #include "include/third-party/cxxpool.h"
 
 #include "include/mvn_test.h"
+
+#if defined(__SSE__)
+#include <xmmintrin.h>
+#endif
 
 #undef NDEBUG
 #include <assert.h>
 
 namespace mvn {
 
-mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean)
+namespace {
+
+constexpr size_t NYSTROM_DEFAULT_MAX_FEATURES = 1024;
+constexpr double NYSTROM_REL_EIGEN_FLOOR = 1e-6;
+constexpr double NYSTROM_MAX_COND = 1e8;
+constexpr double NYSTROM_RIDGE_SCALE = 1e-8;
+constexpr double NYSTROM_RIDGE_MIN = 1e-10;
+
+double dot_float_scalar(const float* lhs, const float* rhs, size_t n) {
+    double acc = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        acc += static_cast<double>(lhs[i]) * static_cast<double>(rhs[i]);
+    }
+    return acc;
+}
+
+double dot_float_sse(const float* lhs, const float* rhs, size_t n) {
+#if defined(__SSE__)
+    size_t i = 0;
+    __m128 acc = _mm_setzero_ps();
+    for (; i + 4 <= n; i += 4) {
+        __m128 a = _mm_loadu_ps(lhs + i);
+        __m128 b = _mm_loadu_ps(rhs + i);
+        acc = _mm_add_ps(acc, _mm_mul_ps(a, b));
+    }
+    alignas(16) float tmp[4];
+    _mm_store_ps(tmp, acc);
+    double sum = static_cast<double>(tmp[0]) + static_cast<double>(tmp[1]) +
+                 static_cast<double>(tmp[2]) + static_cast<double>(tmp[3]);
+    for (; i < n; ++i) {
+        sum += static_cast<double>(lhs[i]) * static_cast<double>(rhs[i]);
+    }
+    return sum;
+#else
+    return dot_float_scalar(lhs, rhs, n);
+#endif
+}
+
+std::vector<size_t> choose_landmarks(size_t n_samples, size_t m, std::mt19937& wheel) {
+    std::vector<size_t> all(n_samples);
+    std::iota(all.begin(), all.end(), 0);
+    std::shuffle(all.begin(), all.end(), wheel);
+    all.resize(m);
+    return all;
+}
+
+} // namespace
+
+mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
+           bool use_nystrom, size_t n_features)
         :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
          clustering(std::make_shared<Clustering>(clst)),
+     use_nystrom(use_nystrom),
+     n_features(n_features),
          wheel(std::random_device()()) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
@@ -36,7 +93,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
     for (double beta: betas) {
         futures.push_back(pool.push([this, clst, beta]() -> std::shared_ptr<mvn_stats> {
-            return std::make_shared<mvn_stats>(*distances, clst, beta);
+            return std::make_shared<mvn_stats>(*distances, clst, beta, this->use_nystrom, this->n_features);
         }));
     }
     for (int i = 0; i < betas.size(); i++) {
@@ -76,33 +133,136 @@ const std::vector<size_t>& mvn_test::current_subset() const {
     return subset;
 }
 
-mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta)
+mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
+                     bool use_nystrom, size_t n_features)
     :mahalanobis_centered(clst.size()),
      mahalanobis_pairwise() {
-    mahalanobis_pairwise.resize(clst.size());
-    size_t n = clst.size();
+    const size_t n_clusters = clst.size();
+    mahalanobis_pairwise.resize(n_clusters);
 
     double k_center = -(beta * beta / (2 * (1 + beta * beta)));
     double k_pw = -(beta * beta) / 2.0;
 
-    for (size_t cl = 0; cl < n; cl++) {
-        mahalanobis_pairwise[cl].resize(clst.size());
+    for (size_t cl = 0; cl < n_clusters; cl++) {
         for (int el: clst.elements(cl)) {
             mahalanobis_centered[cl] += std::exp(k_center * distances.distance(el));
-            for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
-                for (int pair_el: clst.elements(pair_cl)) {
-                    if (cl == pair_cl) {
-                        mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                    } else {
-                        mahalanobis_pairwise[cl][pair_cl] += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                    }
+        }
+    }
+
+    size_t n_samples = 0;
+    for (size_t cl = 0; cl < n_clusters; ++cl) {
+        n_samples += clst.elements(cl).size();
+    }
+
+    const size_t requested_features = (n_features == 0) ? NYSTROM_DEFAULT_MAX_FEATURES : n_features;
+    const size_t feature_count = std::min(n_samples, requested_features);
+    feature_mode = use_nystrom && (feature_count > 0);
+    feature_dim = feature_count;
+
+    if (feature_mode) {
+        std::vector<int> sample_cluster_map(n_samples, -1);
+        for (size_t cl = 0; cl < n_clusters; ++cl) {
+            for (int el : clst.elements(cl)) {
+                sample_cluster_map[el] = static_cast<int>(cl);
+            }
+        }
+
+        std::mt19937 local_wheel(42u);
+        std::vector<size_t> landmarks = choose_landmarks(n_samples, feature_count, local_wheel);
+
+        Eigen::MatrixXd W(feature_count, feature_count);
+        for (size_t i = 0; i < feature_count; ++i) {
+            for (size_t j = i; j < feature_count; ++j) {
+                double val = std::exp(k_pw * distances.interpoint_distance(landmarks[i], landmarks[j]));
+                W(i, j) = val;
+                W(j, i) = val;
+            }
+        }
+
+        W = 0.5 * (W + W.transpose());
+        const double mean_diag = std::max(std::abs(W.diagonal().mean()), 1.0);
+        const double ridge = std::max(NYSTROM_RIDGE_MIN, NYSTROM_RIDGE_SCALE * mean_diag);
+        W.diagonal().array() += ridge;
+
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(W);
+        if (eig.info() != Eigen::Success) {
+            feature_mode = false;
+        } else {
+            Eigen::VectorXd evals = eig.eigenvalues();
+            Eigen::MatrixXd evecs = eig.eigenvectors();
+
+            const double max_eval = std::max(evals.maxCoeff(), ridge);
+            const double floor_rel = NYSTROM_REL_EIGEN_FLOOR * max_eval;
+            const double floor_cond = max_eval / NYSTROM_MAX_COND;
+            const double eigen_floor = std::max({ridge, floor_rel, floor_cond});
+            for (int i = 0; i < evals.size(); ++i) {
+                evals(i) = std::max(evals(i), eigen_floor);
+            }
+
+            Eigen::VectorXd inv_sqrt = evals.array().sqrt().inverse();
+            Eigen::MatrixXd transform = evecs * inv_sqrt.asDiagonal();
+
+            cluster_features.assign(n_clusters, std::vector<float>(feature_count, 0.0f));
+            Eigen::RowVectorXd c_row(feature_count);
+            for (size_t sample = 0; sample < n_samples; ++sample) {
+                for (size_t l = 0; l < feature_count; ++l) {
+                    c_row(static_cast<Eigen::Index>(l)) = std::exp(k_pw * distances.interpoint_distance(sample, landmarks[l]));
+                }
+                Eigen::RowVectorXd feature = c_row * transform;
+                int cl = sample_cluster_map[sample];
+                if (cl < 0) {
+                    continue;
+                }
+                auto& dst = cluster_features[static_cast<size_t>(cl)];
+                for (size_t d = 0; d < feature_count; ++d) {
+                    dst[d] += static_cast<float>(feature(static_cast<Eigen::Index>(d)));
                 }
             }
         }
     }
+
+    if (!feature_mode) {
+        cluster_features.clear();
+        feature_dim = 0;
+        for (size_t cl = 0; cl < n_clusters; cl++) {
+            mahalanobis_pairwise[cl].resize(clst.size());
+            for (int el: clst.elements(cl)) {
+                for (size_t pair_cl = 0; pair_cl < n_clusters; pair_cl++) {
+                    for (int pair_el: clst.elements(pair_cl)) {
+                        if (cl == pair_cl) {
+                            mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
+                        } else {
+                            mahalanobis_pairwise[cl][pair_cl] += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
+                        }
+                    }
+                }
+            }
+        }
+        return;
+    }
+
+    for (size_t cl = 0; cl < n_clusters; ++cl) {
+        mahalanobis_pairwise[cl].resize(n_clusters);
+        for (size_t pair_cl = 0; pair_cl < n_clusters; ++pair_cl) {
+            mahalanobis_pairwise[cl][pair_cl] = feature_pairwise_stat(cl, pair_cl);
+        }
+    }
+}
+
+double mvn_stats::feature_pairwise_stat(size_t i, size_t j) const {
+    const auto& lhs = cluster_features[i];
+    const auto& rhs = cluster_features[j];
+    double dot = dot_float_sse(lhs.data(), rhs.data(), feature_dim);
+    if (i == j) {
+        return 0.5 * dot;
+    }
+    return dot;
 }
 
 double mvn_stats::pairwise_stat(size_t i, size_t j) const {
+    if (feature_mode) {
+        return feature_pairwise_stat(i, j);
+    }
     return mahalanobis_pairwise[i][j];
 }
 
@@ -111,6 +271,13 @@ double mvn_stats::centered_stat(size_t i) const {
 }
 
 double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) const {
+    if (feature_mode) {
+        double ret = 0.0;
+        for (auto s: ss) {
+            ret += feature_pairwise_stat(point, s);
+        }
+        return ret;
+    }
     double ret = 0.0;
     for (auto s: ss) {
         ret += mahalanobis_pairwise[point][s];
@@ -194,6 +361,8 @@ mvn_test::mvn_test(const mvn_test& other)
      n(other.n),
      effect_size(other.effect_size),
      latest_subset_point(other.latest_subset_point),
+    use_nystrom(other.use_nystrom),
+    n_features(other.n_features),
      wheel{other.wheel()},
      subset(other.subset) {}
 

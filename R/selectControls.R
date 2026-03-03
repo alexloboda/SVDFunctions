@@ -54,6 +54,10 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param step perform matching with the step.
 #' @param iterations number of simulated annealing iterations per each subset
 #' @param minCallRate numeric minimal call rate for SNP to be considered.   
+#' @param method string approximation method for SA statistic, either
+#'   \code{"exact"} or \code{"nystrom"}.
+#' @param n_features integer number of Nyström features (landmarks) used when
+#'   \code{method = "nystrom"}.
 #' size.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
@@ -61,9 +65,14 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
                             min = 500, max = 1000, step = 50, iterations = 100000, 
-                            minCallRate = 0.98) {
+                            minCallRate = 0.98,
+                            method = c("exact", "nystrom"),
+                            n_features = 1024L) {
   iterations <- as.integer(iterations)
+  method <- match.arg(method)
+  n_features <- as.integer(n_features)
   stopifnot(iterations > 0)
+  stopifnot(n_features > 0)
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -103,7 +112,8 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 stats::qchisq(stats::ppoints(1e+07), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step, iterations, minCallRate)
+                                max, step, iterations, minCallRate,
+                                method, n_features)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }

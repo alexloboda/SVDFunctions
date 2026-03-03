@@ -95,7 +95,7 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
     std::vector<int> clusters(matrix.ncol());
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
-    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), *r_to_cpp(cov));
+    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), *r_to_cpp(cov), false, 1024);
     annealing.run(1'000'000, 4, 1.0, 0.99995, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
     List ret;
@@ -115,7 +115,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      double min_lambda, double lb_lambda,
                      double max_lambda, double ub_lambda,
                      int min, int max, int step,
-                     int sa_iterations, double min_call_rate) {
+                     int sa_iterations, double min_call_rate,
+                     std::string method, int n_features) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -131,6 +132,15 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int step_clusters = step;
     int iterations = sa_iterations;
     double mcr = min_call_rate;
+    int features = n_features;
+    bool use_nystrom = false;
+    if (method == "exact") {
+        use_nystrom = false;
+    } else if (method == "nystrom") {
+        use_nystrom = true;
+    } else {
+        stop("Unsupported method. Use 'exact' or 'nystrom'.");
+    }
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
@@ -138,7 +148,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters, iterations);
+                        min_controls, max_controls, step_clusters, iterations, use_nystrom, features);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);

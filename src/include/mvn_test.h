@@ -71,8 +71,14 @@ public:
 class mvn_stats {
     std::vector<double> mahalanobis_centered;
     std::vector<std::vector<double>> mahalanobis_pairwise;
+    std::vector<std::vector<float>> cluster_features;
+    bool feature_mode = false;
+    size_t feature_dim = 0;
+
+    double feature_pairwise_stat(size_t i, size_t j) const;
 public:
-    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
+    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
+              bool use_nystrom, size_t n_features);
     mvn_stats() = default;
 
     double pairwise_stat(size_t i, size_t j) const;
@@ -102,9 +108,12 @@ protected:
     mutable std::mt19937 wheel;
 
     std::vector<size_t> subset;
+    bool use_nystrom = false;
+    size_t n_features = 1024;
 
 public:
-    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
+             bool use_nystrom = false, size_t n_features = 1024);
     mvn_test(const mvn_test&);
 
     size_t dimensions() const;
