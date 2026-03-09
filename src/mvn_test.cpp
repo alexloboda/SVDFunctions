@@ -11,7 +11,6 @@
 #include <xmmintrin.h>
 #endif
 
-#undef NDEBUG
 #include <assert.h>
 
 namespace mvn {
