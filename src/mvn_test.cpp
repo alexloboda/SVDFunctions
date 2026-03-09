@@ -132,9 +132,9 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     cxxpool::thread_pool pool(std::thread::hardware_concurrency());
     std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
     for (double beta: betas) {
-        futures.push_back(pool.push([this, clst, beta, seed]() -> std::shared_ptr<mvn_stats> {
+        futures.push_back(pool.push([this, clustering = this->clustering, beta, seed]() -> std::shared_ptr<mvn_stats> {
             const uint32_t local_seed = seed ^ (uint32_t)(beta * 1e6);
-            return std::make_shared<mvn_stats>(*distances, clst, beta, this->use_nystrom, this->n_features,
+            return std::make_shared<mvn_stats>(*distances, *clustering, beta, this->use_nystrom, this->n_features,
                                                false, 0, local_seed);
         }));
     }
@@ -157,7 +157,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         // RFF prefixes taken from one precomputed embedding bank.
         const double beta = betas.at(0);
         const uint32_t rff_seed = seed + 1337u;
-        rff_stats = std::make_shared<mvn_stats>(*distances, clst, beta,
+        rff_stats = std::make_shared<mvn_stats>(*distances, *this->clustering, beta,
                                                 false, 0,
                                                 true, rff_features, rff_seed);
         rff_feature_levels = choose_rff_levels(rff_stats->features_dim());
