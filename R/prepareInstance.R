@@ -242,9 +242,16 @@ writeYaml <- function(clusterResults, clustering, variants,
 
 drop <- function(pca, knn_rate, mvn_rate) {
   n <- ncol(pca)
+  min_keep <- nrow(pca) + 1
+  max_drop <- n - min_keep
+
+  if (max_drop < 0) {
+    return(seq_len(n))
+  }
+
   knn_n <- ceiling(n * knn_rate)
   mvn_n <- ceiling(n * mvn_rate)
-  if (knn_n + mvn_n > n - nrow(pca)) {
+  if (knn_n + mvn_n > max_drop) {
     stop("Drop rates are too high.")
   }
 

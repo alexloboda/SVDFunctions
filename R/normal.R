@@ -10,5 +10,18 @@
 #' @param size the number of points to be subsetted.
 #' @export
 normal_subsample <- function(matrix, size) {
-  subsample_mvn(matrix, size, colMeans(matrix), stats::cov(t(matrix)))
+  stopifnot(is.matrix(matrix))
+  size <- as.integer(size)
+
+  if (nrow(matrix) == 0 || ncol(matrix) == 0) {
+    stop("Matrix must be non-empty.")
+  }
+  if (length(size) != 1 || is.na(size)) {
+    stop("size must be a single integer value.")
+  }
+  if (size < nrow(matrix) + 1 || size > ncol(matrix)) {
+    stop("Requested subsample size must be between nrow(matrix) + 1 and ncol(matrix).")
+  }
+
+  subsample_mvn(matrix, size, rowMeans(matrix), stats::cov(t(matrix)))
 }

@@ -92,6 +92,22 @@ std::vector<std::vector<int>> r_to_cpp_vector(IntegerMatrix& matrix) {
 
 // [[Rcpp::export]]
 List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mean, NumericMatrix& cov) {
+    if (matrix.nrow() == 0 || matrix.ncol() == 0) {
+        stop("Matrix must be non-empty.");
+    }
+    if (size.size() != 1) {
+        stop("size must contain exactly one value.");
+    }
+    if (mean.size() != matrix.nrow()) {
+        stop("mean must have length equal to nrow(matrix).");
+    }
+    if (cov.nrow() != matrix.nrow() || cov.ncol() != matrix.nrow()) {
+        stop("cov must be a square matrix with nrow(matrix) rows.");
+    }
+    if (size[0] < matrix.nrow() + 1 || size[0] > matrix.ncol()) {
+        stop("Requested subsample size must be between nrow(matrix) + 1 and ncol(matrix).");
+    }
+
     std::vector<int> clusters(matrix.ncol());
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
