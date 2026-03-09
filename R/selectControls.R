@@ -72,8 +72,10 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #'   retained per estimator in hybrid mode.
 #' @return A list with selected controls, lambda summaries, and \code{sa_diagnostics},
 #'   which reports per-target-subset SA counters such as total swaps,
-#'   CI-resolved swaps, exact fallback evaluations, calibration sample counts,
-#'   and mean CI widths.
+#'   CI-resolved swaps, how many of those were resolved by the primary Nyström
+#'   estimate versus each auxiliary RFF ladder level, exact fallback evaluations,
+#'   calibration sample counts, mean CI widths, and per-temperature-bin swap
+#'   statistics.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 

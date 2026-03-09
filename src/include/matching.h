@@ -118,6 +118,18 @@ public:
         return subsampling.ci_resolved_swaps(k);
     }
 
+    size_t sa_primary_resolved_swaps(size_t k) const {
+        return subsampling.primary_resolved_swaps(k);
+    }
+
+    size_t sa_aux_ladder_levels() const {
+        return subsampling.aux_ladder_levels();
+    }
+
+    size_t sa_aux_level_resolved_swaps(size_t k, size_t level) const {
+        return subsampling.aux_level_resolved_swaps(k, level);
+    }
+
     size_t sa_exact_unavailable_swaps(size_t k) const {
         return subsampling.exact_unavailable_swaps(k);
     }
@@ -156,6 +168,38 @@ public:
 
     double sa_mean_selected_ci_width(size_t k) const {
         return subsampling.mean_selected_ci_width(k);
+    }
+
+    size_t sa_temperature_bins() const {
+        return subsampling.temperature_bins();
+    }
+
+    size_t sa_temperature_bin_total_swaps(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_total_swaps(k, bin);
+    }
+
+    size_t sa_temperature_bin_accepted_swaps(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_accepted_swaps(k, bin);
+    }
+
+    size_t sa_temperature_bin_primary_resolved_swaps(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_primary_resolved_swaps(k, bin);
+    }
+
+    size_t sa_temperature_bin_aux_resolved_swaps(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_aux_resolved_swaps(k, bin);
+    }
+
+    size_t sa_temperature_bin_exact_evals(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_exact_evals(k, bin);
+    }
+
+    size_t sa_temperature_bin_exact_unavailable_swaps(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_exact_unavailable_swaps(k, bin);
+    }
+
+    size_t sa_temperature_bin_exact_failures(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_exact_failures(k, bin);
     }
 private:
     double get_lambda(std::vector<double>& pvals);

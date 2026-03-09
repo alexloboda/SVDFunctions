@@ -182,6 +182,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     IntegerVector sa_total_swaps((R_xlen_t)n_sa);
     IntegerVector sa_uncertain_swaps((R_xlen_t)n_sa);
     IntegerVector sa_ci_resolved_swaps((R_xlen_t)n_sa);
+    IntegerVector sa_primary_resolved_swaps((R_xlen_t)n_sa);
     IntegerVector sa_exact_unavailable_swaps((R_xlen_t)n_sa);
     IntegerVector sa_exact_evals((R_xlen_t)n_sa);
     IntegerVector sa_exact_evals_on_improving((R_xlen_t)n_sa);
@@ -193,12 +194,29 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     NumericVector sa_mean_aux_ci_width((R_xlen_t)n_sa);
     NumericVector sa_mean_selected_ci_width((R_xlen_t)n_sa);
     CharacterVector sa_names((R_xlen_t)n_sa);
+    const size_t n_aux_levels = matcher.sa_aux_ladder_levels();
+    List sa_aux_level_resolved((R_xlen_t)n_aux_levels);
+    CharacterVector sa_aux_level_names((R_xlen_t)n_aux_levels);
+    for (size_t level = 0; level < n_aux_levels; ++level) {
+        IntegerVector level_counts((R_xlen_t)n_sa);
+        for (size_t i = 0; i < n_sa; ++i) {
+            level_counts[(R_xlen_t)i] = (int)matcher.sa_aux_level_resolved_swaps(i, level);
+        }
+        sa_aux_level_resolved[(R_xlen_t)level] = level_counts;
+        sa_aux_level_names[(R_xlen_t)level] = "x" + std::to_string(1u << (2 * level));
+    }
+    sa_aux_level_resolved.attr("names") = sa_aux_level_names;
+
+    const size_t n_temp_bins = matcher.sa_temperature_bins();
+    List sa_temperature_bins((R_xlen_t)n_temp_bins);
+    CharacterVector sa_temperature_bin_names((R_xlen_t)n_temp_bins);
     for (size_t i = 0; i < n_sa; ++i) {
         const int size = (int)matcher.sa_solution_size(i);
         sa_sizes[(R_xlen_t)i] = size;
         sa_total_swaps[(R_xlen_t)i] = (int)matcher.sa_total_swaps(i);
         sa_uncertain_swaps[(R_xlen_t)i] = (int)matcher.sa_uncertain_swaps(i);
         sa_ci_resolved_swaps[(R_xlen_t)i] = (int)matcher.sa_ci_resolved_swaps(i);
+        sa_primary_resolved_swaps[(R_xlen_t)i] = (int)matcher.sa_primary_resolved_swaps(i);
         sa_exact_unavailable_swaps[(R_xlen_t)i] = (int)matcher.sa_exact_unavailable_swaps(i);
         sa_exact_evals[(R_xlen_t)i] = (int)matcher.sa_exact_evals(i);
         sa_exact_evals_on_improving[(R_xlen_t)i] = (int)matcher.sa_exact_evals_on_improving(i);
@@ -211,6 +229,55 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_mean_selected_ci_width[(R_xlen_t)i] = matcher.sa_mean_selected_ci_width(i);
         sa_names[(R_xlen_t)i] = std::to_string(size);
     }
+    for (size_t level = 0; level < n_aux_levels; ++level) {
+        IntegerVector level_counts = sa_aux_level_resolved[(R_xlen_t)level];
+        level_counts.attr("names") = sa_names;
+        sa_aux_level_resolved[(R_xlen_t)level] = level_counts;
+    }
+    for (size_t bin = 0; bin < n_temp_bins; ++bin) {
+        List bin_stats = List::create(
+            Named("total_swaps") = IntegerVector((R_xlen_t)n_sa),
+            Named("accepted_swaps") = IntegerVector((R_xlen_t)n_sa),
+            Named("primary_resolved_swaps") = IntegerVector((R_xlen_t)n_sa),
+            Named("aux_resolved_swaps") = IntegerVector((R_xlen_t)n_sa),
+            Named("exact_evals") = IntegerVector((R_xlen_t)n_sa),
+            Named("exact_unavailable_swaps") = IntegerVector((R_xlen_t)n_sa),
+            Named("exact_failures") = IntegerVector((R_xlen_t)n_sa)
+        );
+        IntegerVector total_swaps = bin_stats["total_swaps"];
+        IntegerVector accepted_swaps = bin_stats["accepted_swaps"];
+        IntegerVector primary_resolved_swaps = bin_stats["primary_resolved_swaps"];
+        IntegerVector aux_resolved_swaps = bin_stats["aux_resolved_swaps"];
+        IntegerVector exact_evals = bin_stats["exact_evals"];
+        IntegerVector exact_unavailable_swaps = bin_stats["exact_unavailable_swaps"];
+        IntegerVector exact_failures = bin_stats["exact_failures"];
+        for (size_t i = 0; i < n_sa; ++i) {
+            total_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_total_swaps(i, bin);
+            accepted_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_accepted_swaps(i, bin);
+            primary_resolved_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_primary_resolved_swaps(i, bin);
+            aux_resolved_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_aux_resolved_swaps(i, bin);
+            exact_evals[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_evals(i, bin);
+            exact_unavailable_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_unavailable_swaps(i, bin);
+            exact_failures[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_failures(i, bin);
+        }
+        total_swaps.attr("names") = sa_names;
+        accepted_swaps.attr("names") = sa_names;
+        primary_resolved_swaps.attr("names") = sa_names;
+        aux_resolved_swaps.attr("names") = sa_names;
+        exact_evals.attr("names") = sa_names;
+        exact_unavailable_swaps.attr("names") = sa_names;
+        exact_failures.attr("names") = sa_names;
+        bin_stats["total_swaps"] = total_swaps;
+        bin_stats["accepted_swaps"] = accepted_swaps;
+        bin_stats["primary_resolved_swaps"] = primary_resolved_swaps;
+        bin_stats["aux_resolved_swaps"] = aux_resolved_swaps;
+        bin_stats["exact_evals"] = exact_evals;
+        bin_stats["exact_unavailable_swaps"] = exact_unavailable_swaps;
+        bin_stats["exact_failures"] = exact_failures;
+        sa_temperature_bins[(R_xlen_t)bin] = bin_stats;
+        sa_temperature_bin_names[(R_xlen_t)bin] = "bin_" + std::to_string(bin + 1);
+    }
+    sa_temperature_bins.attr("names") = sa_temperature_bin_names;
 
     lambda.attr("names") = names;
     stats.attr("names") = names;
@@ -218,6 +285,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     sa_total_swaps.attr("names") = sa_names;
     sa_uncertain_swaps.attr("names") = sa_names;
     sa_ci_resolved_swaps.attr("names") = sa_names;
+    sa_primary_resolved_swaps.attr("names") = sa_names;
     sa_exact_unavailable_swaps.attr("names") = sa_names;
     sa_exact_evals.attr("names") = sa_names;
     sa_exact_evals_on_improving.attr("names") = sa_names;
@@ -239,6 +307,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         Named("total_swaps") = sa_total_swaps,
         Named("uncertain_swaps") = sa_uncertain_swaps,
         Named("ci_resolved_swaps") = sa_ci_resolved_swaps,
+        Named("primary_resolved_swaps") = sa_primary_resolved_swaps,
+        Named("aux_ladder_resolved_swaps") = sa_aux_level_resolved,
         Named("exact_unavailable_swaps") = sa_exact_unavailable_swaps,
         Named("exact_evals") = sa_exact_evals,
         Named("exact_evals_on_improving_swaps") = sa_exact_evals_on_improving,
@@ -248,7 +318,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         Named("aux_calibration_points") = sa_aux_calibration_points,
         Named("mean_primary_ci_width") = sa_mean_primary_ci_width,
         Named("mean_aux_ci_width") = sa_mean_aux_ci_width,
-        Named("mean_selected_ci_width") = sa_mean_selected_ci_width
+        Named("mean_selected_ci_width") = sa_mean_selected_ci_width,
+        Named("temperature_bins") = sa_temperature_bins
     );
     return ret;
 }

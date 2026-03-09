@@ -19,6 +19,8 @@ class subsample {
     std::vector<size_t> total_swaps_used;
     std::vector<size_t> uncertain_swaps_used;
     std::vector<size_t> ci_resolved_swaps_used;
+    std::vector<size_t> primary_resolved_swaps_used;
+    std::vector<std::vector<size_t>> aux_level_resolved_swaps_used;
     std::vector<size_t> exact_unavailable_swaps_used;
     std::vector<size_t> exact_evals_used;
     std::vector<size_t> exact_evals_on_improving_used;
@@ -29,6 +31,13 @@ class subsample {
     std::vector<double> mean_primary_ci_width_used;
     std::vector<double> mean_aux_ci_width_used;
     std::vector<double> mean_selected_ci_width_used;
+    std::vector<std::vector<size_t>> temperature_bin_total_swaps_used;
+    std::vector<std::vector<size_t>> temperature_bin_accepted_swaps_used;
+    std::vector<std::vector<size_t>> temperature_bin_primary_resolved_swaps_used;
+    std::vector<std::vector<size_t>> temperature_bin_aux_resolved_swaps_used;
+    std::vector<std::vector<size_t>> temperature_bin_exact_evals_used;
+    std::vector<std::vector<size_t>> temperature_bin_exact_unavailable_swaps_used;
+    std::vector<std::vector<size_t>> temperature_bin_exact_failures_used;
     Clustering clst;
 
     std::mt19937 wheel;
@@ -52,6 +61,9 @@ public:
     size_t total_swaps(size_t k) const;
     size_t uncertain_swaps(size_t k) const;
     size_t ci_resolved_swaps(size_t k) const;
+    size_t primary_resolved_swaps(size_t k) const;
+    size_t aux_ladder_levels() const;
+    size_t aux_level_resolved_swaps(size_t k, size_t level) const;
     size_t exact_unavailable_swaps(size_t k) const;
     size_t exact_evals(size_t k) const;
     size_t exact_evals_on_improving(size_t k) const;
@@ -62,6 +74,14 @@ public:
     double mean_primary_ci_width(size_t k) const;
     double mean_aux_ci_width(size_t k) const;
     double mean_selected_ci_width(size_t k) const;
+    size_t temperature_bins() const;
+    size_t temperature_bin_total_swaps(size_t k, size_t bin) const;
+    size_t temperature_bin_accepted_swaps(size_t k, size_t bin) const;
+    size_t temperature_bin_primary_resolved_swaps(size_t k, size_t bin) const;
+    size_t temperature_bin_aux_resolved_swaps(size_t k, size_t bin) const;
+    size_t temperature_bin_exact_evals(size_t k, size_t bin) const;
+    size_t temperature_bin_exact_unavailable_swaps(size_t k, size_t bin) const;
+    size_t temperature_bin_exact_failures(size_t k, size_t bin) const;
 };
 
 }

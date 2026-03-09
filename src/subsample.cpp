@@ -26,12 +26,16 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
 
 namespace {
 
+constexpr size_t TEMPERATURE_BIN_COUNT = 10;
+
 void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
                            const std::vector<double>& best_stat,
                            const std::vector<size_t>& best_size,
                            const std::vector<size_t>& total_swaps_used,
                            const std::vector<size_t>& uncertain_swaps_used,
                            const std::vector<size_t>& ci_resolved_swaps_used,
+                           const std::vector<size_t>& primary_resolved_swaps_used,
+                           const std::vector<std::vector<size_t>>& aux_level_resolved_swaps_used,
                            const std::vector<size_t>& exact_unavailable_swaps_used,
                            const std::vector<size_t>& exact_evals_used,
                            const std::vector<size_t>& exact_evals_on_improving_used,
@@ -41,7 +45,14 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
                            const std::vector<size_t>& aux_calibration_points_used,
                            const std::vector<double>& mean_primary_ci_width_used,
                            const std::vector<double>& mean_aux_ci_width_used,
-                           const std::vector<double>& mean_selected_ci_width_used)
+                           const std::vector<double>& mean_selected_ci_width_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_total_swaps_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_accepted_swaps_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_primary_resolved_swaps_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_aux_resolved_swaps_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_exact_evals_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_exact_unavailable_swaps_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_exact_failures_used)
 {
     const size_t n = best.size();
     auto require_size = [n](size_t size, const char* name) {
@@ -57,6 +68,8 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
     require_size(total_swaps_used.size(), "total_swaps_used");
     require_size(uncertain_swaps_used.size(), "uncertain_swaps_used");
     require_size(ci_resolved_swaps_used.size(), "ci_resolved_swaps_used");
+    require_size(primary_resolved_swaps_used.size(), "primary_resolved_swaps_used");
+    require_size(aux_level_resolved_swaps_used.size(), "aux_level_resolved_swaps_used");
     require_size(exact_unavailable_swaps_used.size(), "exact_unavailable_swaps_used");
     require_size(exact_evals_used.size(), "exact_evals_used");
     require_size(exact_evals_on_improving_used.size(), "exact_evals_on_improving_used");
@@ -67,6 +80,32 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
     require_size(mean_primary_ci_width_used.size(), "mean_primary_ci_width_used");
     require_size(mean_aux_ci_width_used.size(), "mean_aux_ci_width_used");
     require_size(mean_selected_ci_width_used.size(), "mean_selected_ci_width_used");
+    require_size(temperature_bin_total_swaps_used.size(), "temperature_bin_total_swaps_used");
+    require_size(temperature_bin_accepted_swaps_used.size(), "temperature_bin_accepted_swaps_used");
+    require_size(temperature_bin_primary_resolved_swaps_used.size(), "temperature_bin_primary_resolved_swaps_used");
+    require_size(temperature_bin_aux_resolved_swaps_used.size(), "temperature_bin_aux_resolved_swaps_used");
+    require_size(temperature_bin_exact_evals_used.size(), "temperature_bin_exact_evals_used");
+    require_size(temperature_bin_exact_unavailable_swaps_used.size(), "temperature_bin_exact_unavailable_swaps_used");
+    require_size(temperature_bin_exact_failures_used.size(), "temperature_bin_exact_failures_used");
+
+    for (size_t i = 0; i < n; ++i) {
+        for (const auto* bins : {&temperature_bin_total_swaps_used, &temperature_bin_accepted_swaps_used,
+                                 &temperature_bin_primary_resolved_swaps_used, &temperature_bin_aux_resolved_swaps_used,
+                                 &temperature_bin_exact_evals_used, &temperature_bin_exact_unavailable_swaps_used,
+                                 &temperature_bin_exact_failures_used}) {
+            if (bins->at(i).size() != TEMPERATURE_BIN_COUNT) {
+                throw std::logic_error("temperature-bin diagnostics have inconsistent width");
+            }
+        }
+    }
+}
+
+size_t temperature_bin_index(size_t iteration, size_t iterations)
+{
+    if (iterations == 0) {
+        return 0;
+    }
+    return std::min(TEMPERATURE_BIN_COUNT - 1, (iteration * TEMPERATURE_BIN_COUNT) / iterations);
 }
 
 struct run_result {
@@ -74,6 +113,8 @@ struct run_result {
     size_t total_swaps = 0;
     size_t uncertain_swaps = 0;
     size_t ci_resolved_swaps = 0;
+    size_t primary_resolved_swaps = 0;
+    std::vector<size_t> aux_level_resolved_swaps;
     size_t exact_unavailable_swaps = 0;
     size_t exact_evals = 0;
     size_t exact_evals_on_improving = 0;
@@ -85,6 +126,13 @@ struct run_result {
     double aux_ci_width_sum = 0.0;
     double selected_ci_width_sum = 0.0;
     size_t ci_width_observations = 0;
+    std::vector<size_t> temperature_bin_total_swaps;
+    std::vector<size_t> temperature_bin_accepted_swaps;
+    std::vector<size_t> temperature_bin_primary_resolved_swaps;
+    std::vector<size_t> temperature_bin_aux_resolved_swaps;
+    std::vector<size_t> temperature_bin_exact_evals;
+    std::vector<size_t> temperature_bin_exact_unavailable_swaps;
+    std::vector<size_t> temperature_bin_exact_failures;
 };
 
 template <class T>
@@ -159,6 +207,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     total_swaps_used.clear();
     uncertain_swaps_used.clear();
     ci_resolved_swaps_used.clear();
+    primary_resolved_swaps_used.clear();
+    aux_level_resolved_swaps_used.clear();
     exact_unavailable_swaps_used.clear();
     exact_evals_used.clear();
     exact_evals_on_improving_used.clear();
@@ -169,6 +219,13 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     mean_primary_ci_width_used.clear();
     mean_aux_ci_width_used.clear();
     mean_selected_ci_width_used.clear();
+    temperature_bin_total_swaps_used.clear();
+    temperature_bin_accepted_swaps_used.clear();
+    temperature_bin_primary_resolved_swaps_used.clear();
+    temperature_bin_aux_resolved_swaps_used.clear();
+    temperature_bin_exact_evals_used.clear();
+    temperature_bin_exact_unavailable_swaps_used.clear();
+    temperature_bin_exact_failures_used.clear();
 
     cxxpool::thread_pool pool(pool_size);
     size_t curr_size = start;
@@ -189,6 +246,14 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 std::shared_ptr<mvn_test> local_test = test->clone();
                 std::vector<double> primary_residuals;
                 std::vector<std::vector<double>> aux_residuals(local_test->aux_statistic_levels());
+                result.aux_level_resolved_swaps.assign(local_test->aux_statistic_levels(), 0);
+                result.temperature_bin_total_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_accepted_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_primary_resolved_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_aux_resolved_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_exact_evals.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_exact_unavailable_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_exact_failures.assign(TEMPERATURE_BIN_COUNT, 0);
                 result.total_swaps = iterations;
                 while (local_test->subsample_size() < curr_size) {
                     local_test->add_one();
@@ -203,6 +268,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 }
                 for (size_t k = 0; k < iterations; k++) {
                     t = c * t;
+                    const size_t temp_bin = temperature_bin_index(k, iterations);
+                    result.temperature_bin_total_swaps[temp_bin]++;
                     local_test->swap_once();
                     double new_score = local_test->get_normality_statistic();
                     std::vector<double> new_aux_scores(aux_scores.size(), new_score);
@@ -237,6 +304,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                         double fallback_width = primary_width;
                         double fallback_probability = p_primary;
                         bool resolved_by_ci = (primary_width <= ci_width_threshold);
+                        bool resolved_by_primary = resolved_by_ci;
+                        bool resolved_by_aux = false;
+                        size_t resolved_aux_level = p_aux_values.size();
 
                         double reference_probability = p_primary;
                         for (size_t level = 0; level < p_aux_values.size(); ++level) {
@@ -255,6 +325,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                     cheap_probability = p_aux_values[level];
                                 }
                                 resolved_by_ci = true;
+                                resolved_by_primary = false;
+                                resolved_by_aux = true;
+                                resolved_aux_level = level;
                                 break;
                             }
                             reference_probability = p_aux_values[level];
@@ -277,6 +350,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                             if (local_test->last_swap_has_equal_effect_size()) {
                                 try {
                                     result.exact_evals++;
+                                    result.temperature_bin_exact_evals[temp_bin]++;
                                     if (primary_improving) {
                                         result.exact_evals_on_improving++;
                                     } else {
@@ -294,14 +368,24 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                     accept = (random_unif(mersenne_wheel) < p_exact);
                                 } catch (...) {
                                     result.exact_failures++;
+                                    result.temperature_bin_exact_failures[temp_bin]++;
                                     accept = (random_unif(mersenne_wheel) < cheap_probability);
                                 }
                             } else {
                                 result.exact_unavailable_swaps++;
+                                result.temperature_bin_exact_unavailable_swaps[temp_bin]++;
                                 accept = (random_unif(mersenne_wheel) < cheap_probability);
                             }
                         } else {
                             result.ci_resolved_swaps++;
+                            if (resolved_by_primary) {
+                                result.primary_resolved_swaps++;
+                                result.temperature_bin_primary_resolved_swaps[temp_bin]++;
+                            }
+                            if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
+                                result.aux_level_resolved_swaps[resolved_aux_level]++;
+                                result.temperature_bin_aux_resolved_swaps[temp_bin]++;
+                            }
                             accept = (random_unif(mersenne_wheel) < cheap_probability);
                         }
                     } else {
@@ -311,6 +395,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     if (!accept) {
                         local_test->swap_once(true);
                     } else {
+                        result.temperature_bin_accepted_swaps[temp_bin]++;
                         score = new_score;
                         aux_scores = new_aux_scores;
                     }
@@ -323,6 +408,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         size_t total_swaps_curr = 0;
         size_t uncertain_swaps_curr = 0;
         size_t ci_resolved_swaps_curr = 0;
+        size_t primary_resolved_swaps_curr = 0;
+        std::vector<size_t> aux_level_resolved_swaps_curr(test->aux_statistic_levels(), 0);
         size_t exact_unavailable_swaps_curr = 0;
         size_t exact_evals_curr = 0;
         size_t exact_evals_improving_curr = 0;
@@ -334,6 +421,13 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         double aux_ci_width_sum_curr = 0.0;
         double selected_ci_width_sum_curr = 0.0;
         size_t ci_width_observations_curr = 0;
+        std::vector<size_t> temperature_bin_total_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_accepted_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_primary_resolved_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_aux_resolved_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_exact_evals_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_exact_unavailable_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_exact_failures_curr(TEMPERATURE_BIN_COUNT, 0);
 
         for (size_t i = 0; i < thread_solutions.size(); i++) {
             auto& future = thread_solutions[i];
@@ -342,6 +436,13 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
             total_swaps_curr += run.total_swaps;
             uncertain_swaps_curr += run.uncertain_swaps;
             ci_resolved_swaps_curr += run.ci_resolved_swaps;
+            primary_resolved_swaps_curr += run.primary_resolved_swaps;
+            if (aux_level_resolved_swaps_curr.size() < run.aux_level_resolved_swaps.size()) {
+                aux_level_resolved_swaps_curr.resize(run.aux_level_resolved_swaps.size(), 0);
+            }
+            for (size_t level = 0; level < run.aux_level_resolved_swaps.size(); ++level) {
+                aux_level_resolved_swaps_curr[level] += run.aux_level_resolved_swaps[level];
+            }
             exact_unavailable_swaps_curr += run.exact_unavailable_swaps;
             exact_evals_curr += run.exact_evals;
             exact_evals_improving_curr += run.exact_evals_on_improving;
@@ -353,6 +454,15 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
             aux_ci_width_sum_curr += run.aux_ci_width_sum;
             selected_ci_width_sum_curr += run.selected_ci_width_sum;
             ci_width_observations_curr += run.ci_width_observations;
+            for (size_t bin = 0; bin < TEMPERATURE_BIN_COUNT; ++bin) {
+                temperature_bin_total_swaps_curr[bin] += run.temperature_bin_total_swaps[bin];
+                temperature_bin_accepted_swaps_curr[bin] += run.temperature_bin_accepted_swaps[bin];
+                temperature_bin_primary_resolved_swaps_curr[bin] += run.temperature_bin_primary_resolved_swaps[bin];
+                temperature_bin_aux_resolved_swaps_curr[bin] += run.temperature_bin_aux_resolved_swaps[bin];
+                temperature_bin_exact_evals_curr[bin] += run.temperature_bin_exact_evals[bin];
+                temperature_bin_exact_unavailable_swaps_curr[bin] += run.temperature_bin_exact_unavailable_swaps[bin];
+                temperature_bin_exact_failures_curr[bin] += run.temperature_bin_exact_failures[bin];
+            }
             if (i == 0) {
                 test = thread;
             } else if (*thread < *test) {
@@ -366,6 +476,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         total_swaps_used.push_back(total_swaps_curr);
         uncertain_swaps_used.push_back(uncertain_swaps_curr);
         ci_resolved_swaps_used.push_back(ci_resolved_swaps_curr);
+        primary_resolved_swaps_used.push_back(primary_resolved_swaps_curr);
+        aux_level_resolved_swaps_used.push_back(aux_level_resolved_swaps_curr);
         exact_unavailable_swaps_used.push_back(exact_unavailable_swaps_curr);
         exact_evals_used.push_back(exact_evals_curr);
         exact_evals_on_improving_used.push_back(exact_evals_improving_curr);
@@ -383,6 +495,13 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
             mean_aux_ci_width_used.push_back(aux_ci_width_sum_curr / denominator);
             mean_selected_ci_width_used.push_back(selected_ci_width_sum_curr / denominator);
         }
+        temperature_bin_total_swaps_used.push_back(temperature_bin_total_swaps_curr);
+        temperature_bin_accepted_swaps_used.push_back(temperature_bin_accepted_swaps_curr);
+        temperature_bin_primary_resolved_swaps_used.push_back(temperature_bin_primary_resolved_swaps_curr);
+        temperature_bin_aux_resolved_swaps_used.push_back(temperature_bin_aux_resolved_swaps_curr);
+        temperature_bin_exact_evals_used.push_back(temperature_bin_exact_evals_curr);
+        temperature_bin_exact_unavailable_swaps_used.push_back(temperature_bin_exact_unavailable_swaps_curr);
+        temperature_bin_exact_failures_used.push_back(temperature_bin_exact_failures_curr);
 
         curr_size += step;
 
@@ -394,11 +513,16 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
 size_t subsample::solutions() const {
     check_solution_vectors(best, best_stat, best_size, total_swaps_used, uncertain_swaps_used,
-                           ci_resolved_swaps_used, exact_unavailable_swaps_used, exact_evals_used,
+                           ci_resolved_swaps_used, primary_resolved_swaps_used, aux_level_resolved_swaps_used,
+                           exact_unavailable_swaps_used, exact_evals_used,
                            exact_evals_on_improving_used, exact_evals_on_worsening_used,
                            exact_eval_failures, primary_calibration_points_used,
                            aux_calibration_points_used, mean_primary_ci_width_used,
-                           mean_aux_ci_width_used, mean_selected_ci_width_used);
+                           mean_aux_ci_width_used, mean_selected_ci_width_used,
+                           temperature_bin_total_swaps_used, temperature_bin_accepted_swaps_used,
+                           temperature_bin_primary_resolved_swaps_used, temperature_bin_aux_resolved_swaps_used,
+                           temperature_bin_exact_evals_used, temperature_bin_exact_unavailable_swaps_used,
+                           temperature_bin_exact_failures_used);
     return best.size();
 }
 
@@ -426,6 +550,18 @@ size_t subsample::uncertain_swaps(size_t k) const {
 
 size_t subsample::ci_resolved_swaps(size_t k) const {
     return ci_resolved_swaps_used.at(k);
+}
+
+size_t subsample::primary_resolved_swaps(size_t k) const {
+    return primary_resolved_swaps_used.at(k);
+}
+
+size_t subsample::aux_ladder_levels() const {
+    return aux_level_resolved_swaps_used.empty() ? 0 : aux_level_resolved_swaps_used.front().size();
+}
+
+size_t subsample::aux_level_resolved_swaps(size_t k, size_t level) const {
+    return aux_level_resolved_swaps_used.at(k).at(level);
 }
 
 size_t subsample::exact_unavailable_swaps(size_t k) const {
@@ -466,6 +602,38 @@ double subsample::mean_aux_ci_width(size_t k) const {
 
 double subsample::mean_selected_ci_width(size_t k) const {
     return mean_selected_ci_width_used.at(k);
+}
+
+size_t subsample::temperature_bins() const {
+    return TEMPERATURE_BIN_COUNT;
+}
+
+size_t subsample::temperature_bin_total_swaps(size_t k, size_t bin) const {
+    return temperature_bin_total_swaps_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_accepted_swaps(size_t k, size_t bin) const {
+    return temperature_bin_accepted_swaps_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_primary_resolved_swaps(size_t k, size_t bin) const {
+    return temperature_bin_primary_resolved_swaps_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_aux_resolved_swaps(size_t k, size_t bin) const {
+    return temperature_bin_aux_resolved_swaps_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_exact_evals(size_t k, size_t bin) const {
+    return temperature_bin_exact_evals_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_exact_unavailable_swaps(size_t k, size_t bin) const {
+    return temperature_bin_exact_unavailable_swaps_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_exact_failures(size_t k, size_t bin) const {
+    return temperature_bin_exact_failures_used.at(k).at(bin);
 }
 
 }
