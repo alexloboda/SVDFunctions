@@ -57,15 +57,19 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param method string approximation method for SA statistic, either
 #'   \code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
 #'   a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
-#'   of increasing prefix sizes; exact evaluation is used only if no ladder level
-#'   yields a sufficiently narrow CI for the acceptance probability.
+#'   of increasing prefix sizes; a single SA acceptance draw is tested against the
+#'   calibrated probability interval from the primary Nystrom estimate and then
+#'   successively against each auxiliary RFF ladder level, and exact evaluation is
+#'   used only if none of those cheap estimators can resolve the accept/reject
+#'   decision.
 #' @param n_features integer number of Nyström features (landmarks) used when
 #'   \code{method = "nystrom"} or \code{method = "hybrid"}.
 #' @param ciWidthThreshold numeric maximum acceptable CI width for a cheap
 #'   acceptance-probability estimate. In hybrid mode, each cheap estimator uses
 #'   its own exact-vs-cheap calibration residuals to form the CI, and exact
-#'   evaluation is skipped only when some cheap estimator has both CI width and
-#'   local cross-estimator disagreement not exceeding this value.
+#'   evaluation is skipped only when some cheap estimator resolves the sampled SA
+#'   accept/reject decision and has local cross-estimator disagreement not
+#'   exceeding this value.
 #' @param calibrationQuantile numeric quantile of the exact-vs-cheap absolute
 #'   probability error used to calibrate each estimator's CI half-width in
 #'   hybrid mode.

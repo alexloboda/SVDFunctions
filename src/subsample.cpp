@@ -186,6 +186,34 @@ double interval_width(double center, double half_width)
     return upper - lower;
 }
 
+double interval_lower(double center, double half_width)
+{
+    return std::max(0.0, center - half_width);
+}
+
+double interval_upper(double center, double half_width)
+{
+    return std::min(1.0, center + half_width);
+}
+
+bool interval_resolves_draw(double lower, double upper, double draw)
+{
+    return draw < lower || draw > upper;
+}
+
+bool interval_accepts_draw(double lower, double draw)
+{
+    return draw < lower;
+}
+
+double primary_disagreement(const std::vector<double>& aux_values, double primary_value)
+{
+    if (aux_values.empty()) {
+        return 0.0;
+    }
+    return std::abs(primary_value - aux_values.front());
+}
+
 double local_disagreement(const std::vector<double>& values, double reference, size_t index)
 {
     if (values.empty() || index >= values.size()) {
@@ -298,6 +326,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     const double delta_primary = new_score - score;
                     const bool primary_improving = delta_primary <= 0.0;
                     const double p_primary = acceptance_probability(delta_primary, t);
+                    const double acceptance_draw = random_unif(mersenne_wheel);
 
                     bool accept = true;
 
@@ -310,38 +339,48 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
                         const double primary_half_width = calibration_half_width(
                             primary_residuals, calibration_quantile, min_calibration_samples);
+                        const double primary_lower = interval_lower(p_primary, primary_half_width);
+                        const double primary_upper = interval_upper(p_primary, primary_half_width);
                         const double primary_width = interval_width(p_primary, primary_half_width);
-                        const double primary_disagreement = p_aux_values.empty()
-                            ? 0.0
-                            : local_disagreement(p_aux_values, p_primary, 0);
+                        const double primary_disagreement_value = primary_disagreement(p_aux_values, p_primary);
 
                         double representative_aux_width = 1.0;
                         double selected_width = primary_width;
                         double cheap_probability = p_primary;
+                        bool cheap_accept = (acceptance_draw < p_primary);
                         double fallback_width = primary_width;
                         double fallback_probability = p_primary;
-                        bool resolved_by_ci = (primary_width <= ci_width_threshold) &&
-                                              (primary_disagreement <= ci_width_threshold);
+                        bool fallback_accept = cheap_accept;
+                        bool resolved_by_ci = false;
                         bool resolved_by_primary = resolved_by_ci;
                         bool resolved_by_aux = false;
                         size_t resolved_aux_level = p_aux_values.size();
 
+                        const bool primary_passes_veto = primary_disagreement_value <= ci_width_threshold;
+                        if (primary_passes_veto && interval_resolves_draw(primary_lower, primary_upper, acceptance_draw)) {
+                            resolved_by_ci = true;
+                            resolved_by_primary = true;
+                            cheap_accept = interval_accepts_draw(primary_lower, acceptance_draw);
+                        }
+
                         for (size_t level = 0; level < p_aux_values.size(); ++level) {
                             const double aux_half_width = calibration_half_width(
                                 aux_residuals[level], calibration_quantile, min_calibration_samples);
+                            const double aux_lower = interval_lower(p_aux_values[level], aux_half_width);
+                            const double aux_upper = interval_upper(p_aux_values[level], aux_half_width);
                             const double aux_width = interval_width(p_aux_values[level], aux_half_width);
                             const double aux_disagreement = local_disagreement(p_aux_values, p_primary, level);
                             representative_aux_width = aux_width;
                             if (aux_width < fallback_width) {
                                 fallback_width = aux_width;
                                 fallback_probability = p_aux_values[level];
+                                fallback_accept = (acceptance_draw < p_aux_values[level]);
                             }
-                            if ((aux_width <= ci_width_threshold) &&
-                                (aux_disagreement <= ci_width_threshold)) {
-                                if (!resolved_by_ci || aux_width < selected_width) {
-                                    selected_width = aux_width;
-                                    cheap_probability = p_aux_values[level];
-                                }
+                            if ((aux_disagreement <= ci_width_threshold) &&
+                                interval_resolves_draw(aux_lower, aux_upper, acceptance_draw)) {
+                                selected_width = aux_width;
+                                cheap_probability = p_aux_values[level];
+                                cheap_accept = interval_accepts_draw(aux_lower, acceptance_draw);
                                 resolved_by_ci = true;
                                 resolved_by_primary = false;
                                 resolved_by_aux = true;
@@ -357,6 +396,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                         if (!resolved_by_ci) {
                             selected_width = fallback_width;
                             cheap_probability = fallback_probability;
+                            cheap_accept = fallback_accept;
                         }
                         result.selected_ci_width_sum += selected_width;
 
@@ -382,16 +422,16 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                     }
                                     result.primary_calibration_points = primary_residuals.size();
                                     result.aux_calibration_points = aux_residuals.empty() ? 0 : aux_residuals.back().size();
-                                    accept = (random_unif(mersenne_wheel) < p_exact);
+                                    accept = (acceptance_draw < p_exact);
                                 } catch (...) {
                                     result.exact_failures++;
                                     result.temperature_bin_exact_failures[temp_bin]++;
-                                    accept = (random_unif(mersenne_wheel) < cheap_probability);
+                                    accept = cheap_accept;
                                 }
                             } else {
                                 result.exact_unavailable_swaps++;
                                 result.temperature_bin_exact_unavailable_swaps[temp_bin]++;
-                                accept = (random_unif(mersenne_wheel) < cheap_probability);
+                                accept = cheap_accept;
                             }
                         } else {
                             result.ci_resolved_swaps++;
@@ -403,10 +443,10 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                 result.aux_level_resolved_swaps[resolved_aux_level]++;
                                 result.temperature_bin_aux_resolved_swaps[temp_bin]++;
                             }
-                            accept = (random_unif(mersenne_wheel) < cheap_probability);
+                            accept = cheap_accept;
                         }
                     } else {
-                        accept = (random_unif(mersenne_wheel) < p_primary);
+                        accept = (acceptance_draw < p_primary);
                     }
 
                     if (!accept) {
