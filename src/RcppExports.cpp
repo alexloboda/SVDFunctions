@@ -40,8 +40,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // select_controls_cpp
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min, int max, int step, int sa_iterations, double min_call_rate, std::string method, int n_features);
-RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP sa_iterationsSEXP, SEXP min_call_rateSEXP, SEXP methodSEXP, SEXP n_featuresSEXP) {
+List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& clustering, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min, int max, int step, int sa_iterations, double min_call_rate, std::string method, int n_features, double ci_width_threshold, double calibration_quantile, int min_calibration_samples, int max_calibration_history);
+RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP sa_iterationsSEXP, SEXP min_call_rateSEXP, SEXP methodSEXP, SEXP n_featuresSEXP, SEXP ci_width_thresholdSEXP, SEXP calibration_quantileSEXP, SEXP min_calibration_samplesSEXP, SEXP max_calibration_historySEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -63,7 +63,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type min_call_rate(min_call_rateSEXP);
     Rcpp::traits::input_parameter< std::string >::type method(methodSEXP);
     Rcpp::traits::input_parameter< int >::type n_features(n_featuresSEXP);
-    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features));
+    Rcpp::traits::input_parameter< double >::type ci_width_threshold(ci_width_thresholdSEXP);
+    Rcpp::traits::input_parameter< double >::type calibration_quantile(calibration_quantileSEXP);
+    Rcpp::traits::input_parameter< int >::type min_calibration_samples(min_calibration_samplesSEXP);
+    Rcpp::traits::input_parameter< int >::type max_calibration_history(max_calibration_historySEXP);
+    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features, ci_width_threshold, calibration_quantile, min_calibration_samples, max_calibration_history));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -116,7 +120,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
-    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 18},
+    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 22},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 12},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {NULL, NULL, 0}

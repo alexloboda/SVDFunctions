@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <memory>
+#include <cstdint>
 #include <RcppEigen.h>
 
 // [[Rcpp::depends(RcppEigen)]]
@@ -59,13 +60,28 @@ public:
 };
 
 class mahalanobis_distances {
-    std::vector<std::vector<double>> inter;
-    std::vector<double> dist;
+    std::shared_ptr<const Matrix> X;
+
+    Matrix S_inv;
+    Matrix S_inv_X;
+    Vector S_inv_mean;
+
+    std::vector<double> quad_x;
+    std::vector<double> x_mu;
+    double mu_mu = 0.0;
 
 public:
     mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
     double distance(unsigned i) const;
     double interpoint_distance(unsigned i, unsigned j) const;
+
+    const Matrix& inv_cov() const {
+        return S_inv;
+    }
+
+    const Matrix& data() const {
+        return *X;
+    }
 };
 
 class mvn_stats {
@@ -75,11 +91,28 @@ class mvn_stats {
     bool feature_mode = false;
     size_t feature_dim = 0;
 
+    const mahalanobis_distances* distances = nullptr;
+    const Clustering* clustering = nullptr;
+    double k_pw = 0.0;
+
     double feature_pairwise_stat(size_t i, size_t j) const;
 public:
     mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
-              bool use_nystrom, size_t n_features);
+              bool use_nystrom, size_t n_features,
+              bool use_rff = false, size_t rff_features = 256, uint32_t seed = 42u);
     mvn_stats() = default;
+
+    bool is_feature_mode() const {
+        return feature_mode;
+    }
+
+    size_t features_dim() const {
+        return feature_dim;
+    }
+
+    const float* features_ptr(size_t cluster) const {
+        return cluster_features.at(cluster).data();
+    }
 
     double pairwise_stat(size_t i, size_t j) const;
     double sum_pairwise(size_t point, const std::vector<size_t>& ss) const;
@@ -95,6 +128,7 @@ protected:
 
     std::vector<double> pairwise_stat;
     std::vector<double> center_stat;
+    std::vector<std::vector<float>> subset_feature_sum;
     std::vector<double> betas;
 
     std::shared_ptr<Clustering> clustering;
@@ -104,6 +138,7 @@ protected:
 
     size_t effect_size;
     int latest_subset_point;
+    int latest_replacing_point;
 
     mutable std::mt19937 wheel;
 
@@ -111,9 +146,17 @@ protected:
     bool use_nystrom = false;
     size_t n_features = 1024;
 
+    bool use_hybrid = false;
+    std::shared_ptr<mvn_stats> rff_stats;
+    std::vector<size_t> rff_feature_levels;
+    std::vector<double> rff_pairwise_stats;
+    double rff_center_stat = 0.0;
+    std::vector<float> rff_subset_feature_sum;
+
 public:
     mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
-             bool use_nystrom = false, size_t n_features = 1024);
+             bool use_nystrom = false, size_t n_features = 1024,
+             bool use_hybrid = false, size_t rff_features = 256, uint32_t seed = 42u);
     mvn_test(const mvn_test&);
 
     size_t dimensions() const;
@@ -126,6 +169,24 @@ public:
     const std::vector<size_t>& current_subset() const;
 
     double get_normality_statistic();
+    double get_normality_statistic() const;
+
+    bool has_aux_statistic() const {
+        return use_hybrid && (bool)rff_stats && !rff_feature_levels.empty();
+    }
+
+    double get_aux_normality_statistic();
+    double get_aux_normality_statistic(size_t level) const;
+    size_t aux_statistic_levels() const {
+        return rff_feature_levels.size();
+    }
+
+    size_t aux_statistic_level_dim(size_t level) const {
+        return rff_feature_levels.at(level);
+    }
+
+    bool last_swap_has_equal_effect_size() const;
+    double exact_delta_last_swap() const;
 
     friend bool operator<(mvn_test& lhs, mvn_test& rhs);
     std::vector<double> loglikelihood(const std::vector<int>& ids) const;

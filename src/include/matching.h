@@ -84,7 +84,10 @@ public:
     matching(std::vector<std::vector<int>>&& controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int threads, int start, int size_ub, int step, int iterations,
-                     bool use_nystrom, size_t n_features);
+                     bool use_nystrom, size_t n_features,
+                     bool use_hybrid = false, size_t rff_features = 256, uint32_t seed = 42u,
+                     double ci_width_threshold = 0.5, double calibration_quantile = 0.9,
+                     size_t min_calibration_samples = 8, size_t max_calibration_history = 256);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);
 
@@ -94,6 +97,66 @@ public:
 
     void set_soft_threshold(lambda_range range);
     void set_hard_threshold(lambda_range range);
+
+    size_t sa_solutions() const {
+        return subsampling.solutions();
+    }
+
+    size_t sa_solution_size(size_t k) const {
+        return subsampling.solution_size(k);
+    }
+
+    size_t sa_total_swaps(size_t k) const {
+        return subsampling.total_swaps(k);
+    }
+
+    size_t sa_uncertain_swaps(size_t k) const {
+        return subsampling.uncertain_swaps(k);
+    }
+
+    size_t sa_ci_resolved_swaps(size_t k) const {
+        return subsampling.ci_resolved_swaps(k);
+    }
+
+    size_t sa_exact_unavailable_swaps(size_t k) const {
+        return subsampling.exact_unavailable_swaps(k);
+    }
+
+    size_t sa_exact_evals(size_t k) const {
+        return subsampling.exact_evals(k);
+    }
+
+    size_t sa_exact_evals_on_improving(size_t k) const {
+        return subsampling.exact_evals_on_improving(k);
+    }
+
+    size_t sa_exact_evals_on_worsening(size_t k) const {
+        return subsampling.exact_evals_on_worsening(k);
+    }
+
+    size_t sa_exact_failures(size_t k) const {
+        return subsampling.exact_failures(k);
+    }
+
+    size_t sa_primary_calibration_points(size_t k) const {
+        return subsampling.primary_calibration_points(k);
+    }
+
+    size_t sa_aux_calibration_points(size_t k) const {
+        return subsampling.aux_calibration_points(k);
+    }
+
+    double sa_mean_primary_ci_width(size_t k) const {
+        return subsampling.mean_primary_ci_width(k);
+    }
+
+    double sa_mean_aux_ci_width(size_t k) const {
+        return subsampling.mean_aux_ci_width(k);
+    }
+
+    double sa_mean_selected_ci_width(size_t k) const {
+        return subsampling.mean_selected_ci_width(k);
+    }
 private:
     double get_lambda(std::vector<double>& pvals);
 

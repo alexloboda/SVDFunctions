@@ -62,14 +62,35 @@ std::vector<size_t> choose_landmarks(size_t n_samples, size_t m, std::mt19937& w
     return all;
 }
 
+std::vector<size_t> choose_rff_levels(size_t max_features) {
+    std::vector<size_t> levels;
+    if (max_features == 0) {
+        return levels;
+    }
+
+    size_t level = std::min<size_t>(1024, max_features);
+    levels.push_back(level);
+    while (level < max_features) {
+        const size_t next = std::min(max_features, level * 4);
+        if (next == level) {
+            break;
+        }
+        levels.push_back(next);
+        level = next;
+    }
+    return levels;
+}
+
 } // namespace
 
 mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
-           bool use_nystrom, size_t n_features)
+           bool use_nystrom, size_t n_features,
+           bool use_hybrid, size_t rff_features, uint32_t seed)
         :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
          clustering(std::make_shared<Clustering>(clst)),
      use_nystrom(use_nystrom),
      n_features(n_features),
+     use_hybrid(use_hybrid),
          wheel(std::random_device()()) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
@@ -84,6 +105,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     p = X->rows();
     effect_size = 0;
     latest_subset_point = -1;
+    latest_replacing_point = -1;
 
     if (n <= p) {
         throw std::logic_error("Too few points.");
@@ -92,12 +114,40 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     cxxpool::thread_pool pool(std::thread::hardware_concurrency());
     std::vector<std::future<std::shared_ptr<mvn_stats>>> futures;
     for (double beta: betas) {
-        futures.push_back(pool.push([this, clst, beta]() -> std::shared_ptr<mvn_stats> {
-            return std::make_shared<mvn_stats>(*distances, clst, beta, this->use_nystrom, this->n_features);
+        futures.push_back(pool.push([this, clst, beta, seed]() -> std::shared_ptr<mvn_stats> {
+            const uint32_t local_seed = seed ^ (uint32_t)(beta * 1e6);
+            return std::make_shared<mvn_stats>(*distances, clst, beta, this->use_nystrom, this->n_features,
+                                               false, 0, local_seed);
         }));
     }
     for (int i = 0; i < betas.size(); i++) {
         stats.push_back(futures[i].get());
+    }
+
+    pairwise_stat.assign(betas.size(), 0.0);
+    center_stat.assign(betas.size(), 0.0);
+    subset_feature_sum.clear();
+    subset_feature_sum.resize(betas.size());
+    for (size_t i = 0; i < stats.size(); ++i) {
+        if (stats[i]->is_feature_mode()) {
+            subset_feature_sum[i].assign(stats[i]->features_dim(), 0.0f);
+        }
+    }
+
+    if (use_hybrid) {
+        // Single-beta auxiliary statistic for gating with progressively larger
+        // RFF prefixes taken from one precomputed embedding bank.
+        const double beta = betas.at(0);
+        const uint32_t rff_seed = seed + 1337u;
+        rff_stats = std::make_shared<mvn_stats>(*distances, clst, beta,
+                                                false, 0,
+                                                true, rff_features, rff_seed);
+        rff_feature_levels = choose_rff_levels(rff_stats->features_dim());
+        rff_pairwise_stats.assign(rff_feature_levels.size(), 0.0);
+        rff_center_stat = 0.0;
+        if (rff_stats->is_feature_mode()) {
+            rff_subset_feature_sum.assign(rff_stats->features_dim(), 0.0f);
+        }
     }
 
     std::vector<double> lls;
@@ -114,7 +164,100 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     }
 }
 
-double mvn_test::get_normality_statistic() {
+double mvn_test::get_aux_normality_statistic() {
+    if (!has_aux_statistic()) {
+        return get_normality_statistic();
+    }
+    return get_aux_normality_statistic(rff_feature_levels.size() - 1);
+}
+
+double mvn_test::get_aux_normality_statistic(size_t level) const {
+    if (!has_aux_statistic()) {
+        return get_normality_statistic();
+    }
+
+    if (effect_size <= dimensions()) {
+        throw std::logic_error("Too few points.");
+    }
+    const double beta = betas.at(0);
+    double stat = std::pow(1 + 2 * std::pow(beta, 2), dimensions() / -2.0);
+    stat += (1.0 / ((double)effect_size * effect_size)) * rff_pairwise_stats.at(level);
+    stat -= (2.0 / (effect_size * std::pow(1 + std::pow(beta, 2.0), dimensions() / 2.0))) * rff_center_stat;
+    return stat;
+}
+
+bool mvn_test::last_swap_has_equal_effect_size() const {
+    if (latest_subset_point < 0 || latest_replacing_point < 0) {
+        return false;
+    }
+    return clustering->cluster_size((size_t)latest_subset_point) == clustering->cluster_size((size_t)latest_replacing_point);
+}
+
+namespace {
+
+double exact_centered_cluster(const mvn::mahalanobis_distances& distances, const mvn::Clustering& clst, size_t cluster, double k_center) {
+    double acc = 0.0;
+    for (int el : clst.elements(cluster)) {
+        acc += std::exp(k_center * distances.distance((unsigned)el));
+    }
+    return acc;
+}
+
+double exact_pairwise_clusters(const mvn::mahalanobis_distances& distances, const mvn::Clustering& clst, size_t a, size_t b, double k_pw) {
+    double acc = 0.0;
+    const auto& lhs = clst.elements(a);
+    const auto& rhs = clst.elements(b);
+    for (int i : lhs) {
+        for (int j : rhs) {
+            acc += std::exp(k_pw * distances.interpoint_distance((unsigned)i, (unsigned)j));
+        }
+    }
+    if (a == b) {
+        acc *= 0.5;
+    }
+    return acc;
+}
+
+}
+
+double mvn_test::exact_delta_last_swap() const {
+    if (!last_swap_has_equal_effect_size()) {
+        throw std::logic_error("Exact delta requires unchanged effect size (equal cluster sizes)");
+    }
+    if (betas.empty()) {
+        throw std::logic_error("No beta configured");
+    }
+    const double beta = betas.at(0);
+    const double k_center = -(beta * beta / (2 * (1 + beta * beta)));
+    const double k_pw = -(beta * beta) / 2.0;
+
+    const size_t a = (size_t)latest_subset_point;
+    const size_t b = (size_t)latest_replacing_point;
+    const double n = (double)effect_size;
+    const double denom_center = std::pow(1 + std::pow(beta, 2.0), dimensions() / 2.0);
+
+    double sum_bS = 0.0;
+    double sum_aS = 0.0;
+    for (size_t s : subset) {
+        if (s == b) {
+            continue;
+        }
+        sum_bS += exact_pairwise_clusters(*distances, *clustering, b, s, k_pw);
+        sum_aS += exact_pairwise_clusters(*distances, *clustering, a, s, k_pw);
+    }
+    const double self_b = exact_pairwise_clusters(*distances, *clustering, b, b, k_pw);
+    const double self_a = exact_pairwise_clusters(*distances, *clustering, a, a, k_pw);
+
+    const double delta_pairwise = 2.0 * (sum_bS - sum_aS) + (self_b - self_a);
+    const double delta_center = exact_centered_cluster(*distances, *clustering, b, k_center) -
+                                exact_centered_cluster(*distances, *clustering, a, k_center);
+
+    double delta_stat = (1.0 / (n * n)) * delta_pairwise;
+    delta_stat -= (2.0 / (n * denom_center)) * delta_center;
+    return delta_stat;
+}
+
+double mvn_test::get_normality_statistic() const {
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
     }
@@ -129,19 +272,25 @@ double mvn_test::get_normality_statistic() {
     return max_stat;
 }
 
+double mvn_test::get_normality_statistic() {
+    return static_cast<const mvn_test&>(*this).get_normality_statistic();
+}
+
 const std::vector<size_t>& mvn_test::current_subset() const {
     return subset;
 }
 
 mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
-                     bool use_nystrom, size_t n_features)
+                     bool use_nystrom, size_t n_features,
+                     bool use_rff, size_t rff_features, uint32_t seed)
     :mahalanobis_centered(clst.size()),
      mahalanobis_pairwise() {
+    this->distances = &distances;
+    this->clustering = &clst;
     const size_t n_clusters = clst.size();
-    mahalanobis_pairwise.resize(n_clusters);
 
     double k_center = -(beta * beta / (2 * (1 + beta * beta)));
-    double k_pw = -(beta * beta) / 2.0;
+    k_pw = -(beta * beta) / 2.0;
 
     for (size_t cl = 0; cl < n_clusters; cl++) {
         for (int el: clst.elements(cl)) {
@@ -154,10 +303,73 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
         n_samples += clst.elements(cl).size();
     }
 
-    const size_t requested_features = (n_features == 0) ? NYSTROM_DEFAULT_MAX_FEATURES : n_features;
-    const size_t feature_count = std::min(n_samples, requested_features);
-    feature_mode = use_nystrom && (feature_count > 0);
-    feature_dim = feature_count;
+    size_t feature_count = 0;
+    if (use_rff) {
+        feature_mode = true;
+        feature_dim = std::max<size_t>(1, rff_features);
+    } else {
+        const size_t requested_features = (n_features == 0) ? NYSTROM_DEFAULT_MAX_FEATURES : n_features;
+        feature_count = std::min(n_samples, requested_features);
+        feature_mode = use_nystrom && (feature_count > 0);
+        feature_dim = feature_count;
+    }
+
+    if (use_rff) {
+        std::vector<int> sample_cluster_map(n_samples, -1);
+        for (size_t cl = 0; cl < n_clusters; ++cl) {
+            for (int el : clst.elements(cl)) {
+                sample_cluster_map[el] = static_cast<int>(cl);
+            }
+        }
+
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eig(distances.inv_cov());
+        if (eig.info() != Eigen::Success) {
+            throw std::logic_error("Failed to decompose inv_cov for RFF");
+        }
+        Eigen::VectorXd evals = eig.eigenvalues();
+        Eigen::MatrixXd evecs = eig.eigenvectors();
+        for (int i = 0; i < evals.size(); ++i) {
+            evals(i) = std::max(evals(i), 0.0);
+        }
+        Eigen::MatrixXd sqrt_inv = evecs * evals.array().sqrt().matrix().asDiagonal() * evecs.transpose();
+
+        std::mt19937 rng(seed);
+        std::normal_distribution<double> normal(0.0, 1.0);
+        constexpr double PI = 3.141592653589793238462643383279502884;
+        std::uniform_real_distribution<double> unif(0.0, 2.0 * PI);
+
+        Eigen::MatrixXd W(distances.data().rows(), (Eigen::Index)feature_dim);
+        for (Eigen::Index d = 0; d < (Eigen::Index)feature_dim; ++d) {
+            Eigen::VectorXd z(distances.data().rows());
+            for (Eigen::Index r = 0; r < z.size(); ++r) {
+                z(r) = normal(rng);
+            }
+            Eigen::VectorXd w = beta * (sqrt_inv * z);
+            W.col(d) = w;
+        }
+        std::vector<double> b(feature_dim);
+        for (size_t d = 0; d < feature_dim; ++d) {
+            b[d] = unif(rng);
+        }
+        const double scale = std::sqrt(2.0 / (double)feature_dim);
+
+        cluster_features.assign(n_clusters, std::vector<float>(feature_dim, 0.0f));
+        for (size_t sample = 0; sample < n_samples; ++sample) {
+            int cl = sample_cluster_map[sample];
+            if (cl < 0) {
+                continue;
+            }
+            Eigen::VectorXd x = distances.data().col((Eigen::Index)sample);
+            Eigen::RowVectorXd proj = x.transpose() * W;
+            auto& dst = cluster_features[(size_t)cl];
+            for (size_t d = 0; d < feature_dim; ++d) {
+                dst[d] += static_cast<float>(scale * std::cos(proj((Eigen::Index)d) + b[d]));
+            }
+        }
+
+        mahalanobis_pairwise.clear();
+        return;
+    }
 
     if (feature_mode) {
         std::vector<int> sample_cluster_map(n_samples, -1);
@@ -167,7 +379,7 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
             }
         }
 
-        std::mt19937 local_wheel(42u);
+        std::mt19937 local_wheel(seed);
         std::vector<size_t> landmarks = choose_landmarks(n_samples, feature_count, local_wheel);
 
         Eigen::MatrixXd W(feature_count, feature_count);
@@ -224,20 +436,8 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     if (!feature_mode) {
         cluster_features.clear();
         feature_dim = 0;
-        for (size_t cl = 0; cl < n_clusters; cl++) {
-            mahalanobis_pairwise[cl].resize(clst.size());
-            for (int el: clst.elements(cl)) {
-                for (size_t pair_cl = 0; pair_cl < n_clusters; pair_cl++) {
-                    for (int pair_el: clst.elements(pair_cl)) {
-                        if (cl == pair_cl) {
-                            mahalanobis_pairwise[cl][pair_cl] += 0.5 * std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                        } else {
-                            mahalanobis_pairwise[cl][pair_cl] += std::exp(k_pw * distances.interpoint_distance(el, pair_el));
-                        }
-                    }
-                }
-            }
-        }
+        // Exact mode: no precomputed cluster-pair matrix (O(N^2)). Pairwise terms are computed on-the-fly.
+        mahalanobis_pairwise.clear();
         return;
     }
 
@@ -263,7 +463,23 @@ double mvn_stats::pairwise_stat(size_t i, size_t j) const {
     if (feature_mode) {
         return feature_pairwise_stat(i, j);
     }
-    return mahalanobis_pairwise[i][j];
+
+    if (!distances || !clustering) {
+        throw std::logic_error("Exact pairwise requested but distances/clustering are not set");
+    }
+
+    double acc = 0.0;
+    const auto& lhs = clustering->elements(i);
+    const auto& rhs = clustering->elements(j);
+    for (int a : lhs) {
+        for (int b : rhs) {
+            acc += std::exp(k_pw * distances->interpoint_distance((unsigned)a, (unsigned)b));
+        }
+    }
+    if (i == j) {
+        acc *= 0.5;
+    }
+    return acc;
 }
 
 double mvn_stats::centered_stat(size_t i) const {
@@ -278,9 +494,10 @@ double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) cons
         }
         return ret;
     }
+
     double ret = 0.0;
     for (auto s: ss) {
-        ret += mahalanobis_pairwise[point][s];
+        ret += pairwise_stat(point, s);
     }
     return ret;
 }
@@ -307,6 +524,7 @@ void mvn_test::swap_once(bool reject_last) {
         assert(latest_subset_point != -1);
         replacing_point = latest_subset_point;
         latest_subset_point = -1;
+        latest_replacing_point = -1;
     } else {
         std::uniform_int_distribution<unsigned> subset_unif(0, subsample_size() - 1);
         std::swap(subset[subset_unif(wheel)], subset.back());
@@ -316,6 +534,7 @@ void mvn_test::swap_once(bool reject_last) {
     auto subset_point = subset.back();
     if (!reject_last) {
         latest_subset_point = subset_point;
+        latest_replacing_point = replacing_point;
     }
 
     effect_size += clustering->cluster_size(replacing_point) - clustering->cluster_size(subset_point);
@@ -355,14 +574,22 @@ mvn_test::mvn_test(const mvn_test& other)
      sampler(other.sampler),
      pairwise_stat(other.pairwise_stat),
      center_stat(other.center_stat),
+    subset_feature_sum(other.subset_feature_sum),
      betas(other.betas),
      clustering(other.clustering),
      p(other.p),
      n(other.n),
      effect_size(other.effect_size),
      latest_subset_point(other.latest_subset_point),
+    latest_replacing_point(other.latest_replacing_point),
     use_nystrom(other.use_nystrom),
     n_features(other.n_features),
+    use_hybrid(other.use_hybrid),
+    rff_stats(other.rff_stats),
+    rff_feature_levels(other.rff_feature_levels),
+    rff_pairwise_stats(other.rff_pairwise_stats),
+    rff_center_stat(other.rff_center_stat),
+    rff_subset_feature_sum(other.rff_subset_feature_sum),
      wheel{other.wheel()},
      subset(other.subset) {}
 
@@ -393,58 +620,116 @@ size_t Clustering::cluster_size(size_t i) const {
     return clusters.at(i).size();
 }
 
-mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& S, const Vector& mean)
-        :dist(X->cols()) {
-    inter.resize(X->cols());
-    Eigen::FullPivHouseholderQR<Matrix> qr(S);
+mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean)
+        :X(std::move(X)) {
+    if (!this->X || this->X->cols() == 0 || this->X->rows() == 0) {
+        throw std::invalid_argument("Matrix is empty");
+    }
+
+    Eigen::FullPivHouseholderQR<Matrix> qr(cov);
     if (!qr.isInvertible()) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");
     }
+    S_inv = qr.inverse();
 
-    Matrix S_inv = qr.inverse();
+    S_inv_X = S_inv * (*this->X);
+    S_inv_mean = S_inv * mean;
+    mu_mu = mean.dot(S_inv_mean);
 
-    Vector ximu = X->transpose() * S_inv * mean;
-    Vector muxi = mean.transpose() * S_inv * *X;
-    Matrix distances = X->transpose() * S_inv * *X;
-    double mumu = mean.transpose() * S_inv * mean;
-    std::vector<double> diag(distances.rows());
-
-    for (auto i = 0; i < X->cols(); i++) {
-        diag[i] = distances(i, i);
-    }
-    for (auto i = 0; i < X->cols(); i++) {
-        inter[i].resize(X->cols());
-        dist[i] = diag[i] - ximu(i) - muxi(i) + mumu;
-        for (auto j = 0; j < X->cols(); j++) {
-            inter[i][j] = diag[i] - 2 *  distances(i, j) + diag[j];
-        }
+    const Eigen::Index n = this->X->cols();
+    quad_x.assign((size_t)n, 0.0);
+    x_mu.assign((size_t)n, 0.0);
+    for (Eigen::Index i = 0; i < n; ++i) {
+        const auto xi = this->X->col(i);
+        const auto yi = S_inv_X.col(i);
+        quad_x[(size_t)i] = xi.dot(yi);
+        x_mu[(size_t)i] = xi.dot(S_inv_mean);
     }
 }
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
-    return inter[i][j];
+    const double xixj = (*X).col((Eigen::Index)i).dot(S_inv_X.col((Eigen::Index)j));
+    return quad_x.at(i) - 2.0 * xixj + quad_x.at(j);
 }
 
-double mahalanobis_distances::distance(unsigned el) const {
-    return dist[el];
+double mahalanobis_distances::distance(unsigned i) const {
+    return quad_x.at(i) - 2.0 * x_mu.at(i) + mu_mu;
 }
 
 void mvn_test::remove(unsigned point) {
     for (size_t i = 0; i < stats.size(); i++) {
-        pairwise_stat[i] -= 2 * stats[i]->sum_pairwise(point, subset);
+        if (stats[i]->is_feature_mode()) {
+            const float* phi = stats[i]->features_ptr(point);
+            auto& sum = subset_feature_sum[i];
+            const size_t dim = stats[i]->features_dim();
+            const double dot = dot_float_sse(phi, sum.data(), dim);
+            const double self = dot_float_sse(phi, phi, dim);
+            const double sp = dot - 0.5 * self;
+            pairwise_stat[i] -= 2.0 * sp;
+            for (size_t d = 0; d < dim; ++d) {
+                sum[d] -= phi[d];
+            }
+        } else {
+            pairwise_stat[i] -= 2.0 * stats[i]->sum_pairwise(point, subset);
+        }
     }
 
     for (size_t i = 0; i < stats.size(); i++) {
         center_stat[i] -= stats[i]->centered_stat(point);
     }
+
+    if (has_aux_statistic()) {
+        const float* phi = rff_stats->features_ptr(point);
+        for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
+            const size_t dim = rff_feature_levels[level];
+            const double dot = dot_float_sse(phi, rff_subset_feature_sum.data(), dim);
+            const double self = dot_float_sse(phi, phi, dim);
+            const double sp = dot - 0.5 * self;
+            rff_pairwise_stats[level] -= 2.0 * sp;
+        }
+        const size_t full_dim = rff_stats->features_dim();
+        for (size_t d = 0; d < full_dim; ++d) {
+            rff_subset_feature_sum[d] -= phi[d];
+        }
+        rff_center_stat -= rff_stats->centered_stat(point);
+    }
 }
 
 void mvn_test::add(unsigned int point) {
     for (size_t i = 0; i < stats.size(); i++) {
-        pairwise_stat[i] += 2 * stats[i]->sum_pairwise(point, subset);
+        if (stats[i]->is_feature_mode()) {
+            const float* phi = stats[i]->features_ptr(point);
+            auto& sum = subset_feature_sum[i];
+            const size_t dim = stats[i]->features_dim();
+            for (size_t d = 0; d < dim; ++d) {
+                sum[d] += phi[d];
+            }
+            const double dot = dot_float_sse(phi, sum.data(), dim);
+            const double self = dot_float_sse(phi, phi, dim);
+            const double sp = dot - 0.5 * self;
+            pairwise_stat[i] += 2.0 * sp;
+        } else {
+            pairwise_stat[i] += 2.0 * stats[i]->sum_pairwise(point, subset);
+        }
     }
     for (size_t i = 0; i < stats.size(); i++) {
         center_stat[i] += stats[i]->centered_stat(point);
+    }
+
+    if (has_aux_statistic()) {
+        const float* phi = rff_stats->features_ptr(point);
+        const size_t full_dim = rff_stats->features_dim();
+        for (size_t d = 0; d < full_dim; ++d) {
+            rff_subset_feature_sum[d] += phi[d];
+        }
+        for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
+            const size_t dim = rff_feature_levels[level];
+            const double dot = dot_float_sse(phi, rff_subset_feature_sum.data(), dim);
+            const double self = dot_float_sse(phi, phi, dim);
+            const double sp = dot - 0.5 * self;
+            rff_pairwise_stats[level] += 2.0 * sp;
+        }
+        rff_center_stat += rff_stats->centered_stat(point);
     }
 }
 

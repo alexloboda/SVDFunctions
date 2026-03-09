@@ -151,14 +151,20 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
                            int threads, int start, int ub, int step, int iterations,
-                           bool use_nystrom, size_t n_features) {
+                           bool use_nystrom, size_t n_features,
+                           bool use_hybrid, size_t rff_features, uint32_t seed,
+                           double ci_width_threshold, double calibration_quantile,
+                           size_t min_calibration_samples, size_t max_calibration_history) {
     const double EPS = 1e-18;
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
     Matrix rs_cov = directions * directions.transpose();
 
-    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, use_nystrom, n_features);
+    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, use_nystrom, n_features,
+                                 use_hybrid, rff_features, seed,
+                                 ci_width_threshold, calibration_quantile,
+                                 min_calibration_samples, max_calibration_history);
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     double c = std::pow(EPS, 1.0 / (double)iterations);
     subsampling.run(iterations, 4, 1.0 , c, threads, start, ub, step);

@@ -9,8 +9,8 @@ subsample_mvn <- function(matrix, size, mean, cov) {
     .Call('_SVDFunctions_subsample_mvn', PACKAGE = 'SVDFunctions', matrix, size, mean, cov)
 }
 
-select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features) {
-    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features)
+select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features, ci_width_threshold, calibration_quantile, min_calibration_samples, max_calibration_history) {
+    .Call('_SVDFunctions_select_controls_cpp', PACKAGE = 'SVDFunctions', gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, method, n_features, ci_width_threshold, calibration_quantile, min_calibration_samples, max_calibration_history)
 }
 
 parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed) {

@@ -1,3 +1,4 @@
 CXX_STD = CXX14
 PKG_CPPFLAGS = -pthread
+PKG_CXXFLAGS = -Wno-ignored-attributes
 PKG_LIBS = -pthread -lz

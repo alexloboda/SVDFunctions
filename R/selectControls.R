@@ -55,10 +55,25 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param iterations number of simulated annealing iterations per each subset
 #' @param minCallRate numeric minimal call rate for SNP to be considered.   
 #' @param method string approximation method for SA statistic, either
-#'   \code{"exact"} or \code{"nystrom"}.
+#'   \code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
+#'   a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
+#'   of increasing prefix sizes; exact evaluation is used only if no ladder level
+#'   yields a sufficiently narrow CI for the acceptance probability.
 #' @param n_features integer number of Nyström features (landmarks) used when
-#'   \code{method = "nystrom"}.
-#' size.
+#'   \code{method = "nystrom"} or \code{method = "hybrid"}.
+#' @param ciWidthThreshold numeric maximum acceptable CI width for a cheap
+#'   acceptance-probability estimate. If at least one cheap estimator has CI
+#'   width not exceeding this value, exact evaluation is skipped.
+#' @param calibrationQuantile numeric quantile of the exact-vs-cheap absolute
+#'   probability error used to calibrate CI half-widths in hybrid mode.
+#' @param minCalibrationSamples integer minimum number of successful exact
+#'   audits required before using empirical calibration residuals.
+#' @param maxCalibrationHistory integer maximum number of exact-audit residuals
+#'   retained per estimator in hybrid mode.
+#' @return A list with selected controls, lambda summaries, and \code{sa_diagnostics},
+#'   which reports per-target-subset SA counters such as total swaps,
+#'   CI-resolved swaps, exact fallback evaluations, calibration sample counts,
+#'   and mean CI widths.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 
@@ -66,13 +81,25 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
                             min = 500, max = 1000, step = 50, iterations = 100000, 
                             minCallRate = 0.98,
-                            method = c("exact", "nystrom"),
-                            n_features = 1024L) {
+                            method = c("exact", "nystrom", "hybrid"),
+                            n_features = 1024L,
+                            ciWidthThreshold = 0.5,
+                            calibrationQuantile = 0.9,
+                            minCalibrationSamples = 8L,
+                            maxCalibrationHistory = 256L) {
   iterations <- as.integer(iterations)
   method <- match.arg(method)
   n_features <- as.integer(n_features)
+  ciWidthThreshold <- as.numeric(ciWidthThreshold)
+  calibrationQuantile <- as.numeric(calibrationQuantile)
+  minCalibrationSamples <- as.integer(minCalibrationSamples)
+  maxCalibrationHistory <- as.integer(maxCalibrationHistory)
   stopifnot(iterations > 0)
   stopifnot(n_features > 0)
+  stopifnot(ciWidthThreshold > 0, ciWidthThreshold <= 1)
+  stopifnot(calibrationQuantile > 0, calibrationQuantile < 1)
+  stopifnot(minCalibrationSamples > 0)
+  stopifnot(maxCalibrationHistory > 0)
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -113,7 +140,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
                                 max, step, iterations, minCallRate,
-                                method, n_features)
+                                method, n_features,
+                                ciWidthThreshold, calibrationQuantile,
+                                minCalibrationSamples, maxCalibrationHistory)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }

@@ -116,7 +116,9 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      double max_lambda, double ub_lambda,
                      int min, int max, int step,
                      int sa_iterations, double min_call_rate,
-                     std::string method, int n_features) {
+                     std::string method, int n_features,
+                     double ci_width_threshold, double calibration_quantile,
+                     int min_calibration_samples, int max_calibration_history) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -133,13 +135,23 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int iterations = sa_iterations;
     double mcr = min_call_rate;
     int features = n_features;
+    int calibration_min = min_calibration_samples;
+    int calibration_history = max_calibration_history;
     bool use_nystrom = false;
+    bool use_hybrid = false;
+    size_t rff_features = std::max(64, features / 4);
     if (method == "exact") {
         use_nystrom = false;
+        use_hybrid = false;
     } else if (method == "nystrom") {
         use_nystrom = true;
+        use_hybrid = false;
+    } else if (method == "hybrid") {
+        use_nystrom = true;
+        use_hybrid = true;
+        rff_features = std::min<size_t>(20000, std::max<size_t>(1024, 16 * (size_t)features));
     } else {
-        stop("Unsupported method. Use 'exact' or 'nystrom'.");
+        stop("Unsupported method. Use 'exact', 'nystrom', or 'hybrid'.");
     }
     mvn::Clustering cl(clust_vec);
 
@@ -148,7 +160,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters, iterations, use_nystrom, features);
+                        min_controls, max_controls, step_clusters, iterations, use_nystrom, (size_t)features,
+                        use_hybrid, rff_features, 42u,
+                        ci_width_threshold, calibration_quantile,
+                        (size_t)calibration_min, (size_t)calibration_history);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);
@@ -162,14 +177,78 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     IntegerVector optimal_controls(result.optimal_prefix.begin(), result.optimal_prefix.end());
     NumericVector optimal_lambda = {result.optimal_lambda};
 
+    const size_t n_sa = matcher.sa_solutions();
+    IntegerVector sa_sizes((R_xlen_t)n_sa);
+    IntegerVector sa_total_swaps((R_xlen_t)n_sa);
+    IntegerVector sa_uncertain_swaps((R_xlen_t)n_sa);
+    IntegerVector sa_ci_resolved_swaps((R_xlen_t)n_sa);
+    IntegerVector sa_exact_unavailable_swaps((R_xlen_t)n_sa);
+    IntegerVector sa_exact_evals((R_xlen_t)n_sa);
+    IntegerVector sa_exact_evals_on_improving((R_xlen_t)n_sa);
+    IntegerVector sa_exact_evals_on_worsening((R_xlen_t)n_sa);
+    IntegerVector sa_exact_failures((R_xlen_t)n_sa);
+    IntegerVector sa_primary_calibration_points((R_xlen_t)n_sa);
+    IntegerVector sa_aux_calibration_points((R_xlen_t)n_sa);
+    NumericVector sa_mean_primary_ci_width((R_xlen_t)n_sa);
+    NumericVector sa_mean_aux_ci_width((R_xlen_t)n_sa);
+    NumericVector sa_mean_selected_ci_width((R_xlen_t)n_sa);
+    CharacterVector sa_names((R_xlen_t)n_sa);
+    for (size_t i = 0; i < n_sa; ++i) {
+        const int size = (int)matcher.sa_solution_size(i);
+        sa_sizes[(R_xlen_t)i] = size;
+        sa_total_swaps[(R_xlen_t)i] = (int)matcher.sa_total_swaps(i);
+        sa_uncertain_swaps[(R_xlen_t)i] = (int)matcher.sa_uncertain_swaps(i);
+        sa_ci_resolved_swaps[(R_xlen_t)i] = (int)matcher.sa_ci_resolved_swaps(i);
+        sa_exact_unavailable_swaps[(R_xlen_t)i] = (int)matcher.sa_exact_unavailable_swaps(i);
+        sa_exact_evals[(R_xlen_t)i] = (int)matcher.sa_exact_evals(i);
+        sa_exact_evals_on_improving[(R_xlen_t)i] = (int)matcher.sa_exact_evals_on_improving(i);
+        sa_exact_evals_on_worsening[(R_xlen_t)i] = (int)matcher.sa_exact_evals_on_worsening(i);
+        sa_exact_failures[(R_xlen_t)i] = (int)matcher.sa_exact_failures(i);
+        sa_primary_calibration_points[(R_xlen_t)i] = (int)matcher.sa_primary_calibration_points(i);
+        sa_aux_calibration_points[(R_xlen_t)i] = (int)matcher.sa_aux_calibration_points(i);
+        sa_mean_primary_ci_width[(R_xlen_t)i] = matcher.sa_mean_primary_ci_width(i);
+        sa_mean_aux_ci_width[(R_xlen_t)i] = matcher.sa_mean_aux_ci_width(i);
+        sa_mean_selected_ci_width[(R_xlen_t)i] = matcher.sa_mean_selected_ci_width(i);
+        sa_names[(R_xlen_t)i] = std::to_string(size);
+    }
+
     lambda.attr("names") = names;
     stats.attr("names") = names;
     pvals_num.attr("names") = names;
+    sa_total_swaps.attr("names") = sa_names;
+    sa_uncertain_swaps.attr("names") = sa_names;
+    sa_ci_resolved_swaps.attr("names") = sa_names;
+    sa_exact_unavailable_swaps.attr("names") = sa_names;
+    sa_exact_evals.attr("names") = sa_names;
+    sa_exact_evals_on_improving.attr("names") = sa_names;
+    sa_exact_evals_on_worsening.attr("names") = sa_names;
+    sa_exact_failures.attr("names") = sa_names;
+    sa_primary_calibration_points.attr("names") = sa_names;
+    sa_aux_calibration_points.attr("names") = sa_names;
+    sa_mean_primary_ci_width.attr("names") = sa_names;
+    sa_mean_aux_ci_width.attr("names") = sa_names;
+    sa_mean_selected_ci_width.attr("names") = sa_names;
     ret["lambda"] = lambda;
     ret["optimal_lambda"] = optimal_lambda;
     ret["statistics"] = stats;
     ret["controls"] = optimal_controls + 1;
     ret["pvals"] = pvals;
     ret["snps"] = pvals_num;
+    ret["sa_diagnostics"] = List::create(
+        Named("subset_sizes") = sa_sizes,
+        Named("total_swaps") = sa_total_swaps,
+        Named("uncertain_swaps") = sa_uncertain_swaps,
+        Named("ci_resolved_swaps") = sa_ci_resolved_swaps,
+        Named("exact_unavailable_swaps") = sa_exact_unavailable_swaps,
+        Named("exact_evals") = sa_exact_evals,
+        Named("exact_evals_on_improving_swaps") = sa_exact_evals_on_improving,
+        Named("exact_evals_on_worsening_swaps") = sa_exact_evals_on_worsening,
+        Named("exact_failures") = sa_exact_failures,
+        Named("primary_calibration_points") = sa_primary_calibration_points,
+        Named("aux_calibration_points") = sa_aux_calibration_points,
+        Named("mean_primary_ci_width") = sa_mean_primary_ci_width,
+        Named("mean_aux_ci_width") = sa_mean_aux_ci_width,
+        Named("mean_selected_ci_width") = sa_mean_selected_ci_width
+    );
     return ret;
 }
