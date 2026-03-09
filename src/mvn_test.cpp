@@ -175,6 +175,9 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     if (!has_aux_statistic()) {
         return get_normality_statistic();
     }
+    if (level >= rff_feature_levels.size() || level >= rff_pairwise_stats.size()) {
+        throw std::logic_error("RFF ladder state is inconsistent");
+    }
 
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
@@ -441,6 +444,7 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
         return;
     }
 
+    mahalanobis_pairwise.resize(n_clusters);
     for (size_t cl = 0; cl < n_clusters; ++cl) {
         mahalanobis_pairwise[cl].resize(n_clusters);
         for (size_t pair_cl = 0; pair_cl < n_clusters; ++pair_cl) {
