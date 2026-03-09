@@ -193,6 +193,7 @@ public:
     std::unique_ptr<mvn_test> clone();
 
 protected:
+    void check_aux_state() const;
     void remove(unsigned i);
     void add(unsigned i);
 

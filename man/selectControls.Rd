@@ -21,7 +21,13 @@ selectControls(
   max = 1000,
   step = 50,
   iterations = 1e+05,
-  minCallRate = 0.98
+  minCallRate = 0.98,
+  method = c("exact", "nystrom", "hybrid"),
+  n_features = 1024L,
+  ciWidthThreshold = 0.5,
+  calibrationQuantile = 0.9,
+  minCalibrationSamples = 8L,
+  maxCalibrationHistory = 256L
 )
 }
 \arguments{
@@ -59,8 +65,35 @@ principal directions of the data in case dataset.}
 
 \item{iterations}{number of simulated annealing iterations per each subset}
 
-\item{minCallRate}{numeric minimal call rate for SNP to be considered.
-size.}
+\item{minCallRate}{numeric minimal call rate for SNP to be considered.}
+
+\item{method}{string approximation method for SA statistic, either
+\code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
+a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
+of increasing prefix sizes; exact evaluation is used only if no ladder level
+yields a sufficiently narrow CI for the acceptance probability.}
+
+\item{n_features}{integer number of Nyström features (landmarks) used when
+\code{method = "nystrom"} or \code{method = "hybrid"}.}
+
+\item{ciWidthThreshold}{numeric maximum acceptable CI width for a cheap
+acceptance-probability estimate. If at least one cheap estimator has CI
+width not exceeding this value, exact evaluation is skipped.}
+
+\item{calibrationQuantile}{numeric quantile of the exact-vs-cheap absolute
+probability error used to calibrate CI half-widths in hybrid mode.}
+
+\item{minCalibrationSamples}{integer minimum number of successful exact
+audits required before using empirical calibration residuals.}
+
+\item{maxCalibrationHistory}{integer maximum number of exact-audit residuals
+retained per estimator in hybrid mode.}
+}
+\value{
+A list with selected controls, lambda summaries, and \code{sa_diagnostics},
+  which reports per-target-subset SA counters such as total swaps,
+  CI-resolved swaps, exact fallback evaluations, calibration sample counts,
+  and mean CI widths.
 }
 \description{
 Finds an optimal set of controls satisfying 

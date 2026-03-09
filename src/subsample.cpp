@@ -26,6 +26,49 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
 
 namespace {
 
+void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
+                           const std::vector<double>& best_stat,
+                           const std::vector<size_t>& best_size,
+                           const std::vector<size_t>& total_swaps_used,
+                           const std::vector<size_t>& uncertain_swaps_used,
+                           const std::vector<size_t>& ci_resolved_swaps_used,
+                           const std::vector<size_t>& exact_unavailable_swaps_used,
+                           const std::vector<size_t>& exact_evals_used,
+                           const std::vector<size_t>& exact_evals_on_improving_used,
+                           const std::vector<size_t>& exact_evals_on_worsening_used,
+                           const std::vector<size_t>& exact_eval_failures,
+                           const std::vector<size_t>& primary_calibration_points_used,
+                           const std::vector<size_t>& aux_calibration_points_used,
+                           const std::vector<double>& mean_primary_ci_width_used,
+                           const std::vector<double>& mean_aux_ci_width_used,
+                           const std::vector<double>& mean_selected_ci_width_used)
+{
+    const size_t n = best.size();
+    auto require_size = [n](size_t size, const char* name) {
+        if (size != n) {
+            throw std::logic_error(std::string("subsample result vector '") + name +
+                                   "' is inconsistent with solutions(): expected " +
+                                   std::to_string(n) + ", got " + std::to_string(size));
+        }
+    };
+
+    require_size(best_stat.size(), "best_stat");
+    require_size(best_size.size(), "best_size");
+    require_size(total_swaps_used.size(), "total_swaps_used");
+    require_size(uncertain_swaps_used.size(), "uncertain_swaps_used");
+    require_size(ci_resolved_swaps_used.size(), "ci_resolved_swaps_used");
+    require_size(exact_unavailable_swaps_used.size(), "exact_unavailable_swaps_used");
+    require_size(exact_evals_used.size(), "exact_evals_used");
+    require_size(exact_evals_on_improving_used.size(), "exact_evals_on_improving_used");
+    require_size(exact_evals_on_worsening_used.size(), "exact_evals_on_worsening_used");
+    require_size(exact_eval_failures.size(), "exact_eval_failures");
+    require_size(primary_calibration_points_used.size(), "primary_calibration_points_used");
+    require_size(aux_calibration_points_used.size(), "aux_calibration_points_used");
+    require_size(mean_primary_ci_width_used.size(), "mean_primary_ci_width_used");
+    require_size(mean_aux_ci_width_used.size(), "mean_aux_ci_width_used");
+    require_size(mean_selected_ci_width_used.size(), "mean_selected_ci_width_used");
+}
+
 struct run_result {
     std::shared_ptr<mvn_test> test;
     size_t total_swaps = 0;
@@ -350,6 +393,12 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 }
 
 size_t subsample::solutions() const {
+    check_solution_vectors(best, best_stat, best_size, total_swaps_used, uncertain_swaps_used,
+                           ci_resolved_swaps_used, exact_unavailable_swaps_used, exact_evals_used,
+                           exact_evals_on_improving_used, exact_evals_on_worsening_used,
+                           exact_eval_failures, primary_calibration_points_used,
+                           aux_calibration_points_used, mean_primary_ci_width_used,
+                           mean_aux_ci_width_used, mean_selected_ci_width_used);
     return best.size();
 }
 

@@ -83,6 +83,24 @@ std::vector<size_t> choose_rff_levels(size_t max_features) {
 
 } // namespace
 
+void mvn_test::check_aux_state() const {
+    if (!use_hybrid) {
+        return;
+    }
+    if (!rff_stats) {
+        throw std::logic_error("Hybrid mode is enabled but RFF stats are missing");
+    }
+    if (rff_feature_levels.empty()) {
+        throw std::logic_error("Hybrid mode is enabled but the RFF ladder is empty");
+    }
+    if (rff_pairwise_stats.size() != rff_feature_levels.size()) {
+        throw std::logic_error("RFF ladder state is inconsistent: pairwise stats and levels differ in size");
+    }
+    if (rff_subset_feature_sum.size() != rff_stats->features_dim()) {
+        throw std::logic_error("RFF ladder state is inconsistent: subset feature sum has unexpected size");
+    }
+}
+
 mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
            bool use_nystrom, size_t n_features,
            bool use_hybrid, size_t rff_features, uint32_t seed)
@@ -168,6 +186,7 @@ double mvn_test::get_aux_normality_statistic() {
     if (!has_aux_statistic()) {
         return get_normality_statistic();
     }
+    check_aux_state();
     return get_aux_normality_statistic(rff_feature_levels.size() - 1);
 }
 
@@ -175,6 +194,7 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     if (!has_aux_statistic()) {
         return get_normality_statistic();
     }
+    check_aux_state();
     if (level >= rff_feature_levels.size() || level >= rff_pairwise_stats.size()) {
         throw std::logic_error("RFF ladder state is inconsistent");
     }
@@ -683,6 +703,7 @@ void mvn_test::remove(unsigned point) {
     }
 
     if (has_aux_statistic()) {
+        check_aux_state();
         const float* phi = rff_stats->features_ptr(point);
         for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
             const size_t dim = rff_feature_levels[level];
@@ -721,6 +742,7 @@ void mvn_test::add(unsigned int point) {
     }
 
     if (has_aux_statistic()) {
+        check_aux_state();
         const float* phi = rff_stats->features_ptr(point);
         const size_t full_dim = rff_stats->features_dim();
         for (size_t d = 0; d < full_dim; ++d) {
