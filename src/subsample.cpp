@@ -186,6 +186,22 @@ double interval_width(double center, double half_width)
     return upper - lower;
 }
 
+double local_disagreement(const std::vector<double>& values, double reference, size_t index)
+{
+    if (values.empty() || index >= values.size()) {
+        return 0.0;
+    }
+
+    double disagreement = std::abs(values[index] - reference);
+    if (index > 0) {
+        disagreement = std::max(disagreement, std::abs(values[index] - values[index - 1]));
+    }
+    if (index + 1 < values.size()) {
+        disagreement = std::max(disagreement, std::abs(values[index] - values[index + 1]));
+    }
+    return disagreement;
+}
+
 void push_bounded(std::vector<double>& values, double value, size_t max_calibration_history)
 {
     if (values.size() >= max_calibration_history) {
@@ -292,34 +308,36 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                             p_aux_values[level] = acceptance_probability(delta_aux, t);
                         }
 
-                        const double primary_local_spread = std::abs(p_primary - p_aux_values.front());
-                        const double primary_half_width = std::max(
-                            primary_local_spread,
-                            calibration_half_width(primary_residuals, calibration_quantile, min_calibration_samples));
+                        const double primary_half_width = calibration_half_width(
+                            primary_residuals, calibration_quantile, min_calibration_samples);
                         const double primary_width = interval_width(p_primary, primary_half_width);
+                        const double primary_disagreement = p_aux_values.empty()
+                            ? 0.0
+                            : local_disagreement(p_aux_values, p_primary, 0);
 
                         double representative_aux_width = 1.0;
                         double selected_width = primary_width;
                         double cheap_probability = p_primary;
                         double fallback_width = primary_width;
                         double fallback_probability = p_primary;
-                        bool resolved_by_ci = (primary_width <= ci_width_threshold);
+                        bool resolved_by_ci = (primary_width <= ci_width_threshold) &&
+                                              (primary_disagreement <= ci_width_threshold);
                         bool resolved_by_primary = resolved_by_ci;
                         bool resolved_by_aux = false;
                         size_t resolved_aux_level = p_aux_values.size();
 
-                        double reference_probability = p_primary;
                         for (size_t level = 0; level < p_aux_values.size(); ++level) {
-                            const double aux_half_width = std::max(
-                                std::abs(p_aux_values[level] - reference_probability),
-                                calibration_half_width(aux_residuals[level], calibration_quantile, min_calibration_samples));
+                            const double aux_half_width = calibration_half_width(
+                                aux_residuals[level], calibration_quantile, min_calibration_samples);
                             const double aux_width = interval_width(p_aux_values[level], aux_half_width);
+                            const double aux_disagreement = local_disagreement(p_aux_values, p_primary, level);
                             representative_aux_width = aux_width;
                             if (aux_width < fallback_width) {
                                 fallback_width = aux_width;
                                 fallback_probability = p_aux_values[level];
                             }
-                            if (aux_width <= ci_width_threshold) {
+                            if ((aux_width <= ci_width_threshold) &&
+                                (aux_disagreement <= ci_width_threshold)) {
                                 if (!resolved_by_ci || aux_width < selected_width) {
                                     selected_width = aux_width;
                                     cheap_probability = p_aux_values[level];
@@ -330,7 +348,6 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                 resolved_aux_level = level;
                                 break;
                             }
-                            reference_probability = p_aux_values[level];
                         }
 
                         result.primary_ci_width_sum += primary_width;

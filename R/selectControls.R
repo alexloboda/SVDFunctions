@@ -62,10 +62,13 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param n_features integer number of Nyström features (landmarks) used when
 #'   \code{method = "nystrom"} or \code{method = "hybrid"}.
 #' @param ciWidthThreshold numeric maximum acceptable CI width for a cheap
-#'   acceptance-probability estimate. If at least one cheap estimator has CI
-#'   width not exceeding this value, exact evaluation is skipped.
+#'   acceptance-probability estimate. In hybrid mode, each cheap estimator uses
+#'   its own exact-vs-cheap calibration residuals to form the CI, and exact
+#'   evaluation is skipped only when some cheap estimator has both CI width and
+#'   local cross-estimator disagreement not exceeding this value.
 #' @param calibrationQuantile numeric quantile of the exact-vs-cheap absolute
-#'   probability error used to calibrate CI half-widths in hybrid mode.
+#'   probability error used to calibrate each estimator's CI half-width in
+#'   hybrid mode.
 #' @param minCalibrationSamples integer minimum number of successful exact
 #'   audits required before using empirical calibration residuals.
 #' @param maxCalibrationHistory integer maximum number of exact-audit residuals
