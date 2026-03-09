@@ -11,8 +11,6 @@
 #include <xmmintrin.h>
 #endif
 
-#include <assert.h>
-
 namespace mvn {
 
 namespace {
@@ -154,7 +152,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     if (use_hybrid) {
         // Single-beta auxiliary statistic for gating with progressively larger
         // RFF prefixes taken from one precomputed embedding bank.
-        const double beta = betas.at(0);
+        const double beta = betas.front();
         const uint32_t rff_seed = seed + 1337u;
         rff_stats = std::make_shared<mvn_stats>(*distances, *this->clustering, beta,
                                                 false, 0,
@@ -165,6 +163,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         if (rff_stats->is_feature_mode()) {
             rff_subset_feature_sum.assign(rff_stats->features_dim(), 0.0f);
         }
+        check_aux_state();
     }
 
     std::vector<double> lls;
@@ -185,7 +184,6 @@ double mvn_test::get_aux_normality_statistic() {
     if (!has_aux_statistic()) {
         return get_normality_statistic();
     }
-    check_aux_state();
     return get_aux_normality_statistic(rff_feature_levels.size() - 1);
 }
 
@@ -193,7 +191,6 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     if (!has_aux_statistic()) {
         return get_normality_statistic();
     }
-    check_aux_state();
     if (level >= rff_feature_levels.size() || level >= rff_pairwise_stats.size()) {
         throw std::logic_error("RFF ladder state is inconsistent");
     }
@@ -201,9 +198,9 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
     }
-    const double beta = betas.at(0);
+    const double beta = betas.front();
     double stat = std::pow(1 + 2 * std::pow(beta, 2), dimensions() / -2.0);
-    stat += (1.0 / ((double)effect_size * effect_size)) * rff_pairwise_stats.at(level);
+    stat += (1.0 / ((double)effect_size * effect_size)) * rff_pairwise_stats[level];
     stat -= (2.0 / (effect_size * std::pow(1 + std::pow(beta, 2.0), dimensions() / 2.0))) * rff_center_stat;
     return stat;
 }
@@ -249,7 +246,7 @@ double mvn_test::exact_delta_last_swap() const {
     if (betas.empty()) {
         throw std::logic_error("No beta configured");
     }
-    const double beta = betas.at(0);
+    const double beta = betas.front();
     const double k_center = -(beta * beta / (2 * (1 + beta * beta)));
     const double k_pw = -(beta * beta) / 2.0;
 
@@ -544,7 +541,9 @@ void mvn_test::swap_once(bool reject_last) {
 
     int replacing_point = -1;
     if (reject_last) {
-        assert(latest_subset_point != -1);
+        if (latest_subset_point == -1) {
+            throw std::logic_error("Unable to reject the last swap.");
+        }
         replacing_point = latest_subset_point;
         latest_subset_point = -1;
         latest_replacing_point = -1;
@@ -636,11 +635,11 @@ size_t Clustering::size() const {
 }
 
 const std::vector<int>& Clustering::elements(size_t i) const {
-    return clusters.at(i);
+    return clusters[i];
 }
 
 size_t Clustering::cluster_size(size_t i) const {
-    return clusters.at(i).size();
+    return clusters[i].size();
 }
 
 mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean)
@@ -672,11 +671,11 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
     const double xixj = (*X).col((Eigen::Index)i).dot(S_inv_X.col((Eigen::Index)j));
-    return quad_x.at(i) - 2.0 * xixj + quad_x.at(j);
+    return quad_x[i] - 2.0 * xixj + quad_x[j];
 }
 
 double mahalanobis_distances::distance(unsigned i) const {
-    return quad_x.at(i) - 2.0 * x_mu.at(i) + mu_mu;
+    return quad_x[i] - 2.0 * x_mu[i] + mu_mu;
 }
 
 void mvn_test::remove(unsigned point) {
@@ -702,7 +701,6 @@ void mvn_test::remove(unsigned point) {
     }
 
     if (has_aux_statistic()) {
-        check_aux_state();
         const float* phi = rff_stats->features_ptr(point);
         for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
             const size_t dim = rff_feature_levels[level];
@@ -741,7 +739,6 @@ void mvn_test::add(unsigned int point) {
     }
 
     if (has_aux_statistic()) {
-        check_aux_state();
         const float* phi = rff_stats->features_ptr(point);
         const size_t full_dim = rff_stats->features_dim();
         for (size_t d = 0; d < full_dim; ++d) {
@@ -796,7 +793,7 @@ RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :ru
 
 
 bool RandomSampler::is_active(size_t n) const {
-    return active_tree.at(el_pos(n));
+    return active_tree[el_pos(n)];
 }
 
 void RandomSampler::disable(size_t n) {
@@ -815,7 +812,7 @@ void RandomSampler::enable(size_t n) {
     }
     auto pos = el_pos(n);
     segment_tree[pos] = original[n];
-    active_tree.at(pos) = true;
+    active_tree[pos] = true;
     update(pos);
 }
 
@@ -826,16 +823,16 @@ size_t RandomSampler::sample() {
     size_t node = 0;
     while (!is_leaf(node)) {
         auto chld = children(node);
-        if (active_tree.at(chld.first) == 0) {
-            if (active_tree.at(chld.second) == 0) {
+        if (active_tree[chld.first] == 0) {
+            if (active_tree[chld.second] == 0) {
                 throw std::logic_error("No active elements in subtree");
             }
             node = chld.second;
-        } else if(active_tree.at(chld.second) == 0) {
+        } else if(active_tree[chld.second] == 0) {
             node = chld.first;
         } else {
-            double l = segment_tree.at(chld.first);
-            double r = segment_tree.at(chld.second);
+            double l = segment_tree[chld.first];
+            double r = segment_tree[chld.second];
             double maxL = std::max(l, r);
             l = std::exp(l - maxL);
             r = std::exp(r - maxL);
@@ -850,11 +847,10 @@ size_t RandomSampler::sample() {
     }
 
     int aug_nodes = segment_tree.size() - original.size();
-    if (!active_tree.at(node)) {
+    if (!active_tree[node]) {
         throw std::logic_error("Sampled element is not active.");
     }
     int element = node - aug_nodes;
-    assert(el_pos(element) == node);
     return element;
 }
 
@@ -901,8 +897,7 @@ size_t RandomSampler::parent(size_t node) {
 void RandomSampler::update_inner_node(size_t node) {
     auto chs = children(node);
     segment_tree[node] = sum_log(segment_tree[chs.first], segment_tree[chs.second]);
-    assert(!std::isnan(segment_tree[node]));
-    active_tree[node] = active_tree.at(chs.first) + active_tree.at(chs.second);
+    active_tree[node] = active_tree[chs.first] + active_tree[chs.second];
 }
 
 void RandomSampler::update(size_t node) {
@@ -936,7 +931,7 @@ RandomSampler& RandomSampler::operator=(RandomSampler&& other) {
 }
 
 size_t RandomSampler::n_active() const {
-    return active_tree.at(0);
+    return active_tree[0];
 }
 
 }

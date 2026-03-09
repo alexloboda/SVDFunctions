@@ -111,7 +111,7 @@ public:
     }
 
     const float* features_ptr(size_t cluster) const {
-        return cluster_features.at(cluster).data();
+        return cluster_features[cluster].data();
     }
 
     double pairwise_stat(size_t i, size_t j) const;
@@ -182,7 +182,7 @@ public:
     }
 
     size_t aux_statistic_level_dim(size_t level) const {
-        return rff_feature_levels.at(level);
+        return rff_feature_levels[level];
     }
 
     bool last_swap_has_equal_effect_size() const;
