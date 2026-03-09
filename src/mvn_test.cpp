@@ -455,8 +455,20 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     if (!feature_mode) {
         cluster_features.clear();
         feature_dim = 0;
-        // Exact mode: no precomputed cluster-pair matrix (O(N^2)). Pairwise terms are computed on-the-fly.
-        mahalanobis_pairwise.clear();
+        mahalanobis_pairwise.resize(n_clusters);
+        for (size_t cl = 0; cl < n_clusters; ++cl) {
+            mahalanobis_pairwise[cl].resize(n_clusters);
+            for (size_t pair_cl = 0; pair_cl < n_clusters; ++pair_cl) {
+                double acc = 0.0;
+                for (int el : clst.elements(cl)) {
+                    for (int pair_el : clst.elements(pair_cl)) {
+                        const double value = std::exp(k_pw * distances.interpoint_distance((unsigned)el, (unsigned)pair_el));
+                        acc += (cl == pair_cl) ? 0.5 * value : value;
+                    }
+                }
+                mahalanobis_pairwise[cl][pair_cl] = acc;
+            }
+        }
         return;
     }
 
@@ -482,6 +494,10 @@ double mvn_stats::feature_pairwise_stat(size_t i, size_t j) const {
 double mvn_stats::pairwise_stat(size_t i, size_t j) const {
     if (feature_mode) {
         return feature_pairwise_stat(i, j);
+    }
+
+    if (!mahalanobis_pairwise.empty()) {
+        return mahalanobis_pairwise[i][j];
     }
 
     if (!distances || !clustering) {
@@ -511,6 +527,15 @@ double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) cons
         double ret = 0.0;
         for (auto s: ss) {
             ret += feature_pairwise_stat(point, s);
+        }
+        return ret;
+    }
+
+    if (!mahalanobis_pairwise.empty()) {
+        double ret = 0.0;
+        const auto& pairwise_row = mahalanobis_pairwise[point];
+        for (auto s: ss) {
+            ret += pairwise_row[s];
         }
         return ret;
     }
