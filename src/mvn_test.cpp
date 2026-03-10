@@ -205,6 +205,43 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     return stat;
 }
 
+double mvn_test::aux_delta_last_swap(size_t level) const {
+    if (!has_aux_statistic()) {
+        throw std::logic_error("Auxiliary delta requested but hybrid mode is disabled");
+    }
+    if (!last_swap_has_equal_effect_size()) {
+        throw std::logic_error("Auxiliary delta requires unchanged effect size (equal cluster sizes)");
+    }
+    if (level >= rff_feature_levels.size()) {
+        throw std::logic_error("RFF ladder level is out of range");
+    }
+    if (effect_size <= dimensions()) {
+        throw std::logic_error("Too few points.");
+    }
+
+    const size_t a = (size_t)latest_subset_point;
+    const size_t b = (size_t)latest_replacing_point;
+    const size_t dim = rff_feature_levels[level];
+    const float* phi_a = rff_stats->features_ptr(a);
+    const float* phi_b = rff_stats->features_ptr(b);
+    const double beta = betas.front();
+    const double n = (double)effect_size;
+    const double denom_center = std::pow(1 + std::pow(beta, 2.0), dimensions() / 2.0);
+
+    const double dot_sum_b = dot_float_sse(rff_subset_feature_sum.data(), phi_b, dim);
+    const double dot_sum_a = dot_float_sse(rff_subset_feature_sum.data(), phi_a, dim);
+    const double self_b = dot_float_sse(phi_b, phi_b, dim);
+    const double self_a = dot_float_sse(phi_a, phi_a, dim);
+    const double cross_ab = dot_float_sse(phi_a, phi_b, dim);
+
+    const double delta_pairwise = 2.0 * (dot_sum_b - dot_sum_a) - (self_b + self_a - 2.0 * cross_ab);
+    const double delta_center = rff_stats->centered_stat(b) - rff_stats->centered_stat(a);
+
+    double delta_stat = (1.0 / (n * n)) * delta_pairwise;
+    delta_stat -= (2.0 / (n * denom_center)) * delta_center;
+    return delta_stat;
+}
+
 bool mvn_test::last_swap_has_equal_effect_size() const {
     if (latest_subset_point < 0 || latest_replacing_point < 0) {
         return false;

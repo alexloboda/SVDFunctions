@@ -306,24 +306,12 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 }
                 std::uniform_real_distribution<double> random_unif(0.0, 1.0);
                 double score = local_test->get_normality_statistic();
-                std::vector<double> aux_scores(local_test->aux_statistic_levels(), score);
-                if (local_test->has_aux_statistic()) {
-                    for (size_t level = 0; level < aux_scores.size(); ++level) {
-                        aux_scores[level] = local_test->get_aux_normality_statistic(level);
-                    }
-                }
                 for (size_t k = 0; k < iterations; k++) {
                     t = c * t;
                     const size_t temp_bin = temperature_bin_index(k, iterations);
                     result.temperature_bin_total_swaps[temp_bin]++;
                     local_test->swap_once();
                     double new_score = local_test->get_normality_statistic();
-                    std::vector<double> new_aux_scores(aux_scores.size(), new_score);
-                    if (local_test->has_aux_statistic()) {
-                        for (size_t level = 0; level < new_aux_scores.size(); ++level) {
-                            new_aux_scores[level] = local_test->get_aux_normality_statistic(level);
-                        }
-                    }
 
                     const double delta_primary = new_score - score;
                     const bool primary_improving = delta_primary <= 0.0;
@@ -333,7 +321,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     bool accept = true;
 
                     if (local_test->has_aux_statistic()) {
-                        const size_t estimator_count = 1 + new_aux_scores.size();
+                        const size_t estimator_count = 1 + local_test->aux_statistic_levels();
                         const decision_interval primary_interval = probability_interval_from_delta(
                             delta_primary,
                             calibration_half_width(primary_delta_residuals, calibration_quantile,
@@ -349,7 +337,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                         bool resolved_by_ci = false;
                         bool resolved_by_primary = false;
                         bool resolved_by_aux = false;
-                        size_t resolved_aux_level = new_aux_scores.size();
+                        size_t resolved_aux_level = local_test->aux_statistic_levels();
 
                         if (primary_interval.resolved && primary_interval.width <= ci_width_threshold) {
                             resolved_by_ci = true;
@@ -358,8 +346,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                             selected_width = primary_interval.width;
                         }
 
-                        for (size_t level = 0; level < new_aux_scores.size(); ++level) {
-                            const double delta_aux = new_aux_scores[level] - aux_scores[level];
+                        for (size_t level = 0; level < local_test->aux_statistic_levels(); ++level) {
+                            const double delta_aux = local_test->aux_delta_last_swap(level);
                             const decision_interval aux_interval = probability_interval_from_delta(
                                 delta_aux,
                                 calibration_half_width(aux_delta_residuals[level], calibration_quantile,
@@ -414,8 +402,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                     const double delta_exact = local_test->exact_delta_last_swap();
                                     const double p_exact = acceptance_probability(delta_exact, t);
                                     push_bounded(primary_delta_residuals, std::abs(delta_exact - delta_primary), max_calibration_history);
-                                    for (size_t level = 0; level < new_aux_scores.size(); ++level) {
-                                        const double delta_aux = new_aux_scores[level] - aux_scores[level];
+                                    for (size_t level = 0; level < local_test->aux_statistic_levels(); ++level) {
+                                        const double delta_aux = local_test->aux_delta_last_swap(level);
                                         push_bounded(aux_delta_residuals[level], std::abs(delta_exact - delta_aux), max_calibration_history);
                                     }
                                     accept = (acceptance_draw < p_exact);
@@ -462,7 +450,6 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     } else {
                         result.temperature_bin_accepted_swaps[temp_bin]++;
                         score = new_score;
-                        aux_scores = new_aux_scores;
                     }
                 }
                 result.primary_calibration_points = primary_delta_residuals.size();

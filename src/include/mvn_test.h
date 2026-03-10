@@ -177,6 +177,7 @@ public:
 
     double get_aux_normality_statistic();
     double get_aux_normality_statistic(size_t level) const;
+    double aux_delta_last_swap(size_t level) const;
     size_t aux_statistic_levels() const {
         return rff_feature_levels.size();
     }
