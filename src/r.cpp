@@ -219,7 +219,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
             level_counts[(R_xlen_t)i] = (int)matcher.sa_aux_level_resolved_swaps(i, level);
         }
         sa_aux_level_resolved[(R_xlen_t)level] = level_counts;
-        sa_aux_level_names[(R_xlen_t)level] = "x" + std::to_string(1u << (2 * level));
+        sa_aux_level_names[(R_xlen_t)level] = "f" + std::to_string(matcher.sa_aux_level_dim(level));
     }
     sa_aux_level_resolved.attr("names") = sa_aux_level_names;
 

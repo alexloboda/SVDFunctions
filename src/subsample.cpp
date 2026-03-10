@@ -3,6 +3,7 @@
 #include <Rcpp.h>
 #include <iostream>
 #include <fstream>
+#include <limits>
 #include <random>
 #include <chrono>
 #include "include/third-party/cxxpool.h"
@@ -27,6 +28,7 @@ subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& cls
 namespace {
 
 constexpr size_t TEMPERATURE_BIN_COUNT = 10;
+constexpr double HYBRID_RESOLVED_AUDIT_RATE = 0.05;
 
 void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
                            const std::vector<double>& best_stat,
@@ -171,63 +173,63 @@ double empirical_quantile(const std::vector<double>& values, double probability)
 }
 
 double calibration_half_width(const std::vector<double>& residuals, double calibration_quantile,
-                              size_t min_calibration_samples)
+                              size_t min_calibration_samples, size_t estimator_count)
 {
     if (residuals.size() < min_calibration_samples) {
-        return 1.0;
+        return std::numeric_limits<double>::infinity();
     }
-    return empirical_quantile(residuals, calibration_quantile);
+    const double clamped_quantile = std::min(1.0, std::max(0.0, calibration_quantile));
+    const double adjusted_quantile = 1.0 - ((1.0 - clamped_quantile) / std::max<size_t>(1, estimator_count));
+    return empirical_quantile(residuals, adjusted_quantile);
 }
 
-double interval_width(double center, double half_width)
-{
-    const double lower = std::max(0.0, center - half_width);
-    const double upper = std::min(1.0, center + half_width);
-    return upper - lower;
-}
+struct decision_interval {
+    double lower_probability = 0.0;
+    double upper_probability = 1.0;
+    double width = 1.0;
+    double point_probability = 0.0;
+    bool resolved = false;
+    bool accept = false;
+};
 
-double interval_lower(double center, double half_width)
+decision_interval probability_interval_from_delta(double delta, double delta_half_width,
+                                                  double temperature, double draw)
 {
-    return std::max(0.0, center - half_width);
-}
+    decision_interval interval;
+    interval.point_probability = acceptance_probability(delta, temperature);
+    interval.accept = (draw < interval.point_probability);
 
-double interval_upper(double center, double half_width)
-{
-    return std::min(1.0, center + half_width);
-}
-
-bool interval_resolves_draw(double lower, double upper, double draw)
-{
-    return draw < lower || draw > upper;
-}
-
-bool interval_accepts_draw(double lower, double draw)
-{
-    return draw < lower;
-}
-
-double primary_disagreement(const std::vector<double>& aux_values, double primary_value)
-{
-    if (aux_values.empty()) {
-        return 0.0;
-    }
-    return std::abs(primary_value - aux_values.front());
-}
-
-double local_disagreement(const std::vector<double>& values, double reference, size_t index)
-{
-    if (values.empty() || index >= values.size()) {
-        return 0.0;
+    if (!std::isfinite(delta_half_width)) {
+        return interval;
     }
 
-    double disagreement = std::abs(values[index] - reference);
-    if (index > 0) {
-        disagreement = std::max(disagreement, std::abs(values[index] - values[index - 1]));
+    const double delta_lower = delta - delta_half_width;
+    const double delta_upper = delta + delta_half_width;
+
+    if (delta_upper <= 0.0) {
+        interval.lower_probability = 1.0;
+        interval.upper_probability = 1.0;
+        interval.width = 0.0;
+        interval.resolved = true;
+        interval.accept = true;
+        return interval;
     }
-    if (index + 1 < values.size()) {
-        disagreement = std::max(disagreement, std::abs(values[index] - values[index + 1]));
+
+    interval.lower_probability = acceptance_probability(std::max(0.0, delta_upper), temperature);
+    interval.upper_probability = (delta_lower <= 0.0)
+        ? 1.0
+        : acceptance_probability(delta_lower, temperature);
+    interval.width = interval.upper_probability - interval.lower_probability;
+
+    if (draw < interval.lower_probability) {
+        interval.resolved = true;
+        interval.accept = true;
+    } else if (draw > interval.upper_probability) {
+        interval.resolved = true;
+        interval.accept = false;
     }
-    return disagreement;
+
+    return interval;
 }
 
 void push_bounded(std::vector<double>& values, double value, size_t max_calibration_history)
@@ -288,8 +290,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 double t = t_start;
                 std::mt19937 mersenne_wheel(seed);
                 std::shared_ptr<mvn_test> local_test = test->clone();
-                std::vector<double> primary_residuals;
-                std::vector<std::vector<double>> aux_residuals(local_test->aux_statistic_levels());
+                std::vector<double> primary_delta_residuals;
+                std::vector<std::vector<double>> aux_delta_residuals(local_test->aux_statistic_levels());
                 result.aux_level_resolved_swaps.assign(local_test->aux_statistic_levels(), 0);
                 result.temperature_bin_total_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
                 result.temperature_bin_accepted_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
@@ -331,79 +333,74 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     bool accept = true;
 
                     if (local_test->has_aux_statistic()) {
-                        std::vector<double> p_aux_values(new_aux_scores.size(), p_primary);
-                        for (size_t level = 0; level < new_aux_scores.size(); ++level) {
-                            const double delta_aux = new_aux_scores[level] - aux_scores[level];
-                            p_aux_values[level] = acceptance_probability(delta_aux, t);
-                        }
-
-                        const double primary_half_width = calibration_half_width(
-                            primary_residuals, calibration_quantile, min_calibration_samples);
-                        const double primary_lower = interval_lower(p_primary, primary_half_width);
-                        const double primary_upper = interval_upper(p_primary, primary_half_width);
-                        const double primary_width = interval_width(p_primary, primary_half_width);
-                        const double primary_disagreement_value = primary_disagreement(p_aux_values, p_primary);
+                        const size_t estimator_count = 1 + new_aux_scores.size();
+                        const decision_interval primary_interval = probability_interval_from_delta(
+                            delta_primary,
+                            calibration_half_width(primary_delta_residuals, calibration_quantile,
+                                                   min_calibration_samples, estimator_count),
+                            t,
+                            acceptance_draw);
 
                         double representative_aux_width = 1.0;
-                        double selected_width = primary_width;
-                        double cheap_probability = p_primary;
-                        bool cheap_accept = (acceptance_draw < p_primary);
-                        double fallback_width = primary_width;
-                        double fallback_probability = p_primary;
-                        bool fallback_accept = cheap_accept;
+                        double selected_width = primary_interval.width;
+                        bool cheap_accept = primary_interval.accept;
+                        double fallback_width = primary_interval.width;
+                        bool fallback_accept = primary_interval.accept;
                         bool resolved_by_ci = false;
-                        bool resolved_by_primary = resolved_by_ci;
+                        bool resolved_by_primary = false;
                         bool resolved_by_aux = false;
-                        size_t resolved_aux_level = p_aux_values.size();
+                        size_t resolved_aux_level = new_aux_scores.size();
 
-                        const bool primary_passes_veto = primary_disagreement_value <= ci_width_threshold;
-                        if (primary_passes_veto && interval_resolves_draw(primary_lower, primary_upper, acceptance_draw)) {
+                        if (primary_interval.resolved && primary_interval.width <= ci_width_threshold) {
                             resolved_by_ci = true;
                             resolved_by_primary = true;
-                            cheap_accept = interval_accepts_draw(primary_lower, acceptance_draw);
+                            cheap_accept = primary_interval.accept;
+                            selected_width = primary_interval.width;
                         }
 
-                        for (size_t level = 0; level < p_aux_values.size(); ++level) {
-                            const double aux_half_width = calibration_half_width(
-                                aux_residuals[level], calibration_quantile, min_calibration_samples);
-                            const double aux_lower = interval_lower(p_aux_values[level], aux_half_width);
-                            const double aux_upper = interval_upper(p_aux_values[level], aux_half_width);
-                            const double aux_width = interval_width(p_aux_values[level], aux_half_width);
-                            const double aux_disagreement = local_disagreement(p_aux_values, p_primary, level);
-                            representative_aux_width = aux_width;
-                            if (aux_width < fallback_width) {
-                                fallback_width = aux_width;
-                                fallback_probability = p_aux_values[level];
-                                fallback_accept = (acceptance_draw < p_aux_values[level]);
+                        for (size_t level = 0; level < new_aux_scores.size(); ++level) {
+                            const double delta_aux = new_aux_scores[level] - aux_scores[level];
+                            const decision_interval aux_interval = probability_interval_from_delta(
+                                delta_aux,
+                                calibration_half_width(aux_delta_residuals[level], calibration_quantile,
+                                                       min_calibration_samples, estimator_count),
+                                t,
+                                acceptance_draw);
+                            representative_aux_width = std::min(representative_aux_width, aux_interval.width);
+                            if (aux_interval.width < fallback_width) {
+                                fallback_width = aux_interval.width;
+                                fallback_accept = aux_interval.accept;
                             }
-                            if ((aux_disagreement <= ci_width_threshold) &&
-                                interval_resolves_draw(aux_lower, aux_upper, acceptance_draw)) {
-                                selected_width = aux_width;
-                                cheap_probability = p_aux_values[level];
-                                cheap_accept = interval_accepts_draw(aux_lower, acceptance_draw);
+                            if (aux_interval.resolved && aux_interval.width <= ci_width_threshold &&
+                                (!resolved_by_ci || aux_interval.width < selected_width)) {
                                 resolved_by_ci = true;
                                 resolved_by_primary = false;
                                 resolved_by_aux = true;
                                 resolved_aux_level = level;
-                                break;
+                                cheap_accept = aux_interval.accept;
+                                selected_width = aux_interval.width;
                             }
                         }
 
-                        result.primary_ci_width_sum += primary_width;
+                        result.primary_ci_width_sum += primary_interval.width;
                         result.aux_ci_width_sum += representative_aux_width;
                         result.ci_width_observations++;
 
                         if (!resolved_by_ci) {
                             selected_width = fallback_width;
-                            cheap_probability = fallback_probability;
                             cheap_accept = fallback_accept;
                         }
                         result.selected_ci_width_sum += selected_width;
 
-                        const bool need_exact = !resolved_by_ci;
+                        const bool should_audit = resolved_by_ci && local_test->last_swap_has_equal_effect_size() &&
+                            (primary_delta_residuals.size() < min_calibration_samples ||
+                             random_unif(mersenne_wheel) < HYBRID_RESOLVED_AUDIT_RATE);
+                        const bool need_exact = !resolved_by_ci || should_audit;
 
                         if (need_exact) {
-                            result.uncertain_swaps++;
+                            if (!resolved_by_ci) {
+                                result.uncertain_swaps++;
+                            }
                             if (local_test->last_swap_has_equal_effect_size()) {
                                 try {
                                     result.exact_evals++;
@@ -416,16 +413,27 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
 
                                     const double delta_exact = local_test->exact_delta_last_swap();
                                     const double p_exact = acceptance_probability(delta_exact, t);
-                                    push_bounded(primary_residuals, std::abs(p_exact - p_primary), max_calibration_history);
-                                    for (size_t level = 0; level < p_aux_values.size(); ++level) {
-                                        push_bounded(aux_residuals[level], std::abs(p_exact - p_aux_values[level]), max_calibration_history);
+                                    push_bounded(primary_delta_residuals, std::abs(delta_exact - delta_primary), max_calibration_history);
+                                    for (size_t level = 0; level < new_aux_scores.size(); ++level) {
+                                        const double delta_aux = new_aux_scores[level] - aux_scores[level];
+                                        push_bounded(aux_delta_residuals[level], std::abs(delta_exact - delta_aux), max_calibration_history);
                                     }
-                                    result.primary_calibration_points = primary_residuals.size();
-                                    result.aux_calibration_points = aux_residuals.empty() ? 0 : aux_residuals.back().size();
                                     accept = (acceptance_draw < p_exact);
                                 } catch (...) {
                                     result.exact_failures++;
                                     result.temperature_bin_exact_failures[temp_bin]++;
+
+                                     if (resolved_by_ci) {
+                                        result.ci_resolved_swaps++;
+                                        if (resolved_by_primary) {
+                                            result.primary_resolved_swaps++;
+                                            result.temperature_bin_primary_resolved_swaps[temp_bin]++;
+                                        }
+                                        if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
+                                            result.aux_level_resolved_swaps[resolved_aux_level]++;
+                                            result.temperature_bin_aux_resolved_swaps[temp_bin]++;
+                                        }
+                                    }
                                     accept = cheap_accept;
                                 }
                             } else {
@@ -457,6 +465,8 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                         aux_scores = new_aux_scores;
                     }
                 }
+                result.primary_calibration_points = primary_delta_residuals.size();
+                result.aux_calibration_points = aux_delta_residuals.empty() ? 0 : aux_delta_residuals.back().size();
                 result.test = local_test;
                 return result;
             }));
@@ -615,6 +625,10 @@ size_t subsample::primary_resolved_swaps(size_t k) const {
 
 size_t subsample::aux_ladder_levels() const {
     return aux_level_resolved_swaps_used.empty() ? 0 : aux_level_resolved_swaps_used.front().size();
+}
+
+size_t subsample::aux_level_dim(size_t level) const {
+    return test->aux_statistic_level_dim(level);
 }
 
 size_t subsample::aux_level_resolved_swaps(size_t k, size_t level) const {

@@ -65,16 +65,16 @@ std::vector<size_t> choose_rff_levels(size_t max_features) {
         return levels;
     }
 
-    size_t level = std::min<size_t>(1024, max_features);
-    levels.push_back(level);
+    size_t level = std::min<size_t>(64, max_features);
     while (level < max_features) {
-        const size_t next = std::min(max_features, level * 4);
+        levels.push_back(level);
+        const size_t next = std::min(max_features, level * 2);
         if (next == level) {
             break;
         }
-        levels.push_back(next);
         level = next;
     }
+    levels.push_back(max_features);
     return levels;
 }
 

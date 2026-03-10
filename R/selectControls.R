@@ -58,21 +58,21 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #'   \code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
 #'   a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
 #'   of increasing prefix sizes; a single SA acceptance draw is tested against the
-#'   calibrated probability interval from the primary Nystrom estimate and then
-#'   successively against each auxiliary RFF ladder level, and exact evaluation is
-#'   used only if none of those cheap estimators can resolve the accept/reject
-#'   decision.
+#'   calibrated acceptance interval from the primary Nystrom estimate and each
+#'   auxiliary RFF ladder level, and the narrowest cheap interval that both
+#'   resolves the sampled SA accept/reject decision and stays below the requested
+#'   CI-width threshold is used. A small fraction of cheap-resolved swaps is still
+#'   audited exactly to keep the calibration unbiased.
 #' @param n_features integer number of Nyström features (landmarks) used when
 #'   \code{method = "nystrom"} or \code{method = "hybrid"}.
 #' @param ciWidthThreshold numeric maximum acceptable CI width for a cheap
 #'   acceptance-probability estimate. In hybrid mode, each cheap estimator uses
-#'   its own exact-vs-cheap calibration residuals to form the CI, and exact
-#'   evaluation is skipped only when some cheap estimator resolves the sampled SA
-#'   accept/reject decision and has local cross-estimator disagreement not
-#'   exceeding this value.
+#'   its own exact-vs-cheap delta residuals to form a conservative acceptance
+#'   interval, and exact evaluation is skipped only when some cheap estimator
+#'   resolves the sampled SA accept/reject decision with CI width not exceeding
+#'   this value.
 #' @param calibrationQuantile numeric quantile of the exact-vs-cheap absolute
-#'   probability error used to calibrate each estimator's CI half-width in
-#'   hybrid mode.
+#'   delta error used to calibrate each estimator's CI half-width in hybrid mode.
 #' @param minCalibrationSamples integer minimum number of successful exact
 #'   audits required before using empirical calibration residuals.
 #' @param maxCalibrationHistory integer maximum number of exact-audit residuals

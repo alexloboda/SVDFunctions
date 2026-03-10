@@ -126,6 +126,10 @@ public:
         return subsampling.aux_ladder_levels();
     }
 
+    size_t sa_aux_level_dim(size_t level) const {
+        return subsampling.aux_level_dim(level);
+    }
+
     size_t sa_aux_level_resolved_swaps(size_t k, size_t level) const {
         return subsampling.aux_level_resolved_swaps(k, level);
     }

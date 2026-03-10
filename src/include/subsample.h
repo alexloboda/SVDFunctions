@@ -63,6 +63,7 @@ public:
     size_t ci_resolved_swaps(size_t k) const;
     size_t primary_resolved_swaps(size_t k) const;
     size_t aux_ladder_levels() const;
+    size_t aux_level_dim(size_t level) const;
     size_t aux_level_resolved_swaps(size_t k, size_t level) const;
     size_t exact_unavailable_swaps(size_t k) const;
     size_t exact_evals(size_t k) const;
