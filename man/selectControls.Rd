@@ -70,18 +70,27 @@ principal directions of the data in case dataset.}
 \item{method}{string approximation method for SA statistic, either
 \code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
 a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
-of increasing prefix sizes; exact evaluation is used only if no ladder level
-yields a sufficiently narrow CI for the acceptance probability.}
+of increasing prefix sizes; a single SA acceptance draw is first tested
+against the calibrated interval from the primary Nystrom estimate and then,
+only if needed, against progressively larger auxiliary RFF prefixes until
+the sampled SA accept/reject decision is resolved within the requested
+CI-width threshold. A small fraction of cheap-resolved swaps is still
+audited exactly to keep the calibration unbiased, and an additional shadow
+audit stream can record full-ladder plus exact diagnostics without changing
+the actual SA trajectory.}
 
 \item{n_features}{integer number of Nyström features (landmarks) used when
 \code{method = "nystrom"} or \code{method = "hybrid"}.}
 
 \item{ciWidthThreshold}{numeric maximum acceptable CI width for a cheap
-acceptance-probability estimate. If at least one cheap estimator has CI
-width not exceeding this value, exact evaluation is skipped.}
+acceptance-probability estimate. In hybrid mode, each cheap estimator uses
+its own exact-vs-cheap delta residuals to form a conservative acceptance
+interval, and exact evaluation is skipped only when some cheap estimator
+resolves the sampled SA accept/reject decision with CI width not exceeding
+this value.}
 
 \item{calibrationQuantile}{numeric quantile of the exact-vs-cheap absolute
-probability error used to calibrate CI half-widths in hybrid mode.}
+delta error used to calibrate each estimator's CI half-width in hybrid mode.}
 
 \item{minCalibrationSamples}{integer minimum number of successful exact
 audits required before using empirical calibration residuals.}
@@ -94,8 +103,9 @@ A list with selected controls, lambda summaries, and \code{sa_diagnostics},
   which reports per-target-subset SA counters such as total swaps,
   CI-resolved swaps, how many of those were resolved by the primary Nyström
   estimate versus each auxiliary RFF ladder level, exact fallback evaluations,
-  calibration sample counts, mean CI widths, and per-temperature-bin swap
-  statistics.
+  calibration sample counts, mean CI widths, the mean number of auxiliary
+  ladder levels scanned before early stop, shadow-audit mismatch/error
+  summaries, and per-temperature-bin swap statistics.
 }
 \description{
 Finds an optimal set of controls satisfying 

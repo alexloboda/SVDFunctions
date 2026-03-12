@@ -11,6 +11,10 @@
 #include <xmmintrin.h>
 #endif
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+
 namespace mvn {
 
 namespace {
@@ -51,6 +55,43 @@ double dot_float_sse(const float* lhs, const float* rhs, size_t n) {
 #endif
 }
 
+double dot_float_double_scalar(const float* lhs, const double* rhs, size_t n) {
+    double acc = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+        acc += static_cast<double>(lhs[i]) * rhs[i];
+    }
+    return acc;
+}
+
+double dot_float_double_sse(const float* lhs, const double* rhs, size_t n) {
+#if defined(__SSE2__)
+    size_t i = 0;
+    __m128d acc_lo = _mm_setzero_pd();
+    __m128d acc_hi = _mm_setzero_pd();
+    for (; i + 4 <= n; i += 4) {
+        __m128 a = _mm_loadu_ps(lhs + i);
+        __m128d lhs_lo = _mm_cvtps_pd(a);
+        __m128 a_hi = _mm_movehl_ps(a, a);
+        __m128d lhs_hi = _mm_cvtps_pd(a_hi);
+        __m128d rhs_lo = _mm_loadu_pd(rhs + i);
+        __m128d rhs_hi = _mm_loadu_pd(rhs + i + 2);
+        acc_lo = _mm_add_pd(acc_lo, _mm_mul_pd(lhs_lo, rhs_lo));
+        acc_hi = _mm_add_pd(acc_hi, _mm_mul_pd(lhs_hi, rhs_hi));
+    }
+    alignas(16) double tmp_lo[2];
+    alignas(16) double tmp_hi[2];
+    _mm_store_pd(tmp_lo, acc_lo);
+    _mm_store_pd(tmp_hi, acc_hi);
+    double sum = tmp_lo[0] + tmp_lo[1] + tmp_hi[0] + tmp_hi[1];
+    for (; i < n; ++i) {
+        sum += static_cast<double>(lhs[i]) * rhs[i];
+    }
+    return sum;
+#else
+    return dot_float_double_scalar(lhs, rhs, n);
+#endif
+}
+
 std::vector<size_t> choose_landmarks(size_t n_samples, size_t m, std::mt19937& wheel) {
     std::vector<size_t> all(n_samples);
     std::iota(all.begin(), all.end(), 0);
@@ -76,6 +117,32 @@ std::vector<size_t> choose_rff_levels(size_t max_features) {
     }
     levels.push_back(max_features);
     return levels;
+}
+
+Eigen::MatrixXd sample_orf_basis(Eigen::Index dimension, Eigen::Index pair_count, std::mt19937& rng) {
+    Eigen::MatrixXd basis(dimension, pair_count);
+    std::normal_distribution<double> normal(0.0, 1.0);
+    std::chi_squared_distribution<double> chi_squared((double)dimension);
+
+    for (Eigen::Index offset = 0; offset < pair_count; offset += dimension) {
+        const Eigen::Index block_cols = std::min<Eigen::Index>(dimension, pair_count - offset);
+        Eigen::MatrixXd gaussian_block(dimension, dimension);
+        for (Eigen::Index col = 0; col < dimension; ++col) {
+            for (Eigen::Index row = 0; row < dimension; ++row) {
+                gaussian_block(row, col) = normal(rng);
+            }
+        }
+
+        Eigen::HouseholderQR<Eigen::MatrixXd> qr(gaussian_block);
+        Eigen::MatrixXd orthogonal = qr.householderQ() * Eigen::MatrixXd::Identity(dimension, block_cols);
+
+        for (Eigen::Index col = 0; col < block_cols; ++col) {
+            const double radius = std::sqrt(chi_squared(rng));
+            basis.col(offset + col) = orthogonal.col(col) * radius;
+        }
+    }
+
+    return basis;
 }
 
 } // namespace
@@ -145,7 +212,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
     subset_feature_sum.resize(betas.size());
     for (size_t i = 0; i < stats.size(); ++i) {
         if (stats[i]->is_feature_mode()) {
-            subset_feature_sum[i].assign(stats[i]->features_dim(), 0.0f);
+            subset_feature_sum[i].assign(stats[i]->features_dim(), 0.0);
         }
     }
 
@@ -161,7 +228,7 @@ mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, cons
         rff_pairwise_stats.assign(rff_feature_levels.size(), 0.0);
         rff_center_stat = 0.0;
         if (rff_stats->is_feature_mode()) {
-            rff_subset_feature_sum.assign(rff_stats->features_dim(), 0.0f);
+            rff_subset_feature_sum.assign(rff_stats->features_dim(), 0.0);
         }
         check_aux_state();
     }
@@ -205,41 +272,88 @@ double mvn_test::get_aux_normality_statistic(size_t level) const {
     return stat;
 }
 
-double mvn_test::aux_delta_last_swap(size_t level) const {
+void mvn_test::check_aux_delta_request() const {
     if (!has_aux_statistic()) {
         throw std::logic_error("Auxiliary delta requested but hybrid mode is disabled");
     }
     if (!last_swap_has_equal_effect_size()) {
         throw std::logic_error("Auxiliary delta requires unchanged effect size (equal cluster sizes)");
     }
-    if (level >= rff_feature_levels.size()) {
-        throw std::logic_error("RFF ladder level is out of range");
-    }
     if (effect_size <= dimensions()) {
         throw std::logic_error("Too few points.");
     }
+}
+
+void mvn_test::scan_aux_deltas_last_swap(const std::function<bool(size_t, double)>& visitor) const {
+    check_aux_delta_request();
 
     const size_t a = (size_t)latest_subset_point;
     const size_t b = (size_t)latest_replacing_point;
-    const size_t dim = rff_feature_levels[level];
     const float* phi_a = rff_stats->features_ptr(a);
     const float* phi_b = rff_stats->features_ptr(b);
     const double beta = betas.front();
     const double n = (double)effect_size;
     const double denom_center = std::pow(1 + std::pow(beta, 2.0), dimensions() / 2.0);
-
-    const double dot_sum_b = dot_float_sse(rff_subset_feature_sum.data(), phi_b, dim);
-    const double dot_sum_a = dot_float_sse(rff_subset_feature_sum.data(), phi_a, dim);
-    const double self_b = dot_float_sse(phi_b, phi_b, dim);
-    const double self_a = dot_float_sse(phi_a, phi_a, dim);
-    const double cross_ab = dot_float_sse(phi_a, phi_b, dim);
-
-    const double delta_pairwise = 2.0 * (dot_sum_b - dot_sum_a) - (self_b + self_a - 2.0 * cross_ab);
     const double delta_center = rff_stats->centered_stat(b) - rff_stats->centered_stat(a);
 
-    double delta_stat = (1.0 / (n * n)) * delta_pairwise;
-    delta_stat -= (2.0 / (n * denom_center)) * delta_center;
-    return delta_stat;
+    double dot_sum_b = 0.0;
+    double dot_sum_a = 0.0;
+    double self_b = 0.0;
+    double self_a = 0.0;
+    double cross_ab = 0.0;
+    size_t prev_dim = 0;
+
+    for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
+        const size_t dim = rff_feature_levels[level];
+        const size_t chunk = dim - prev_dim;
+        if (chunk > 0) {
+            dot_sum_b += dot_float_double_sse(phi_b + prev_dim, rff_subset_feature_sum.data() + prev_dim, chunk);
+            dot_sum_a += dot_float_double_sse(phi_a + prev_dim, rff_subset_feature_sum.data() + prev_dim, chunk);
+            self_b += dot_float_sse(phi_b + prev_dim, phi_b + prev_dim, chunk);
+            self_a += dot_float_sse(phi_a + prev_dim, phi_a + prev_dim, chunk);
+            cross_ab += dot_float_sse(phi_a + prev_dim, phi_b + prev_dim, chunk);
+            prev_dim = dim;
+        }
+
+        const double delta_pairwise = 2.0 * (dot_sum_b - dot_sum_a) - (self_b + self_a - 2.0 * cross_ab);
+        double delta_stat = (1.0 / (n * n)) * delta_pairwise;
+        delta_stat -= (2.0 / (n * denom_center)) * delta_center;
+        if (!visitor(level, delta_stat)) {
+            break;
+        }
+    }
+}
+
+double mvn_test::aux_delta_last_swap(size_t level) const {
+    if (level >= rff_feature_levels.size()) {
+        throw std::logic_error("RFF ladder level is out of range");
+    }
+
+    double delta = 0.0;
+    bool found = false;
+    scan_aux_deltas_last_swap([&](size_t current_level, double current_delta) {
+        if (current_level == level) {
+            delta = current_delta;
+            found = true;
+            return false;
+        }
+        return true;
+    });
+
+    if (!found) {
+        throw std::logic_error("RFF ladder level is out of range");
+    }
+    return delta;
+}
+
+std::vector<double> mvn_test::aux_deltas_last_swap() const {
+    std::vector<double> delta_stats;
+    delta_stats.reserve(rff_feature_levels.size());
+    scan_aux_deltas_last_swap([&](size_t, double delta_stat) {
+        delta_stats.push_back(delta_stat);
+        return true;
+    });
+    return delta_stats;
 }
 
 bool mvn_test::last_swap_has_equal_effect_size() const {
@@ -362,7 +476,9 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     size_t feature_count = 0;
     if (use_rff) {
         feature_mode = true;
-        feature_dim = std::max<size_t>(1, rff_features);
+        const size_t requested_features = std::max<size_t>(2, rff_features);
+        const size_t pair_count = std::max<size_t>(1, requested_features / 2);
+        feature_dim = 2 * pair_count;
     } else {
         const size_t requested_features = (n_features == 0) ? NYSTROM_DEFAULT_MAX_FEATURES : n_features;
         feature_count = std::min(n_samples, requested_features);
@@ -390,24 +506,10 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
         Eigen::MatrixXd sqrt_inv = evecs * evals.array().sqrt().matrix().asDiagonal() * evecs.transpose();
 
         std::mt19937 rng(seed);
-        std::normal_distribution<double> normal(0.0, 1.0);
-        constexpr double PI = 3.141592653589793238462643383279502884;
-        std::uniform_real_distribution<double> unif(0.0, 2.0 * PI);
-
-        Eigen::MatrixXd W(distances.data().rows(), (Eigen::Index)feature_dim);
-        for (Eigen::Index d = 0; d < (Eigen::Index)feature_dim; ++d) {
-            Eigen::VectorXd z(distances.data().rows());
-            for (Eigen::Index r = 0; r < z.size(); ++r) {
-                z(r) = normal(rng);
-            }
-            Eigen::VectorXd w = beta * (sqrt_inv * z);
-            W.col(d) = w;
-        }
-        std::vector<double> b(feature_dim);
-        for (size_t d = 0; d < feature_dim; ++d) {
-            b[d] = unif(rng);
-        }
-        const double scale = std::sqrt(2.0 / (double)feature_dim);
+        const Eigen::Index pair_count = static_cast<Eigen::Index>(feature_dim / 2);
+        Eigen::MatrixXd gaussian_basis = sample_orf_basis(distances.data().rows(), pair_count, rng);
+        Eigen::MatrixXd W = beta * (sqrt_inv * gaussian_basis);
+        const double scale = std::sqrt(1.0 / (double)pair_count);
 
         cluster_features.assign(n_clusters, std::vector<float>(feature_dim, 0.0f));
         for (size_t sample = 0; sample < n_samples; ++sample) {
@@ -418,8 +520,10 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
             Eigen::VectorXd x = distances.data().col((Eigen::Index)sample);
             Eigen::RowVectorXd proj = x.transpose() * W;
             auto& dst = cluster_features[(size_t)cl];
-            for (size_t d = 0; d < feature_dim; ++d) {
-                dst[d] += static_cast<float>(scale * std::cos(proj((Eigen::Index)d) + b[d]));
+            for (Eigen::Index d = 0; d < pair_count; ++d) {
+                const double projection = proj(d);
+                dst[(size_t)(2 * d)] += static_cast<float>(scale * std::cos(projection));
+                dst[(size_t)(2 * d + 1)] += static_cast<float>(scale * std::sin(projection));
             }
         }
 
@@ -746,7 +850,7 @@ void mvn_test::remove(unsigned point) {
             const float* phi = stats[i]->features_ptr(point);
             auto& sum = subset_feature_sum[i];
             const size_t dim = stats[i]->features_dim();
-            const double dot = dot_float_sse(phi, sum.data(), dim);
+            const double dot = dot_float_double_sse(phi, sum.data(), dim);
             const double self = dot_float_sse(phi, phi, dim);
             const double sp = dot - 0.5 * self;
             pairwise_stat[i] -= 2.0 * sp;
@@ -764,10 +868,17 @@ void mvn_test::remove(unsigned point) {
 
     if (has_aux_statistic()) {
         const float* phi = rff_stats->features_ptr(point);
+        double dot = 0.0;
+        double self = 0.0;
+        size_t prev_dim = 0;
         for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
             const size_t dim = rff_feature_levels[level];
-            const double dot = dot_float_sse(phi, rff_subset_feature_sum.data(), dim);
-            const double self = dot_float_sse(phi, phi, dim);
+            const size_t chunk = dim - prev_dim;
+            if (chunk > 0) {
+                dot += dot_float_double_sse(phi + prev_dim, rff_subset_feature_sum.data() + prev_dim, chunk);
+                self += dot_float_sse(phi + prev_dim, phi + prev_dim, chunk);
+                prev_dim = dim;
+            }
             const double sp = dot - 0.5 * self;
             rff_pairwise_stats[level] -= 2.0 * sp;
         }
@@ -788,7 +899,7 @@ void mvn_test::add(unsigned int point) {
             for (size_t d = 0; d < dim; ++d) {
                 sum[d] += phi[d];
             }
-            const double dot = dot_float_sse(phi, sum.data(), dim);
+            const double dot = dot_float_double_sse(phi, sum.data(), dim);
             const double self = dot_float_sse(phi, phi, dim);
             const double sp = dot - 0.5 * self;
             pairwise_stat[i] += 2.0 * sp;
@@ -806,10 +917,17 @@ void mvn_test::add(unsigned int point) {
         for (size_t d = 0; d < full_dim; ++d) {
             rff_subset_feature_sum[d] += phi[d];
         }
+        double dot = 0.0;
+        double self = 0.0;
+        size_t prev_dim = 0;
         for (size_t level = 0; level < rff_feature_levels.size(); ++level) {
             const size_t dim = rff_feature_levels[level];
-            const double dot = dot_float_sse(phi, rff_subset_feature_sum.data(), dim);
-            const double self = dot_float_sse(phi, phi, dim);
+            const size_t chunk = dim - prev_dim;
+            if (chunk > 0) {
+                dot += dot_float_double_sse(phi + prev_dim, rff_subset_feature_sum.data() + prev_dim, chunk);
+                self += dot_float_sse(phi + prev_dim, phi + prev_dim, chunk);
+                prev_dim = dim;
+            }
             const double sp = dot - 0.5 * self;
             rff_pairwise_stats[level] += 2.0 * sp;
         }

@@ -29,6 +29,7 @@ namespace {
 
 constexpr size_t TEMPERATURE_BIN_COUNT = 10;
 constexpr double HYBRID_RESOLVED_AUDIT_RATE = 0.05;
+constexpr double HYBRID_SHADOW_AUDIT_RATE = 0.05;
 
 void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
                            const std::vector<double>& best_stat,
@@ -48,13 +49,27 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
                            const std::vector<double>& mean_primary_ci_width_used,
                            const std::vector<double>& mean_aux_ci_width_used,
                            const std::vector<double>& mean_selected_ci_width_used,
+                           const std::vector<double>& mean_scanned_aux_levels_used,
+                           const std::vector<size_t>& shadow_audits_used,
+                           const std::vector<size_t>& shadow_exact_failures_used,
+                           const std::vector<size_t>& shadow_primary_decision_mismatches_used,
+                           const std::vector<size_t>& shadow_selected_decision_mismatches_used,
+                           const std::vector<size_t>& shadow_selected_interval_hits_used,
+                           const std::vector<size_t>& shadow_full_scan_better_swaps_used,
+                           const std::vector<double>& mean_shadow_selected_regret_used,
+                           const std::vector<double>& mean_shadow_primary_abs_delta_error_used,
+                           const std::vector<double>& mean_shadow_selected_abs_delta_error_used,
+                           const std::vector<double>& mean_shadow_selected_abs_p_error_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_total_swaps_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_accepted_swaps_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_primary_resolved_swaps_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_aux_resolved_swaps_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_exact_evals_used,
                            const std::vector<std::vector<size_t>>& temperature_bin_exact_unavailable_swaps_used,
-                           const std::vector<std::vector<size_t>>& temperature_bin_exact_failures_used)
+                           const std::vector<std::vector<size_t>>& temperature_bin_exact_failures_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_shadow_audits_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_shadow_selected_decision_mismatches_used,
+                           const std::vector<std::vector<size_t>>& temperature_bin_shadow_exact_failures_used)
 {
     const size_t n = best.size();
     auto require_size = [n](size_t size, const char* name) {
@@ -82,6 +97,17 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
     require_size(mean_primary_ci_width_used.size(), "mean_primary_ci_width_used");
     require_size(mean_aux_ci_width_used.size(), "mean_aux_ci_width_used");
     require_size(mean_selected_ci_width_used.size(), "mean_selected_ci_width_used");
+    require_size(mean_scanned_aux_levels_used.size(), "mean_scanned_aux_levels_used");
+    require_size(shadow_audits_used.size(), "shadow_audits_used");
+    require_size(shadow_exact_failures_used.size(), "shadow_exact_failures_used");
+    require_size(shadow_primary_decision_mismatches_used.size(), "shadow_primary_decision_mismatches_used");
+    require_size(shadow_selected_decision_mismatches_used.size(), "shadow_selected_decision_mismatches_used");
+    require_size(shadow_selected_interval_hits_used.size(), "shadow_selected_interval_hits_used");
+    require_size(shadow_full_scan_better_swaps_used.size(), "shadow_full_scan_better_swaps_used");
+    require_size(mean_shadow_selected_regret_used.size(), "mean_shadow_selected_regret_used");
+    require_size(mean_shadow_primary_abs_delta_error_used.size(), "mean_shadow_primary_abs_delta_error_used");
+    require_size(mean_shadow_selected_abs_delta_error_used.size(), "mean_shadow_selected_abs_delta_error_used");
+    require_size(mean_shadow_selected_abs_p_error_used.size(), "mean_shadow_selected_abs_p_error_used");
     require_size(temperature_bin_total_swaps_used.size(), "temperature_bin_total_swaps_used");
     require_size(temperature_bin_accepted_swaps_used.size(), "temperature_bin_accepted_swaps_used");
     require_size(temperature_bin_primary_resolved_swaps_used.size(), "temperature_bin_primary_resolved_swaps_used");
@@ -89,12 +115,17 @@ void check_solution_vectors(const std::vector<std::vector<size_t>>& best,
     require_size(temperature_bin_exact_evals_used.size(), "temperature_bin_exact_evals_used");
     require_size(temperature_bin_exact_unavailable_swaps_used.size(), "temperature_bin_exact_unavailable_swaps_used");
     require_size(temperature_bin_exact_failures_used.size(), "temperature_bin_exact_failures_used");
+    require_size(temperature_bin_shadow_audits_used.size(), "temperature_bin_shadow_audits_used");
+    require_size(temperature_bin_shadow_selected_decision_mismatches_used.size(), "temperature_bin_shadow_selected_decision_mismatches_used");
+    require_size(temperature_bin_shadow_exact_failures_used.size(), "temperature_bin_shadow_exact_failures_used");
 
     for (size_t i = 0; i < n; ++i) {
         for (const auto* bins : {&temperature_bin_total_swaps_used, &temperature_bin_accepted_swaps_used,
                                  &temperature_bin_primary_resolved_swaps_used, &temperature_bin_aux_resolved_swaps_used,
                                  &temperature_bin_exact_evals_used, &temperature_bin_exact_unavailable_swaps_used,
-                                 &temperature_bin_exact_failures_used}) {
+                                 &temperature_bin_exact_failures_used, &temperature_bin_shadow_audits_used,
+                                 &temperature_bin_shadow_selected_decision_mismatches_used,
+                                 &temperature_bin_shadow_exact_failures_used}) {
             if (bins->at(i).size() != TEMPERATURE_BIN_COUNT) {
                 throw std::logic_error("temperature-bin diagnostics have inconsistent width");
             }
@@ -127,7 +158,22 @@ struct run_result {
     double primary_ci_width_sum = 0.0;
     double aux_ci_width_sum = 0.0;
     double selected_ci_width_sum = 0.0;
-    size_t ci_width_observations = 0;
+    size_t primary_ci_width_observations = 0;
+    size_t aux_ci_width_observations = 0;
+    size_t selected_ci_width_observations = 0;
+    double scanned_aux_levels_sum = 0.0;
+    size_t scanned_aux_levels_observations = 0;
+    size_t shadow_audits = 0;
+    size_t shadow_exact_failures = 0;
+    size_t shadow_primary_decision_mismatches = 0;
+    size_t shadow_selected_decision_mismatches = 0;
+    size_t shadow_selected_interval_hits = 0;
+    size_t shadow_full_scan_better_swaps = 0;
+    double shadow_selected_regret_sum = 0.0;
+    double shadow_primary_abs_delta_error_sum = 0.0;
+    double shadow_selected_abs_delta_error_sum = 0.0;
+    double shadow_selected_abs_p_error_sum = 0.0;
+    size_t shadow_metric_observations = 0;
     std::vector<size_t> temperature_bin_total_swaps;
     std::vector<size_t> temperature_bin_accepted_swaps;
     std::vector<size_t> temperature_bin_primary_resolved_swaps;
@@ -135,6 +181,9 @@ struct run_result {
     std::vector<size_t> temperature_bin_exact_evals;
     std::vector<size_t> temperature_bin_exact_unavailable_swaps;
     std::vector<size_t> temperature_bin_exact_failures;
+    std::vector<size_t> temperature_bin_shadow_audits;
+    std::vector<size_t> temperature_bin_shadow_selected_decision_mismatches;
+    std::vector<size_t> temperature_bin_shadow_exact_failures;
 };
 
 template <class T>
@@ -173,14 +222,13 @@ double empirical_quantile(const std::vector<double>& values, double probability)
 }
 
 double calibration_half_width(const std::vector<double>& residuals, double calibration_quantile,
-                              size_t min_calibration_samples, size_t estimator_count)
+                              size_t min_calibration_samples)
 {
     if (residuals.size() < min_calibration_samples) {
         return std::numeric_limits<double>::infinity();
     }
     const double clamped_quantile = std::min(1.0, std::max(0.0, calibration_quantile));
-    const double adjusted_quantile = 1.0 - ((1.0 - clamped_quantile) / std::max<size_t>(1, estimator_count));
-    return empirical_quantile(residuals, adjusted_quantile);
+    return empirical_quantile(residuals, clamped_quantile);
 }
 
 struct decision_interval {
@@ -232,6 +280,13 @@ decision_interval probability_interval_from_delta(double delta, double delta_hal
     return interval;
 }
 
+bool interval_contains_probability(const decision_interval& interval, double probability)
+{
+    constexpr double eps = 1e-12;
+    return probability + eps >= interval.lower_probability &&
+           probability <= interval.upper_probability + eps;
+}
+
 void push_bounded(std::vector<double>& values, double value, size_t max_calibration_history)
 {
     if (values.size() >= max_calibration_history) {
@@ -265,6 +320,17 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     mean_primary_ci_width_used.clear();
     mean_aux_ci_width_used.clear();
     mean_selected_ci_width_used.clear();
+    mean_scanned_aux_levels_used.clear();
+    shadow_audits_used.clear();
+    shadow_exact_failures_used.clear();
+    shadow_primary_decision_mismatches_used.clear();
+    shadow_selected_decision_mismatches_used.clear();
+    shadow_selected_interval_hits_used.clear();
+    shadow_full_scan_better_swaps_used.clear();
+    mean_shadow_selected_regret_used.clear();
+    mean_shadow_primary_abs_delta_error_used.clear();
+    mean_shadow_selected_abs_delta_error_used.clear();
+    mean_shadow_selected_abs_p_error_used.clear();
     temperature_bin_total_swaps_used.clear();
     temperature_bin_accepted_swaps_used.clear();
     temperature_bin_primary_resolved_swaps_used.clear();
@@ -272,6 +338,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     temperature_bin_exact_evals_used.clear();
     temperature_bin_exact_unavailable_swaps_used.clear();
     temperature_bin_exact_failures_used.clear();
+    temperature_bin_shadow_audits_used.clear();
+    temperature_bin_shadow_selected_decision_mismatches_used.clear();
+    temperature_bin_shadow_exact_failures_used.clear();
 
     cxxpool::thread_pool pool(pool_size);
     size_t curr_size = start;
@@ -300,6 +369,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 result.temperature_bin_exact_evals.assign(TEMPERATURE_BIN_COUNT, 0);
                 result.temperature_bin_exact_unavailable_swaps.assign(TEMPERATURE_BIN_COUNT, 0);
                 result.temperature_bin_exact_failures.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_shadow_audits.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_shadow_selected_decision_mismatches.assign(TEMPERATURE_BIN_COUNT, 0);
+                result.temperature_bin_shadow_exact_failures.assign(TEMPERATURE_BIN_COUNT, 0);
                 result.total_swaps = iterations;
                 while (local_test->subsample_size() < curr_size) {
                     local_test->add_one();
@@ -321,74 +393,16 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                     bool accept = true;
 
                     if (local_test->has_aux_statistic()) {
-                        const size_t estimator_count = 1 + local_test->aux_statistic_levels();
-                        const decision_interval primary_interval = probability_interval_from_delta(
-                            delta_primary,
-                            calibration_half_width(primary_delta_residuals, calibration_quantile,
-                                                   min_calibration_samples, estimator_count),
-                            t,
-                            acceptance_draw);
+                        const bool calibration_ready = primary_delta_residuals.size() >= min_calibration_samples;
+                        if (!calibration_ready) {
+                            result.primary_ci_width_sum += 1.0;
+                            result.primary_ci_width_observations++;
+                            result.aux_ci_width_sum += 1.0;
+                            result.aux_ci_width_observations++;
+                            result.selected_ci_width_sum += 1.0;
+                            result.selected_ci_width_observations++;
+                            result.uncertain_swaps++;
 
-                        double representative_aux_width = 1.0;
-                        double selected_width = primary_interval.width;
-                        bool cheap_accept = primary_interval.accept;
-                        double fallback_width = primary_interval.width;
-                        bool fallback_accept = primary_interval.accept;
-                        bool resolved_by_ci = false;
-                        bool resolved_by_primary = false;
-                        bool resolved_by_aux = false;
-                        size_t resolved_aux_level = local_test->aux_statistic_levels();
-
-                        if (primary_interval.resolved && primary_interval.width <= ci_width_threshold) {
-                            resolved_by_ci = true;
-                            resolved_by_primary = true;
-                            cheap_accept = primary_interval.accept;
-                            selected_width = primary_interval.width;
-                        }
-
-                        for (size_t level = 0; level < local_test->aux_statistic_levels(); ++level) {
-                            const double delta_aux = local_test->aux_delta_last_swap(level);
-                            const decision_interval aux_interval = probability_interval_from_delta(
-                                delta_aux,
-                                calibration_half_width(aux_delta_residuals[level], calibration_quantile,
-                                                       min_calibration_samples, estimator_count),
-                                t,
-                                acceptance_draw);
-                            representative_aux_width = std::min(representative_aux_width, aux_interval.width);
-                            if (aux_interval.width < fallback_width) {
-                                fallback_width = aux_interval.width;
-                                fallback_accept = aux_interval.accept;
-                            }
-                            if (aux_interval.resolved && aux_interval.width <= ci_width_threshold &&
-                                (!resolved_by_ci || aux_interval.width < selected_width)) {
-                                resolved_by_ci = true;
-                                resolved_by_primary = false;
-                                resolved_by_aux = true;
-                                resolved_aux_level = level;
-                                cheap_accept = aux_interval.accept;
-                                selected_width = aux_interval.width;
-                            }
-                        }
-
-                        result.primary_ci_width_sum += primary_interval.width;
-                        result.aux_ci_width_sum += representative_aux_width;
-                        result.ci_width_observations++;
-
-                        if (!resolved_by_ci) {
-                            selected_width = fallback_width;
-                            cheap_accept = fallback_accept;
-                        }
-                        result.selected_ci_width_sum += selected_width;
-
-                        const bool should_audit = resolved_by_ci && local_test->last_swap_has_equal_effect_size() &&
-                            (primary_delta_residuals.size() < min_calibration_samples ||
-                             random_unif(mersenne_wheel) < HYBRID_RESOLVED_AUDIT_RATE);
-                        const bool need_exact = !resolved_by_ci || should_audit;
-
-                        if (need_exact) {
-                            if (!resolved_by_ci) {
-                                result.uncertain_swaps++;
-                            }
                             if (local_test->last_swap_has_equal_effect_size()) {
                                 try {
                                     result.exact_evals++;
@@ -399,47 +413,213 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                         result.exact_evals_on_worsening++;
                                     }
 
+                                    const std::vector<double> aux_deltas = local_test->aux_deltas_last_swap();
                                     const double delta_exact = local_test->exact_delta_last_swap();
                                     const double p_exact = acceptance_probability(delta_exact, t);
                                     push_bounded(primary_delta_residuals, std::abs(delta_exact - delta_primary), max_calibration_history);
-                                    for (size_t level = 0; level < local_test->aux_statistic_levels(); ++level) {
-                                        const double delta_aux = local_test->aux_delta_last_swap(level);
-                                        push_bounded(aux_delta_residuals[level], std::abs(delta_exact - delta_aux), max_calibration_history);
+                                    for (size_t level = 0; level < aux_deltas.size(); ++level) {
+                                        push_bounded(aux_delta_residuals[level], std::abs(delta_exact - aux_deltas[level]), max_calibration_history);
                                     }
                                     accept = (acceptance_draw < p_exact);
                                 } catch (...) {
                                     result.exact_failures++;
                                     result.temperature_bin_exact_failures[temp_bin]++;
-
-                                     if (resolved_by_ci) {
-                                        result.ci_resolved_swaps++;
-                                        if (resolved_by_primary) {
-                                            result.primary_resolved_swaps++;
-                                            result.temperature_bin_primary_resolved_swaps[temp_bin]++;
-                                        }
-                                        if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
-                                            result.aux_level_resolved_swaps[resolved_aux_level]++;
-                                            result.temperature_bin_aux_resolved_swaps[temp_bin]++;
-                                        }
-                                    }
-                                    accept = cheap_accept;
+                                    accept = (acceptance_draw < p_primary);
                                 }
                             } else {
                                 result.exact_unavailable_swaps++;
                                 result.temperature_bin_exact_unavailable_swaps[temp_bin]++;
-                                accept = cheap_accept;
+                                accept = (acceptance_draw < p_primary);
                             }
                         } else {
-                            result.ci_resolved_swaps++;
-                            if (resolved_by_primary) {
-                                result.primary_resolved_swaps++;
-                                result.temperature_bin_primary_resolved_swaps[temp_bin]++;
+                            const decision_interval primary_interval = probability_interval_from_delta(
+                                delta_primary,
+                                calibration_half_width(primary_delta_residuals, calibration_quantile,
+                                                       min_calibration_samples),
+                                t,
+                                acceptance_draw);
+
+                            double representative_aux_width = 1.0;
+                            double selected_width = primary_interval.width;
+                            bool cheap_accept = primary_interval.accept;
+                            double fallback_width = primary_interval.width;
+                            bool fallback_accept = primary_interval.accept;
+                            bool resolved_by_ci = false;
+                            bool resolved_by_primary = false;
+                            bool resolved_by_aux = false;
+                            bool observed_aux_width = false;
+                            size_t scanned_aux_levels = 0;
+                            size_t resolved_aux_level = local_test->aux_statistic_levels();
+                            double selected_delta = delta_primary;
+                            decision_interval selected_interval = primary_interval;
+
+                            if (primary_interval.resolved && primary_interval.width <= ci_width_threshold) {
+                                resolved_by_ci = true;
+                                resolved_by_primary = true;
+                                cheap_accept = primary_interval.accept;
+                                selected_width = primary_interval.width;
+                            } else {
+                                local_test->scan_aux_deltas_last_swap([&](size_t level, double delta_aux) {
+                                    scanned_aux_levels++;
+                                    const decision_interval aux_interval = probability_interval_from_delta(
+                                        delta_aux,
+                                        calibration_half_width(aux_delta_residuals[level], calibration_quantile,
+                                                               min_calibration_samples),
+                                        t,
+                                        acceptance_draw);
+                                    observed_aux_width = true;
+                                    representative_aux_width = std::min(representative_aux_width, aux_interval.width);
+                                    if (aux_interval.width < fallback_width) {
+                                        fallback_width = aux_interval.width;
+                                        fallback_accept = aux_interval.accept;
+                                    }
+                                    if (aux_interval.resolved && aux_interval.width <= ci_width_threshold) {
+                                        resolved_by_ci = true;
+                                        resolved_by_aux = true;
+                                        resolved_aux_level = level;
+                                        cheap_accept = aux_interval.accept;
+                                        selected_width = aux_interval.width;
+                                        selected_delta = delta_aux;
+                                        selected_interval = aux_interval;
+                                        return false;
+                                    }
+                                    return true;
+                                });
                             }
-                            if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
-                                result.aux_level_resolved_swaps[resolved_aux_level]++;
-                                result.temperature_bin_aux_resolved_swaps[temp_bin]++;
+
+                            result.primary_ci_width_sum += primary_interval.width;
+                            result.primary_ci_width_observations++;
+                            result.scanned_aux_levels_sum += static_cast<double>(scanned_aux_levels);
+                            result.scanned_aux_levels_observations++;
+                            if (observed_aux_width) {
+                                result.aux_ci_width_sum += representative_aux_width;
+                                result.aux_ci_width_observations++;
                             }
-                            accept = cheap_accept;
+
+                            if (!resolved_by_ci) {
+                                selected_width = fallback_width;
+                                cheap_accept = fallback_accept;
+                            }
+                            result.selected_ci_width_sum += selected_width;
+                            result.selected_ci_width_observations++;
+
+                            const bool should_audit = resolved_by_ci && local_test->last_swap_has_equal_effect_size() &&
+                                (primary_delta_residuals.size() < min_calibration_samples ||
+                                 random_unif(mersenne_wheel) < HYBRID_RESOLVED_AUDIT_RATE);
+                            const bool need_exact = !resolved_by_ci || should_audit;
+
+                            if (need_exact) {
+                                if (!resolved_by_ci) {
+                                    result.uncertain_swaps++;
+                                }
+                                if (local_test->last_swap_has_equal_effect_size()) {
+                                    try {
+                                        result.exact_evals++;
+                                        result.temperature_bin_exact_evals[temp_bin]++;
+                                        if (primary_improving) {
+                                            result.exact_evals_on_improving++;
+                                        } else {
+                                            result.exact_evals_on_worsening++;
+                                        }
+
+                                        const std::vector<double> aux_deltas = local_test->aux_deltas_last_swap();
+                                        const double delta_exact = local_test->exact_delta_last_swap();
+                                        const double p_exact = acceptance_probability(delta_exact, t);
+                                        push_bounded(primary_delta_residuals, std::abs(delta_exact - delta_primary), max_calibration_history);
+                                        for (size_t level = 0; level < aux_deltas.size(); ++level) {
+                                            push_bounded(aux_delta_residuals[level], std::abs(delta_exact - aux_deltas[level]), max_calibration_history);
+                                        }
+                                        accept = (acceptance_draw < p_exact);
+                                    } catch (...) {
+                                        result.exact_failures++;
+                                        result.temperature_bin_exact_failures[temp_bin]++;
+
+                                         if (resolved_by_ci) {
+                                            result.ci_resolved_swaps++;
+                                            if (resolved_by_primary) {
+                                                result.primary_resolved_swaps++;
+                                                result.temperature_bin_primary_resolved_swaps[temp_bin]++;
+                                            }
+                                            if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
+                                                result.aux_level_resolved_swaps[resolved_aux_level]++;
+                                                result.temperature_bin_aux_resolved_swaps[temp_bin]++;
+                                            }
+                                        }
+                                        accept = cheap_accept;
+                                    }
+                                } else {
+                                    result.exact_unavailable_swaps++;
+                                    result.temperature_bin_exact_unavailable_swaps[temp_bin]++;
+                                    accept = cheap_accept;
+                                }
+                            } else {
+                                result.ci_resolved_swaps++;
+                                if (resolved_by_primary) {
+                                    result.primary_resolved_swaps++;
+                                    result.temperature_bin_primary_resolved_swaps[temp_bin]++;
+                                }
+                                if (resolved_by_aux && resolved_aux_level < result.aux_level_resolved_swaps.size()) {
+                                    result.aux_level_resolved_swaps[resolved_aux_level]++;
+                                    result.temperature_bin_aux_resolved_swaps[temp_bin]++;
+                                }
+                                accept = cheap_accept;
+
+                                const bool should_shadow_audit = local_test->last_swap_has_equal_effect_size() &&
+                                    random_unif(mersenne_wheel) < HYBRID_SHADOW_AUDIT_RATE;
+                                if (should_shadow_audit) {
+                                    result.shadow_audits++;
+                                    result.temperature_bin_shadow_audits[temp_bin]++;
+                                    try {
+                                        const std::vector<double> aux_deltas = local_test->aux_deltas_last_swap();
+                                        const double delta_exact = local_test->exact_delta_last_swap();
+                                        const double p_exact = acceptance_probability(delta_exact, t);
+                                        const bool exact_accept = (acceptance_draw < p_exact);
+
+                                        result.shadow_metric_observations++;
+                                        result.shadow_primary_abs_delta_error_sum += std::abs(delta_exact - delta_primary);
+                                        result.shadow_selected_abs_delta_error_sum += std::abs(delta_exact - selected_delta);
+                                        result.shadow_selected_abs_p_error_sum += std::abs(p_exact - acceptance_probability(selected_delta, t));
+
+                                        if (primary_interval.accept != exact_accept) {
+                                            result.shadow_primary_decision_mismatches++;
+                                        }
+                                        if (cheap_accept != exact_accept) {
+                                            result.shadow_selected_decision_mismatches++;
+                                            result.temperature_bin_shadow_selected_decision_mismatches[temp_bin]++;
+                                        }
+                                        if (interval_contains_probability(selected_interval, p_exact)) {
+                                            result.shadow_selected_interval_hits++;
+                                        }
+
+                                        double full_best_width = std::numeric_limits<double>::infinity();
+                                        if (primary_interval.resolved && primary_interval.width <= ci_width_threshold) {
+                                            full_best_width = primary_interval.width;
+                                        }
+                                        for (size_t level = 0; level < aux_deltas.size(); ++level) {
+                                            const decision_interval aux_interval = probability_interval_from_delta(
+                                                aux_deltas[level],
+                                                calibration_half_width(aux_delta_residuals[level], calibration_quantile,
+                                                                       min_calibration_samples),
+                                                t,
+                                                acceptance_draw);
+                                            if (aux_interval.resolved && aux_interval.width <= ci_width_threshold) {
+                                                full_best_width = std::min(full_best_width, aux_interval.width);
+                                            }
+                                        }
+
+                                        const double regret = std::isfinite(full_best_width)
+                                            ? std::max(0.0, selected_width - full_best_width)
+                                            : 0.0;
+                                        result.shadow_selected_regret_sum += regret;
+                                        if (regret > 0.0) {
+                                            result.shadow_full_scan_better_swaps++;
+                                        }
+                                    } catch (...) {
+                                        result.shadow_exact_failures++;
+                                        result.temperature_bin_shadow_exact_failures[temp_bin]++;
+                                    }
+                                }
+                            }
                         }
                     } else {
                         accept = (acceptance_draw < p_primary);
@@ -474,7 +654,22 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         double primary_ci_width_sum_curr = 0.0;
         double aux_ci_width_sum_curr = 0.0;
         double selected_ci_width_sum_curr = 0.0;
-        size_t ci_width_observations_curr = 0;
+        size_t primary_ci_width_observations_curr = 0;
+        size_t aux_ci_width_observations_curr = 0;
+        size_t selected_ci_width_observations_curr = 0;
+        double scanned_aux_levels_sum_curr = 0.0;
+        size_t scanned_aux_levels_observations_curr = 0;
+        size_t shadow_audits_curr = 0;
+        size_t shadow_exact_failures_curr = 0;
+        size_t shadow_primary_decision_mismatches_curr = 0;
+        size_t shadow_selected_decision_mismatches_curr = 0;
+        size_t shadow_selected_interval_hits_curr = 0;
+        size_t shadow_full_scan_better_swaps_curr = 0;
+        double shadow_selected_regret_sum_curr = 0.0;
+        double shadow_primary_abs_delta_error_sum_curr = 0.0;
+        double shadow_selected_abs_delta_error_sum_curr = 0.0;
+        double shadow_selected_abs_p_error_sum_curr = 0.0;
+        size_t shadow_metric_observations_curr = 0;
         std::vector<size_t> temperature_bin_total_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
         std::vector<size_t> temperature_bin_accepted_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
         std::vector<size_t> temperature_bin_primary_resolved_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
@@ -482,6 +677,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         std::vector<size_t> temperature_bin_exact_evals_curr(TEMPERATURE_BIN_COUNT, 0);
         std::vector<size_t> temperature_bin_exact_unavailable_swaps_curr(TEMPERATURE_BIN_COUNT, 0);
         std::vector<size_t> temperature_bin_exact_failures_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_shadow_audits_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_shadow_selected_decision_mismatches_curr(TEMPERATURE_BIN_COUNT, 0);
+        std::vector<size_t> temperature_bin_shadow_exact_failures_curr(TEMPERATURE_BIN_COUNT, 0);
 
         for (size_t i = 0; i < thread_solutions.size(); i++) {
             auto& future = thread_solutions[i];
@@ -507,7 +705,22 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
             primary_ci_width_sum_curr += run.primary_ci_width_sum;
             aux_ci_width_sum_curr += run.aux_ci_width_sum;
             selected_ci_width_sum_curr += run.selected_ci_width_sum;
-            ci_width_observations_curr += run.ci_width_observations;
+            primary_ci_width_observations_curr += run.primary_ci_width_observations;
+            aux_ci_width_observations_curr += run.aux_ci_width_observations;
+            selected_ci_width_observations_curr += run.selected_ci_width_observations;
+            scanned_aux_levels_sum_curr += run.scanned_aux_levels_sum;
+            scanned_aux_levels_observations_curr += run.scanned_aux_levels_observations;
+            shadow_audits_curr += run.shadow_audits;
+            shadow_exact_failures_curr += run.shadow_exact_failures;
+            shadow_primary_decision_mismatches_curr += run.shadow_primary_decision_mismatches;
+            shadow_selected_decision_mismatches_curr += run.shadow_selected_decision_mismatches;
+            shadow_selected_interval_hits_curr += run.shadow_selected_interval_hits;
+            shadow_full_scan_better_swaps_curr += run.shadow_full_scan_better_swaps;
+            shadow_selected_regret_sum_curr += run.shadow_selected_regret_sum;
+            shadow_primary_abs_delta_error_sum_curr += run.shadow_primary_abs_delta_error_sum;
+            shadow_selected_abs_delta_error_sum_curr += run.shadow_selected_abs_delta_error_sum;
+            shadow_selected_abs_p_error_sum_curr += run.shadow_selected_abs_p_error_sum;
+            shadow_metric_observations_curr += run.shadow_metric_observations;
             for (size_t bin = 0; bin < TEMPERATURE_BIN_COUNT; ++bin) {
                 temperature_bin_total_swaps_curr[bin] += run.temperature_bin_total_swaps[bin];
                 temperature_bin_accepted_swaps_curr[bin] += run.temperature_bin_accepted_swaps[bin];
@@ -516,6 +729,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                 temperature_bin_exact_evals_curr[bin] += run.temperature_bin_exact_evals[bin];
                 temperature_bin_exact_unavailable_swaps_curr[bin] += run.temperature_bin_exact_unavailable_swaps[bin];
                 temperature_bin_exact_failures_curr[bin] += run.temperature_bin_exact_failures[bin];
+                temperature_bin_shadow_audits_curr[bin] += run.temperature_bin_shadow_audits[bin];
+                temperature_bin_shadow_selected_decision_mismatches_curr[bin] += run.temperature_bin_shadow_selected_decision_mismatches[bin];
+                temperature_bin_shadow_exact_failures_curr[bin] += run.temperature_bin_shadow_exact_failures[bin];
             }
             if (i == 0) {
                 test = thread;
@@ -539,16 +755,44 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         exact_eval_failures.push_back(exact_failures_curr);
         primary_calibration_points_used.push_back(primary_calibration_points_curr);
         aux_calibration_points_used.push_back(aux_calibration_points_curr);
-        if (ci_width_observations_curr == 0) {
-            mean_primary_ci_width_used.push_back(NA_REAL);
-            mean_aux_ci_width_used.push_back(NA_REAL);
-            mean_selected_ci_width_used.push_back(NA_REAL);
-        } else {
-            const double denominator = static_cast<double>(ci_width_observations_curr);
-            mean_primary_ci_width_used.push_back(primary_ci_width_sum_curr / denominator);
-            mean_aux_ci_width_used.push_back(aux_ci_width_sum_curr / denominator);
-            mean_selected_ci_width_used.push_back(selected_ci_width_sum_curr / denominator);
-        }
+        mean_primary_ci_width_used.push_back(
+            (primary_ci_width_observations_curr == 0)
+                ? NA_REAL
+                : primary_ci_width_sum_curr / static_cast<double>(primary_ci_width_observations_curr));
+        mean_aux_ci_width_used.push_back(
+            (aux_ci_width_observations_curr == 0)
+                ? NA_REAL
+                : aux_ci_width_sum_curr / static_cast<double>(aux_ci_width_observations_curr));
+        mean_selected_ci_width_used.push_back(
+            (selected_ci_width_observations_curr == 0)
+                ? NA_REAL
+                : selected_ci_width_sum_curr / static_cast<double>(selected_ci_width_observations_curr));
+        mean_scanned_aux_levels_used.push_back(
+            (scanned_aux_levels_observations_curr == 0)
+                ? NA_REAL
+                : scanned_aux_levels_sum_curr / static_cast<double>(scanned_aux_levels_observations_curr));
+        shadow_audits_used.push_back(shadow_audits_curr);
+        shadow_exact_failures_used.push_back(shadow_exact_failures_curr);
+        shadow_primary_decision_mismatches_used.push_back(shadow_primary_decision_mismatches_curr);
+        shadow_selected_decision_mismatches_used.push_back(shadow_selected_decision_mismatches_curr);
+        shadow_selected_interval_hits_used.push_back(shadow_selected_interval_hits_curr);
+        shadow_full_scan_better_swaps_used.push_back(shadow_full_scan_better_swaps_curr);
+        mean_shadow_selected_regret_used.push_back(
+            (shadow_metric_observations_curr == 0)
+                ? NA_REAL
+                : shadow_selected_regret_sum_curr / static_cast<double>(shadow_metric_observations_curr));
+        mean_shadow_primary_abs_delta_error_used.push_back(
+            (shadow_metric_observations_curr == 0)
+                ? NA_REAL
+                : shadow_primary_abs_delta_error_sum_curr / static_cast<double>(shadow_metric_observations_curr));
+        mean_shadow_selected_abs_delta_error_used.push_back(
+            (shadow_metric_observations_curr == 0)
+                ? NA_REAL
+                : shadow_selected_abs_delta_error_sum_curr / static_cast<double>(shadow_metric_observations_curr));
+        mean_shadow_selected_abs_p_error_used.push_back(
+            (shadow_metric_observations_curr == 0)
+                ? NA_REAL
+                : shadow_selected_abs_p_error_sum_curr / static_cast<double>(shadow_metric_observations_curr));
         temperature_bin_total_swaps_used.push_back(temperature_bin_total_swaps_curr);
         temperature_bin_accepted_swaps_used.push_back(temperature_bin_accepted_swaps_curr);
         temperature_bin_primary_resolved_swaps_used.push_back(temperature_bin_primary_resolved_swaps_curr);
@@ -556,6 +800,9 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
         temperature_bin_exact_evals_used.push_back(temperature_bin_exact_evals_curr);
         temperature_bin_exact_unavailable_swaps_used.push_back(temperature_bin_exact_unavailable_swaps_curr);
         temperature_bin_exact_failures_used.push_back(temperature_bin_exact_failures_curr);
+        temperature_bin_shadow_audits_used.push_back(temperature_bin_shadow_audits_curr);
+        temperature_bin_shadow_selected_decision_mismatches_used.push_back(temperature_bin_shadow_selected_decision_mismatches_curr);
+        temperature_bin_shadow_exact_failures_used.push_back(temperature_bin_shadow_exact_failures_curr);
 
         curr_size += step;
 
@@ -573,10 +820,20 @@ size_t subsample::solutions() const {
                            exact_eval_failures, primary_calibration_points_used,
                            aux_calibration_points_used, mean_primary_ci_width_used,
                            mean_aux_ci_width_used, mean_selected_ci_width_used,
+                           mean_scanned_aux_levels_used, shadow_audits_used,
+                           shadow_exact_failures_used, shadow_primary_decision_mismatches_used,
+                           shadow_selected_decision_mismatches_used, shadow_selected_interval_hits_used,
+                           shadow_full_scan_better_swaps_used, mean_shadow_selected_regret_used,
+                           mean_shadow_primary_abs_delta_error_used,
+                           mean_shadow_selected_abs_delta_error_used,
+                           mean_shadow_selected_abs_p_error_used,
                            temperature_bin_total_swaps_used, temperature_bin_accepted_swaps_used,
                            temperature_bin_primary_resolved_swaps_used, temperature_bin_aux_resolved_swaps_used,
                            temperature_bin_exact_evals_used, temperature_bin_exact_unavailable_swaps_used,
-                           temperature_bin_exact_failures_used);
+                           temperature_bin_exact_failures_used,
+                           temperature_bin_shadow_audits_used,
+                           temperature_bin_shadow_selected_decision_mismatches_used,
+                           temperature_bin_shadow_exact_failures_used);
     return best.size();
 }
 
@@ -662,6 +919,50 @@ double subsample::mean_selected_ci_width(size_t k) const {
     return mean_selected_ci_width_used.at(k);
 }
 
+double subsample::mean_scanned_aux_levels(size_t k) const {
+    return mean_scanned_aux_levels_used.at(k);
+}
+
+size_t subsample::shadow_audits(size_t k) const {
+    return shadow_audits_used.at(k);
+}
+
+size_t subsample::shadow_exact_failures(size_t k) const {
+    return shadow_exact_failures_used.at(k);
+}
+
+size_t subsample::shadow_primary_decision_mismatches(size_t k) const {
+    return shadow_primary_decision_mismatches_used.at(k);
+}
+
+size_t subsample::shadow_selected_decision_mismatches(size_t k) const {
+    return shadow_selected_decision_mismatches_used.at(k);
+}
+
+size_t subsample::shadow_selected_interval_hits(size_t k) const {
+    return shadow_selected_interval_hits_used.at(k);
+}
+
+size_t subsample::shadow_full_scan_better_swaps(size_t k) const {
+    return shadow_full_scan_better_swaps_used.at(k);
+}
+
+double subsample::mean_shadow_selected_regret(size_t k) const {
+    return mean_shadow_selected_regret_used.at(k);
+}
+
+double subsample::mean_shadow_primary_abs_delta_error(size_t k) const {
+    return mean_shadow_primary_abs_delta_error_used.at(k);
+}
+
+double subsample::mean_shadow_selected_abs_delta_error(size_t k) const {
+    return mean_shadow_selected_abs_delta_error_used.at(k);
+}
+
+double subsample::mean_shadow_selected_abs_p_error(size_t k) const {
+    return mean_shadow_selected_abs_p_error_used.at(k);
+}
+
 size_t subsample::temperature_bins() const {
     return TEMPERATURE_BIN_COUNT;
 }
@@ -692,6 +993,18 @@ size_t subsample::temperature_bin_exact_unavailable_swaps(size_t k, size_t bin) 
 
 size_t subsample::temperature_bin_exact_failures(size_t k, size_t bin) const {
     return temperature_bin_exact_failures_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_shadow_audits(size_t k, size_t bin) const {
+    return temperature_bin_shadow_audits_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_shadow_selected_decision_mismatches(size_t k, size_t bin) const {
+    return temperature_bin_shadow_selected_decision_mismatches_used.at(k).at(bin);
+}
+
+size_t subsample::temperature_bin_shadow_exact_failures(size_t k, size_t bin) const {
+    return temperature_bin_shadow_exact_failures_used.at(k).at(bin);
 }
 
 }

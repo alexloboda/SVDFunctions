@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <cstdint>
+#include <functional>
 #include <RcppEigen.h>
 
 // [[Rcpp::depends(RcppEigen)]]
@@ -128,7 +129,7 @@ protected:
 
     std::vector<double> pairwise_stat;
     std::vector<double> center_stat;
-    std::vector<std::vector<float>> subset_feature_sum;
+    std::vector<std::vector<double>> subset_feature_sum;
     std::vector<double> betas;
 
     std::shared_ptr<Clustering> clustering;
@@ -151,7 +152,7 @@ protected:
     std::vector<size_t> rff_feature_levels;
     std::vector<double> rff_pairwise_stats;
     double rff_center_stat = 0.0;
-    std::vector<float> rff_subset_feature_sum;
+    std::vector<double> rff_subset_feature_sum;
 
 public:
     mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
@@ -177,6 +178,8 @@ public:
 
     double get_aux_normality_statistic();
     double get_aux_normality_statistic(size_t level) const;
+    void scan_aux_deltas_last_swap(const std::function<bool(size_t, double)>& visitor) const;
+    std::vector<double> aux_deltas_last_swap() const;
     double aux_delta_last_swap(size_t level) const;
     size_t aux_statistic_levels() const {
         return rff_feature_levels.size();
@@ -195,6 +198,7 @@ public:
 
 protected:
     void check_aux_state() const;
+    void check_aux_delta_request() const;
     void remove(unsigned i);
     void add(unsigned i);
 

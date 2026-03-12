@@ -174,6 +174,50 @@ public:
         return subsampling.mean_selected_ci_width(k);
     }
 
+    double sa_mean_scanned_aux_levels(size_t k) const {
+        return subsampling.mean_scanned_aux_levels(k);
+    }
+
+    size_t sa_shadow_audits(size_t k) const {
+        return subsampling.shadow_audits(k);
+    }
+
+    size_t sa_shadow_exact_failures(size_t k) const {
+        return subsampling.shadow_exact_failures(k);
+    }
+
+    size_t sa_shadow_primary_decision_mismatches(size_t k) const {
+        return subsampling.shadow_primary_decision_mismatches(k);
+    }
+
+    size_t sa_shadow_selected_decision_mismatches(size_t k) const {
+        return subsampling.shadow_selected_decision_mismatches(k);
+    }
+
+    size_t sa_shadow_selected_interval_hits(size_t k) const {
+        return subsampling.shadow_selected_interval_hits(k);
+    }
+
+    size_t sa_shadow_full_scan_better_swaps(size_t k) const {
+        return subsampling.shadow_full_scan_better_swaps(k);
+    }
+
+    double sa_mean_shadow_selected_regret(size_t k) const {
+        return subsampling.mean_shadow_selected_regret(k);
+    }
+
+    double sa_mean_shadow_primary_abs_delta_error(size_t k) const {
+        return subsampling.mean_shadow_primary_abs_delta_error(k);
+    }
+
+    double sa_mean_shadow_selected_abs_delta_error(size_t k) const {
+        return subsampling.mean_shadow_selected_abs_delta_error(k);
+    }
+
+    double sa_mean_shadow_selected_abs_p_error(size_t k) const {
+        return subsampling.mean_shadow_selected_abs_p_error(k);
+    }
+
     size_t sa_temperature_bins() const {
         return subsampling.temperature_bins();
     }
@@ -204,6 +248,18 @@ public:
 
     size_t sa_temperature_bin_exact_failures(size_t k, size_t bin) const {
         return subsampling.temperature_bin_exact_failures(k, bin);
+    }
+
+    size_t sa_temperature_bin_shadow_audits(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_shadow_audits(k, bin);
+    }
+
+    size_t sa_temperature_bin_shadow_selected_decision_mismatches(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_shadow_selected_decision_mismatches(k, bin);
+    }
+
+    size_t sa_temperature_bin_shadow_exact_failures(size_t k, size_t bin) const {
+        return subsampling.temperature_bin_shadow_exact_failures(k, bin);
     }
 private:
     double get_lambda(std::vector<double>& pvals);

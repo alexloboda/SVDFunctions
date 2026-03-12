@@ -31,6 +31,17 @@ class subsample {
     std::vector<double> mean_primary_ci_width_used;
     std::vector<double> mean_aux_ci_width_used;
     std::vector<double> mean_selected_ci_width_used;
+    std::vector<double> mean_scanned_aux_levels_used;
+    std::vector<size_t> shadow_audits_used;
+    std::vector<size_t> shadow_exact_failures_used;
+    std::vector<size_t> shadow_primary_decision_mismatches_used;
+    std::vector<size_t> shadow_selected_decision_mismatches_used;
+    std::vector<size_t> shadow_selected_interval_hits_used;
+    std::vector<size_t> shadow_full_scan_better_swaps_used;
+    std::vector<double> mean_shadow_selected_regret_used;
+    std::vector<double> mean_shadow_primary_abs_delta_error_used;
+    std::vector<double> mean_shadow_selected_abs_delta_error_used;
+    std::vector<double> mean_shadow_selected_abs_p_error_used;
     std::vector<std::vector<size_t>> temperature_bin_total_swaps_used;
     std::vector<std::vector<size_t>> temperature_bin_accepted_swaps_used;
     std::vector<std::vector<size_t>> temperature_bin_primary_resolved_swaps_used;
@@ -38,6 +49,9 @@ class subsample {
     std::vector<std::vector<size_t>> temperature_bin_exact_evals_used;
     std::vector<std::vector<size_t>> temperature_bin_exact_unavailable_swaps_used;
     std::vector<std::vector<size_t>> temperature_bin_exact_failures_used;
+    std::vector<std::vector<size_t>> temperature_bin_shadow_audits_used;
+    std::vector<std::vector<size_t>> temperature_bin_shadow_selected_decision_mismatches_used;
+    std::vector<std::vector<size_t>> temperature_bin_shadow_exact_failures_used;
     Clustering clst;
 
     std::mt19937 wheel;
@@ -75,6 +89,17 @@ public:
     double mean_primary_ci_width(size_t k) const;
     double mean_aux_ci_width(size_t k) const;
     double mean_selected_ci_width(size_t k) const;
+    double mean_scanned_aux_levels(size_t k) const;
+    size_t shadow_audits(size_t k) const;
+    size_t shadow_exact_failures(size_t k) const;
+    size_t shadow_primary_decision_mismatches(size_t k) const;
+    size_t shadow_selected_decision_mismatches(size_t k) const;
+    size_t shadow_selected_interval_hits(size_t k) const;
+    size_t shadow_full_scan_better_swaps(size_t k) const;
+    double mean_shadow_selected_regret(size_t k) const;
+    double mean_shadow_primary_abs_delta_error(size_t k) const;
+    double mean_shadow_selected_abs_delta_error(size_t k) const;
+    double mean_shadow_selected_abs_p_error(size_t k) const;
     size_t temperature_bins() const;
     size_t temperature_bin_total_swaps(size_t k, size_t bin) const;
     size_t temperature_bin_accepted_swaps(size_t k, size_t bin) const;
@@ -83,6 +108,9 @@ public:
     size_t temperature_bin_exact_evals(size_t k, size_t bin) const;
     size_t temperature_bin_exact_unavailable_swaps(size_t k, size_t bin) const;
     size_t temperature_bin_exact_failures(size_t k, size_t bin) const;
+    size_t temperature_bin_shadow_audits(size_t k, size_t bin) const;
+    size_t temperature_bin_shadow_selected_decision_mismatches(size_t k, size_t bin) const;
+    size_t temperature_bin_shadow_exact_failures(size_t k, size_t bin) const;
 };
 
 }

@@ -209,6 +209,18 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     NumericVector sa_mean_primary_ci_width((R_xlen_t)n_sa);
     NumericVector sa_mean_aux_ci_width((R_xlen_t)n_sa);
     NumericVector sa_mean_selected_ci_width((R_xlen_t)n_sa);
+    NumericVector sa_mean_scanned_aux_levels((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_audits((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_exact_failures((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_primary_decision_mismatches((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_selected_decision_mismatches((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_selected_interval_hits((R_xlen_t)n_sa);
+    NumericVector sa_shadow_selected_interval_coverage((R_xlen_t)n_sa);
+    IntegerVector sa_shadow_full_scan_better_swaps((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_selected_regret((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_primary_abs_delta_error((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_selected_abs_delta_error((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_selected_abs_p_error((R_xlen_t)n_sa);
     CharacterVector sa_names((R_xlen_t)n_sa);
     const size_t n_aux_levels = matcher.sa_aux_ladder_levels();
     List sa_aux_level_resolved((R_xlen_t)n_aux_levels);
@@ -243,6 +255,22 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_mean_primary_ci_width[(R_xlen_t)i] = matcher.sa_mean_primary_ci_width(i);
         sa_mean_aux_ci_width[(R_xlen_t)i] = matcher.sa_mean_aux_ci_width(i);
         sa_mean_selected_ci_width[(R_xlen_t)i] = matcher.sa_mean_selected_ci_width(i);
+        sa_mean_scanned_aux_levels[(R_xlen_t)i] = matcher.sa_mean_scanned_aux_levels(i);
+        sa_shadow_audits[(R_xlen_t)i] = (int)matcher.sa_shadow_audits(i);
+        sa_shadow_exact_failures[(R_xlen_t)i] = (int)matcher.sa_shadow_exact_failures(i);
+        sa_shadow_primary_decision_mismatches[(R_xlen_t)i] = (int)matcher.sa_shadow_primary_decision_mismatches(i);
+        sa_shadow_selected_decision_mismatches[(R_xlen_t)i] = (int)matcher.sa_shadow_selected_decision_mismatches(i);
+        sa_shadow_selected_interval_hits[(R_xlen_t)i] = (int)matcher.sa_shadow_selected_interval_hits(i);
+        const size_t shadow_successes = matcher.sa_shadow_audits(i) - matcher.sa_shadow_exact_failures(i);
+        sa_shadow_selected_interval_coverage[(R_xlen_t)i] = shadow_successes == 0
+            ? NA_REAL
+            : static_cast<double>(matcher.sa_shadow_selected_interval_hits(i)) /
+                  static_cast<double>(shadow_successes);
+        sa_shadow_full_scan_better_swaps[(R_xlen_t)i] = (int)matcher.sa_shadow_full_scan_better_swaps(i);
+        sa_mean_shadow_selected_regret[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_regret(i);
+        sa_mean_shadow_primary_abs_delta_error[(R_xlen_t)i] = matcher.sa_mean_shadow_primary_abs_delta_error(i);
+        sa_mean_shadow_selected_abs_delta_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_abs_delta_error(i);
+        sa_mean_shadow_selected_abs_p_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_abs_p_error(i);
         sa_names[(R_xlen_t)i] = std::to_string(size);
     }
     for (size_t level = 0; level < n_aux_levels; ++level) {
@@ -258,7 +286,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
             Named("aux_resolved_swaps") = IntegerVector((R_xlen_t)n_sa),
             Named("exact_evals") = IntegerVector((R_xlen_t)n_sa),
             Named("exact_unavailable_swaps") = IntegerVector((R_xlen_t)n_sa),
-            Named("exact_failures") = IntegerVector((R_xlen_t)n_sa)
+            Named("exact_failures") = IntegerVector((R_xlen_t)n_sa),
+            Named("shadow_audits") = IntegerVector((R_xlen_t)n_sa),
+            Named("shadow_selected_decision_mismatches") = IntegerVector((R_xlen_t)n_sa),
+            Named("shadow_exact_failures") = IntegerVector((R_xlen_t)n_sa)
         );
         IntegerVector total_swaps = bin_stats["total_swaps"];
         IntegerVector accepted_swaps = bin_stats["accepted_swaps"];
@@ -267,6 +298,9 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         IntegerVector exact_evals = bin_stats["exact_evals"];
         IntegerVector exact_unavailable_swaps = bin_stats["exact_unavailable_swaps"];
         IntegerVector exact_failures = bin_stats["exact_failures"];
+        IntegerVector shadow_audits = bin_stats["shadow_audits"];
+        IntegerVector shadow_selected_decision_mismatches = bin_stats["shadow_selected_decision_mismatches"];
+        IntegerVector shadow_exact_failures = bin_stats["shadow_exact_failures"];
         for (size_t i = 0; i < n_sa; ++i) {
             total_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_total_swaps(i, bin);
             accepted_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_accepted_swaps(i, bin);
@@ -275,6 +309,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
             exact_evals[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_evals(i, bin);
             exact_unavailable_swaps[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_unavailable_swaps(i, bin);
             exact_failures[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_exact_failures(i, bin);
+            shadow_audits[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_shadow_audits(i, bin);
+            shadow_selected_decision_mismatches[(R_xlen_t)i] =
+                (int)matcher.sa_temperature_bin_shadow_selected_decision_mismatches(i, bin);
+            shadow_exact_failures[(R_xlen_t)i] = (int)matcher.sa_temperature_bin_shadow_exact_failures(i, bin);
         }
         total_swaps.attr("names") = sa_names;
         accepted_swaps.attr("names") = sa_names;
@@ -283,6 +321,9 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         exact_evals.attr("names") = sa_names;
         exact_unavailable_swaps.attr("names") = sa_names;
         exact_failures.attr("names") = sa_names;
+        shadow_audits.attr("names") = sa_names;
+        shadow_selected_decision_mismatches.attr("names") = sa_names;
+        shadow_exact_failures.attr("names") = sa_names;
         bin_stats["total_swaps"] = total_swaps;
         bin_stats["accepted_swaps"] = accepted_swaps;
         bin_stats["primary_resolved_swaps"] = primary_resolved_swaps;
@@ -290,6 +331,9 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         bin_stats["exact_evals"] = exact_evals;
         bin_stats["exact_unavailable_swaps"] = exact_unavailable_swaps;
         bin_stats["exact_failures"] = exact_failures;
+        bin_stats["shadow_audits"] = shadow_audits;
+        bin_stats["shadow_selected_decision_mismatches"] = shadow_selected_decision_mismatches;
+        bin_stats["shadow_exact_failures"] = shadow_exact_failures;
         sa_temperature_bins[(R_xlen_t)bin] = bin_stats;
         sa_temperature_bin_names[(R_xlen_t)bin] = "bin_" + std::to_string(bin + 1);
     }
@@ -312,6 +356,18 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     sa_mean_primary_ci_width.attr("names") = sa_names;
     sa_mean_aux_ci_width.attr("names") = sa_names;
     sa_mean_selected_ci_width.attr("names") = sa_names;
+    sa_mean_scanned_aux_levels.attr("names") = sa_names;
+    sa_shadow_audits.attr("names") = sa_names;
+    sa_shadow_exact_failures.attr("names") = sa_names;
+    sa_shadow_primary_decision_mismatches.attr("names") = sa_names;
+    sa_shadow_selected_decision_mismatches.attr("names") = sa_names;
+    sa_shadow_selected_interval_hits.attr("names") = sa_names;
+    sa_shadow_selected_interval_coverage.attr("names") = sa_names;
+    sa_shadow_full_scan_better_swaps.attr("names") = sa_names;
+    sa_mean_shadow_selected_regret.attr("names") = sa_names;
+    sa_mean_shadow_primary_abs_delta_error.attr("names") = sa_names;
+    sa_mean_shadow_selected_abs_delta_error.attr("names") = sa_names;
+    sa_mean_shadow_selected_abs_p_error.attr("names") = sa_names;
     ret["lambda"] = lambda;
     ret["optimal_lambda"] = optimal_lambda;
     ret["statistics"] = stats;
@@ -335,6 +391,18 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         Named("mean_primary_ci_width") = sa_mean_primary_ci_width,
         Named("mean_aux_ci_width") = sa_mean_aux_ci_width,
         Named("mean_selected_ci_width") = sa_mean_selected_ci_width,
+        Named("mean_scanned_aux_levels") = sa_mean_scanned_aux_levels,
+        Named("shadow_audits") = sa_shadow_audits,
+        Named("shadow_exact_failures") = sa_shadow_exact_failures,
+        Named("shadow_primary_decision_mismatches") = sa_shadow_primary_decision_mismatches,
+        Named("shadow_selected_decision_mismatches") = sa_shadow_selected_decision_mismatches,
+        Named("shadow_selected_interval_hits") = sa_shadow_selected_interval_hits,
+        Named("shadow_selected_interval_coverage") = sa_shadow_selected_interval_coverage,
+        Named("shadow_full_scan_better_swaps") = sa_shadow_full_scan_better_swaps,
+        Named("mean_shadow_selected_regret") = sa_mean_shadow_selected_regret,
+        Named("mean_shadow_primary_abs_delta_error") = sa_mean_shadow_primary_abs_delta_error,
+        Named("mean_shadow_selected_abs_delta_error") = sa_mean_shadow_selected_abs_delta_error,
+        Named("mean_shadow_selected_abs_p_error") = sa_mean_shadow_selected_abs_p_error,
         Named("temperature_bins") = sa_temperature_bins
     );
     return ret;

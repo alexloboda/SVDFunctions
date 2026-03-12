@@ -57,12 +57,14 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param method string approximation method for SA statistic, either
 #'   \code{"exact"}, \code{"nystrom"}, or \code{"hybrid"}. In hybrid mode,
 #'   a fixed-size Nystrom approximation is combined with a precomputed RFF ladder
-#'   of increasing prefix sizes; a single SA acceptance draw is tested against the
-#'   calibrated acceptance interval from the primary Nystrom estimate and each
-#'   auxiliary RFF ladder level, and the narrowest cheap interval that both
-#'   resolves the sampled SA accept/reject decision and stays below the requested
-#'   CI-width threshold is used. A small fraction of cheap-resolved swaps is still
-#'   audited exactly to keep the calibration unbiased.
+#'   of increasing prefix sizes; a single SA acceptance draw is first tested
+#'   against the calibrated interval from the primary Nystrom estimate and then,
+#'   only if needed, against progressively larger auxiliary RFF prefixes until
+#'   the sampled SA accept/reject decision is resolved within the requested
+#'   CI-width threshold. A small fraction of cheap-resolved swaps is still
+#'   audited exactly to keep the calibration unbiased, and an additional shadow
+#'   audit stream can record full-ladder plus exact diagnostics without changing
+#'   the actual SA trajectory.
 #' @param n_features integer number of Nyström features (landmarks) used when
 #'   \code{method = "nystrom"} or \code{method = "hybrid"}.
 #' @param ciWidthThreshold numeric maximum acceptable CI width for a cheap
@@ -81,8 +83,9 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #'   which reports per-target-subset SA counters such as total swaps,
 #'   CI-resolved swaps, how many of those were resolved by the primary Nyström
 #'   estimate versus each auxiliary RFF ladder level, exact fallback evaluations,
-#'   calibration sample counts, mean CI widths, and per-temperature-bin swap
-#'   statistics.
+#'   calibration sample counts, mean CI widths, the mean number of auxiliary
+#'   ladder levels scanned before early stop, shadow-audit mismatch/error
+#'   summaries, and per-temperature-bin swap statistics.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 
