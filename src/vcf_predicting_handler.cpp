@@ -174,12 +174,20 @@ namespace vcf {
             tree_pool_threads = 0;
         }
 
+        std::size_t metrics_pool_threads = 0;
+        try {
+            metrics_pool_threads = metrics_thread_pool.n_threads();
+        } catch (...) {
+            metrics_pool_threads = 0;
+        }
+
         auto variant_name = (std::string)variant;
         pending_loo_rows.push_back(metrics_thread_pool.push([
             variant_name = std::move(variant_name),
             n_observed,
             n_missing,
             tree_pool_threads,
+            metrics_pool_threads,
             observed_idx = std::move(observed_idx),
             features = std::move(dataset.first),
             truth_labels = std::move(dataset.second),
@@ -220,12 +228,19 @@ namespace vcf {
             };
 
             EvalAccum rf_acc;
-            if (observed_idx.size() >= 512 && tree_pool_threads >= 2) {
-                const size_t target_tasks = std::min<std::size_t>(tree_pool_threads * 4, 32);
+            if (observed_idx.size() >= 512 && metrics_pool_threads >= 2) {
+                const size_t target_tasks = std::min<std::size_t>(metrics_pool_threads, 8);
                 const size_t chunk = std::max<std::size_t>((observed_idx.size() + target_tasks - 1) / target_tasks, 128);
+                std::vector<std::future<EvalAccum>> futures;
+                futures.reserve((observed_idx.size() + chunk - 1) / chunk);
                 for (size_t begin = 0; begin < observed_idx.size(); begin += chunk) {
                     size_t end = std::min(begin + chunk, observed_idx.size());
-                    auto acc = eval_rf_range(begin, end);
+                    futures.push_back(std::async(std::launch::async, [begin, end, &eval_rf_range]() {
+                        return eval_rf_range(begin, end);
+                    }));
+                }
+                for (auto& future: futures) {
+                    auto acc = future.get();
                     rf_acc.sum_abs += acc.sum_abs;
                     rf_acc.sum_sq += acc.sum_sq;
                     rf_acc.correct += acc.correct;
