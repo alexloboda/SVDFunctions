@@ -152,8 +152,8 @@ namespace vcf {
         return *this;
     }
 
-    void GenotypeMatrixIterator::set(std::vector<float> genotypes) {
-        gh.gmatrix[pos] = genotypes;
+    void GenotypeMatrixIterator::set(std::vector<float>&& genotypes) {
+        gh.gmatrix[pos] = std::move(genotypes);
     }
 
     Variant GenotypeMatrixIterator::operator*() {

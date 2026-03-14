@@ -32,6 +32,8 @@ namespace vcf {
         Format(const std::string& format);
         AlleleType parse_gt(const std::string& gt, int allele);
         Allele parse(const std::string& genotype, int allele, const VCFFilter& filter, VCFFilterStats& stats);
+        Allele parse(const std::string& genotype, std::size_t start, std::size_t end,
+                     int allele, const VCFFilter& filter, VCFFilterStats& stats);
     };
 
     class AlleleVector {
@@ -40,9 +42,13 @@ namespace vcf {
         std::shared_ptr<VCFFilter> filter;
         vcf::VCFFilterStats& stats;
         std::vector<Allele> alleles;
+        std::vector<AlleleType> cached_unflipped;
+        std::vector<AlleleType> cached_flipped;
         std::size_t variant;
         bool resolved = false;
         bool corrupted = false;
+        bool cached_unflipped_ready = false;
+        bool cached_flipped_ready = false;
         std::string corruption_cause;
         std::size_t expected_ncols;
 

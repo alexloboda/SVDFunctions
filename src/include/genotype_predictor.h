@@ -24,11 +24,11 @@ namespace vcf {
     public:
         explicit Node(std::vector<double>&& class_weights);
 
-        double accuracy();
+        double accuracy() const;
         virtual double predict(std::vector<vcf::AlleleType>& features) const = 0;
         virtual ~Node() = default;
 
-        std::vector<double> weights();
+        const std::vector<double>& weights() const;
 
     protected:
         static double prediction(const std::vector<double>& alpha);
@@ -54,8 +54,8 @@ namespace vcf {
     class Bags;
 
     class TreeBuilder {
-        const Features features;
-        const Labels values;
+        const Features& features;
+        const Labels& values;
         std::size_t max_features;
     public:
         TreeBuilder(const Features&, const Labels& labels, std::size_t max_features);

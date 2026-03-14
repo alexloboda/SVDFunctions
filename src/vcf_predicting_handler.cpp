@@ -1,7 +1,7 @@
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <limits>
-#include <algorithm>
-#include <future>
 
 #include "include/vcf_predicting_handler.h"
 #include "include/genotype_predictor.h"
@@ -9,6 +9,22 @@
 
 namespace {
     using std::size_t;
+
+    static inline std::size_t safe_hardware_threads() {
+        auto threads = (std::size_t)std::thread::hardware_concurrency();
+        return std::max<std::size_t>(threads, 1);
+    }
+
+    static inline std::size_t metrics_threads_for(std::size_t tree_threads) {
+        return std::max<std::size_t>(tree_threads / 4, 1);
+    }
+
+    static inline std::size_t pending_loo_limit_for(std::size_t sample_count, std::size_t metrics_threads) {
+        if (sample_count >= 50000) {
+            return 1;
+        }
+        return std::max<std::size_t>(metrics_threads, 1);
+    }
 
     static inline int clamp_round_to_genotype(double x) {
         int r = (int)std::llround(x);
@@ -20,15 +36,20 @@ namespace {
         }
         return r;
     }
+
 }
 
 namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                         int window_size_kb, int window_size, unsigned int seed)
+                                         int window_size_kb, int window_size,
+                                         std::size_t rf_ntrees, unsigned int seed)
                                          :VariantsHandler(samples), curr_chr(-1), iterator{gh},
                                           window(window_size),
-                                          thread_pool(std::thread::hardware_concurrency()),
-                                          random_seed(seed) {
+                                          thread_pool(safe_hardware_threads()),
+                                          metrics_thread_pool(metrics_threads_for(safe_hardware_threads())),
+                                          random_seed(seed),
+                                          rf_ntrees(rf_ntrees),
+                                          max_pending_loo_tasks(pending_loo_limit_for(samples.size(), metrics_threads_for(safe_hardware_threads()))) {
         auto variants = gh.desired_variants();
         int halfws = window_size_kb / 2;
         for (const Variant& v : variants) {
@@ -68,8 +89,9 @@ namespace vcf {
                     return;
                 }
                 Variant v = *iterator;
-                fix_labels(v, dataset);
+                fix_labels(v, std::move(dataset));
                 ++iterator;
+                collect_ready_loo_rows(false);
             }
         }
     }
@@ -81,12 +103,33 @@ namespace vcf {
             if (dataset.second.empty()) {
                 break;
             }
-            fix_labels(var, dataset);
+            fix_labels(var, std::move(dataset));
+            collect_ready_loo_rows(false);
         }
+        collect_ready_loo_rows(true);
         window.clear();
     }
 
-    void PredictingHandler::fix_labels(const Variant& variant, const std::pair<Features, Labels>& dataset) {
+    void PredictingHandler::collect_ready_loo_rows(bool wait_all) {
+        while (!pending_loo_rows.empty()) {
+            auto& next = pending_loo_rows.front();
+            if (!wait_all && next.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+                break;
+            }
+            loo_rows.push_back(next.get());
+            pending_loo_rows.pop_front();
+        }
+    }
+
+    void PredictingHandler::collect_next_loo_row() {
+        if (pending_loo_rows.empty()) {
+            return;
+        }
+        loo_rows.push_back(pending_loo_rows.front().get());
+        pending_loo_rows.pop_front();
+    }
+
+    void PredictingHandler::fix_labels(const Variant& variant, std::pair<Features, Labels> dataset) {
         bool missing = false;
         for (auto l: dataset.second) {
             if (l == MISSING) {
@@ -97,7 +140,7 @@ namespace vcf {
             return;
         }
         TreeBuilder tree_builder = make_tree_builder(dataset);
-        RandomForest forest{tree_builder, thread_pool, /*ntrees=*/100, random_seed};
+        RandomForest forest{tree_builder, thread_pool, rf_ntrees, random_seed};
 
         // First pass: produce the returned genotype row (impute only missing).
         std::size_t n_observed = 0;
@@ -107,98 +150,107 @@ namespace vcf {
 
         std::vector<float> labels;
         labels.reserve(dataset.second.size());
+        std::vector<AlleleType> sample_features(dataset.first.size());
         for (size_t i = 0; i < dataset.second.size(); i++) {
             AlleleType curr = dataset.second[i];
             if (curr == MISSING) {
                 ++n_missing;
-                std::vector<AlleleType> features;
-                features.reserve(dataset.first.size());
                 for (size_t j = 0; j < dataset.first.size(); j++) {
-                    features.push_back(dataset.first[j][i]);
+                    sample_features[j] = dataset.first[j][i];
                 }
-                labels.push_back((float)forest.predict(features));
+                labels.push_back((float)forest.predict(sample_features));
             } else {
                 ++n_observed;
                 observed_idx.push_back(i);
                 labels.push_back((float)to_int(curr));
             }
         }
-        iterator.set(labels);
+        iterator.set(std::move(labels));
 
-        // RF OOB evaluation on observed genotypes (parallelized in chunks when beneficial).
-        struct EvalAccum {
-            double sum_abs = 0.0;
-            double sum_sq = 0.0;
-            std::size_t correct = 0;
-            std::size_t count = 0;
-        };
-
-        auto eval_rf_range = [&](size_t begin, size_t end) -> EvalAccum {
-            EvalAccum acc;
-            for (size_t k = begin; k < end; k++) {
-                size_t i = observed_idx[k];
-                std::vector<AlleleType> features;
-                features.reserve(dataset.first.size());
-                for (size_t j = 0; j < dataset.first.size(); j++) {
-                    features.push_back(dataset.first[j][i]);
-                }
-                double pred = forest.predict_oob(features, i);
-                double truth = (double)to_int(dataset.second[i]);
-                double err = pred - truth;
-                acc.sum_abs += std::abs(err);
-                acc.sum_sq += err * err;
-                int rounded = clamp_round_to_genotype(pred);
-                if ((double)rounded == truth) {
-                    acc.correct++;
-                }
-                acc.count++;
-            }
-            return acc;
-        };
-
-        std::size_t pool_threads = 0;
+        std::size_t tree_pool_threads = 0;
         try {
-            pool_threads = thread_pool.n_threads();
+            tree_pool_threads = thread_pool.n_threads();
         } catch (...) {
-            pool_threads = 0;
+            tree_pool_threads = 0;
         }
 
-        EvalAccum rf_acc;
-        if (observed_idx.size() >= 512 && pool_threads >= 2) {
-            const size_t target_tasks = std::min<std::size_t>(pool_threads * 4, 32);
-            const size_t chunk = std::max<std::size_t>((observed_idx.size() + target_tasks - 1) / target_tasks, 128);
-            std::vector<std::future<EvalAccum>> futures;
-            for (size_t begin = 0; begin < observed_idx.size(); begin += chunk) {
-                size_t end = std::min(begin + chunk, observed_idx.size());
-                futures.push_back(thread_pool.push([&eval_rf_range, begin, end]() { return eval_rf_range(begin, end); }));
+        auto variant_name = (std::string)variant;
+        pending_loo_rows.push_back(metrics_thread_pool.push([
+            variant_name = std::move(variant_name),
+            n_observed,
+            n_missing,
+            tree_pool_threads,
+            observed_idx = std::move(observed_idx),
+            features = std::move(dataset.first),
+            truth_labels = std::move(dataset.second),
+            forest = std::move(forest)
+        ]() mutable {
+            struct EvalAccum {
+                double sum_abs = 0.0;
+                double sum_sq = 0.0;
+                std::size_t correct = 0;
+                std::size_t count = 0;
+            };
+
+            ImputationLooRow row;
+            row.variant = std::move(variant_name);
+            row.n_observed = n_observed;
+            row.n_missing = n_missing;
+
+            auto eval_rf_range = [&](size_t begin, size_t end) -> EvalAccum {
+                EvalAccum acc;
+                std::vector<AlleleType> sample_features(features.size());
+                for (size_t k = begin; k < end; k++) {
+                    size_t sample_index = observed_idx[k];
+                    for (size_t j = 0; j < features.size(); j++) {
+                        sample_features[j] = features[j][sample_index];
+                    }
+                    double pred = forest.predict_oob(sample_features, sample_index);
+                    double truth = (double)to_int(truth_labels[sample_index]);
+                    double err = pred - truth;
+                    acc.sum_abs += std::abs(err);
+                    acc.sum_sq += err * err;
+                    int rounded = clamp_round_to_genotype(pred);
+                    if ((double)rounded == truth) {
+                        acc.correct++;
+                    }
+                    acc.count++;
+                }
+                return acc;
+            };
+
+            EvalAccum rf_acc;
+            if (observed_idx.size() >= 512 && tree_pool_threads >= 2) {
+                const size_t target_tasks = std::min<std::size_t>(tree_pool_threads * 4, 32);
+                const size_t chunk = std::max<std::size_t>((observed_idx.size() + target_tasks - 1) / target_tasks, 128);
+                for (size_t begin = 0; begin < observed_idx.size(); begin += chunk) {
+                    size_t end = std::min(begin + chunk, observed_idx.size());
+                    auto acc = eval_rf_range(begin, end);
+                    rf_acc.sum_abs += acc.sum_abs;
+                    rf_acc.sum_sq += acc.sum_sq;
+                    rf_acc.correct += acc.correct;
+                    rf_acc.count += acc.count;
+                }
+            } else {
+                rf_acc = eval_rf_range(0, observed_idx.size());
             }
-            for (auto& f : futures) {
-                auto a = f.get();
-                rf_acc.sum_abs += a.sum_abs;
-                rf_acc.sum_sq += a.sum_sq;
-                rf_acc.correct += a.correct;
-                rf_acc.count += a.count;
+
+            if (rf_acc.count == 0) {
+                row.oob_mae = std::numeric_limits<double>::quiet_NaN();
+                row.oob_rmse = std::numeric_limits<double>::quiet_NaN();
+                row.rounded_acc = std::numeric_limits<double>::quiet_NaN();
+            } else {
+                row.oob_mae = rf_acc.sum_abs / (double)rf_acc.count;
+                row.oob_rmse = std::sqrt(rf_acc.sum_sq / (double)rf_acc.count);
+                row.rounded_acc = (double)rf_acc.correct / (double)rf_acc.count;
             }
-        } else {
-            rf_acc = eval_rf_range(0, observed_idx.size());
+
+            return row;
+        }));
+
+        while (pending_loo_rows.size() > max_pending_loo_tasks) {
+            collect_next_loo_row();
         }
-
-
-        ImputationLooRow row;
-        row.variant = (std::string)variant;
-        row.n_observed = n_observed;
-        row.n_missing = n_missing;
-        if (rf_acc.count == 0) {
-            row.oob_mae = std::numeric_limits<double>::quiet_NaN();
-            row.oob_rmse = std::numeric_limits<double>::quiet_NaN();
-            row.rounded_acc = std::numeric_limits<double>::quiet_NaN();
-        } else {
-            row.oob_mae = rf_acc.sum_abs / (double)rf_acc.count;
-            row.oob_rmse = std::sqrt(rf_acc.sum_sq / (double)rf_acc.count);
-            row.rounded_acc = (double)rf_acc.correct / (double)rf_acc.count;
-        }
-
-        loo_rows.push_back(std::move(row));
     }
 
     TreeBuilder PredictingHandler::make_tree_builder(const std::pair<Features, Labels>& dataset) {

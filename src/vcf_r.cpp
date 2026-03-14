@@ -218,15 +218,26 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold,
-               Rcpp::Nullable<int> seed, const IntegerVector& window_size) {
+               Rcpp::Nullable<int> seed, const IntegerVector& window_size,
+               const IntegerVector& rf_ntrees) {
     List ret;
-    unsigned int random_seed = Rcpp::as<int>(seed);
+    unsigned int random_seed = 42;
+    if (seed.isNotNull()) {
+        random_seed = (unsigned int)Rcpp::as<int>(seed);
+    }
     int ws = 100;
     if (window_size.length() > 0) {
         ws = window_size[0];
     }
     if (ws < 3) {
         Rcpp::stop("window_size must be >= 3");
+    }
+    int ntrees = 50;
+    if (rf_ntrees.length() > 0) {
+        ntrees = rf_ntrees[0];
+    }
+    if (ntrees < 1) {
+        Rcpp::stop("rf_ntrees must be >= 1");
     }
     try {
         const char *name = filename[0];
@@ -268,7 +279,8 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
             gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
             parser.register_handler(gmatrix_handler, 1);
             if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, ws, random_seed);
+                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, ws,
+                                                                    (std::size_t)ntrees, random_seed);
                 parser.register_handler(predicting_handler, 2);
             }
         }

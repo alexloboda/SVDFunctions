@@ -66,8 +66,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_vcf
-List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix, const LogicalVector& predictMissing, const CharacterVector& regions, const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold, Rcpp::Nullable<int> seed, const IntegerVector& window_size);
-RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP gmatrixSEXP, SEXP predictMissingSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP, SEXP missingRateThresholdSEXP, SEXP seedSEXP, SEXP window_sizeSEXP) {
+List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix, const LogicalVector& predictMissing, const CharacterVector& regions, const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold, Rcpp::Nullable<int> seed, const IntegerVector& window_size, const IntegerVector& rf_ntrees);
+RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP gmatrixSEXP, SEXP predictMissingSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP, SEXP missingRateThresholdSEXP, SEXP seedSEXP, SEXP window_sizeSEXP, SEXP rf_ntreesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -84,7 +84,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const NumericVector& >::type missingRateThreshold(missingRateThresholdSEXP);
     Rcpp::traits::input_parameter< Rcpp::Nullable<int> >::type seed(seedSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type window_size(window_sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed, window_size));
+    Rcpp::traits::input_parameter< const IntegerVector& >::type rf_ntrees(rf_ntreesSEXP);
+    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed, window_size, rf_ntrees));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -116,7 +117,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 16},
-    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 13},
+    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 14},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {NULL, NULL, 0}
 };

@@ -17,7 +17,9 @@ scanVCF(
   regions = NULL,
   binaryPathPrefix = NULL,
   verbose = FALSE,
-  seed = NULL
+  seed = 42L,
+  window_size = 100L,
+  rf_ntrees = 50L
 )
 }
 \arguments{
@@ -55,10 +57,24 @@ metadata file prefix_meta. If not NULL corresponding files will be generated.}
 \item{verbose}{logical}
 
 \item{seed}{integer: seed for random number generator (for reproducible imputation). Default is 42.}
+
+\item{window_size}{integer: number of variants in the sliding window used for
+RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 100.}
+
+\item{rf_ntrees}{integer: number of trees in the random forest used for
+RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 50.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 
-requested.
+requested. If 
+\code{predictMissing = TRUE}, the \code{genotype} element is a list with:
+\itemize{
+  \item \code{genotype}: numeric matrix with missing values replaced by predictions
+  \item \code{predicted}: logical matrix indicating which entries were originally missing
+  \item \code{loo}: data.frame with per-variant imputation QC based on out-of-bag
+    (leave-one-out-like) predictions on observed genotypes. Columns include
+    random-forest OOB metrics (\code{oob_mae}, \code{oob_rmse}, \code{rounded_acc}).
+}
 }
 \description{
 Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate

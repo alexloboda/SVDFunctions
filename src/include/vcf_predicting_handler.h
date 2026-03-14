@@ -1,6 +1,8 @@
 #ifndef SRC_VCF_PREDICTING_HANDLER_H
 #define SRC_VCF_PREDICTING_HANDLER_H
 
+#include <deque>
+#include <future>
 #include <string>
 
 #include "vcf_handlers.h"
@@ -37,19 +39,27 @@ namespace vcf {
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;
-        unsigned int random_seed; // добавлено поле для seed
+        cxxpool::thread_pool metrics_thread_pool;
+        unsigned int random_seed;
+        std::size_t rf_ntrees;
+        std::size_t max_pending_loo_tasks;
 
+        std::deque<std::future<ImputationLooRow>> pending_loo_rows;
         std::vector<ImputationLooRow> loo_rows;
 
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
+        void collect_ready_loo_rows(bool wait_all);
+        void collect_next_loo_row();
     public:
         explicit PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
-                                   int window_size_kb, int window_size, unsigned int seed = 42); 
+                                   int window_size_kb, int window_size,
+                                   std::size_t rf_ntrees = 50,
+                                   unsigned int seed = 42);
         void processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) override;
         bool isOfInterest(const Variant& position) override;
         void cleanup();
 
-        void fix_labels(const Variant& variant, const std::pair<Features, Labels>& dataset);
+        void fix_labels(const Variant& variant, std::pair<Features, Labels> dataset);
 
         const std::vector<ImputationLooRow>& imputation_loo() const { return loo_rows; }
     };
