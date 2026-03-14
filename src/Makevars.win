@@ -1,3 +1,7 @@
-PKG_LIBS = -lz
+RHTSLIB_LIBS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e 'Rhtslib::pkgconfig("PKG_LIBS")')
+RHTSLIB_CPPFLAGS=$(shell "${R_HOME}/bin${R_ARCH_BIN}/Rscript" -e 'Rhtslib::pkgconfig("PKG_CPPFLAGS")')
 
-CXX_STD = CXX11
+PKG_CPPFLAGS = $(RHTSLIB_CPPFLAGS)
+PKG_LIBS = $(RHTSLIB_LIBS)
+
+CXX_STD = CXX14

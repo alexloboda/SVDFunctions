@@ -18,7 +18,8 @@ namespace {
 namespace vcf {
     VariantsHandler::VariantsHandler(const std::vector<std::string>& samples) :samples(samples){}
 
-    void VariantsHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {}
+    void VariantsHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles,
+                                         int64_t line_offset) {}
 
     bool VariantsHandler::isOfInterest(const Variant& variant) {
         return false;
@@ -33,7 +34,8 @@ namespace vcf {
         std::sort(ranges.begin(), ranges.end());
     }
 
-    void CallRateHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {
+    void CallRateHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles,
+                                         int64_t line_offset) {
         auto it = std::lower_bound(ranges.begin(), ranges.end(), variant.position());
         if (it == ranges.end() || !it->includes(variant.position())) {
             return;
@@ -57,8 +59,15 @@ namespace vcf {
         return it->includes(position);
     }
 
-    void GenotypeMatrixHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {
+    void GenotypeMatrixHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles,
+                                               int64_t line_offset) {
+        last_consumed_row = false;
         if (!isOfInterest(variant)) {
+            return;
+        }
+        if (next_row_index < row_offset) {
+            ++next_row_index;
+            last_consumed_row = true;
             return;
         }
         bool as_is = available_variants.empty() || available_variants[variant];
@@ -92,6 +101,8 @@ namespace vcf {
         gmatrix.push_back(row);
         missing.push_back(missing_row);
         variants.push_back(as_is ? variant : variant.reversed());
+        ++next_row_index;
+        last_consumed_row = true;
     }
 
     bool GenotypeMatrixHandler::isOfInterest(const Variant& variant) {
@@ -100,7 +111,8 @@ namespace vcf {
 
     GenotypeMatrixHandler::GenotypeMatrixHandler(const std::vector<std::string>& ss, const std::vector<Variant>& vs,
                                                  VCFFilterStats& stats, double missing_rate_threshold)
-        : VariantsHandler(ss), stats(stats), missing_rate_threshold(missing_rate_threshold) {
+                : VariantsHandler(ss), stats(stats), missing_rate_threshold(missing_rate_threshold),
+                    row_offset(0), next_row_index(0), last_consumed_row(false) {
         for (const Variant& v: vs) {
             available_variants[v] = true;
             available_variants[v.reversed()] = false;
@@ -109,6 +121,18 @@ namespace vcf {
 
     GenotypeMatrixIterator GenotypeMatrixHandler::iterator() {
         return GenotypeMatrixIterator(*this);
+    }
+
+    std::size_t GenotypeMatrixHandler::logical_size() const {
+        return row_offset + variants.size();
+    }
+
+    std::size_t GenotypeMatrixHandler::next_row_position() const {
+        return next_row_index;
+    }
+
+    bool GenotypeMatrixHandler::last_variant_consumed_row() const {
+        return last_consumed_row;
     }
 
     std::vector<Variant> GenotypeMatrixHandler::desired_variants() {
@@ -127,7 +151,8 @@ namespace vcf {
         meta << "\n";
     }
 
-    void BinaryFileHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {
+    void BinaryFileHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles,
+                                           int64_t line_offset) {
         if (!MAC_filter(*alleles)) {
             return;
         }
@@ -145,6 +170,30 @@ namespace vcf {
 
     bool GenotypeMatrixIterator::dereferencable() {
         return pos < gh.variants.size();
+    }
+
+    std::size_t GenotypeMatrixIterator::position() const {
+        return gh.row_offset + pos;
+    }
+
+    void GenotypeMatrixIterator::discard_prefix(std::size_t new_row_offset) {
+        if (new_row_offset < gh.row_offset || new_row_offset > gh.logical_size()) {
+            throw std::runtime_error("Attempted to discard an invalid genotype prefix");
+        }
+
+        const std::size_t drop = new_row_offset - gh.row_offset;
+        if (drop == 0) {
+            return;
+        }
+        if (drop > pos) {
+            throw std::runtime_error("Attempted to discard rows ahead of the prediction iterator");
+        }
+
+        gh.gmatrix.erase(gh.gmatrix.begin(), gh.gmatrix.begin() + static_cast<std::ptrdiff_t>(drop));
+        gh.missing.erase(gh.missing.begin(), gh.missing.begin() + static_cast<std::ptrdiff_t>(drop));
+        gh.variants.erase(gh.variants.begin(), gh.variants.begin() + static_cast<std::ptrdiff_t>(drop));
+        gh.row_offset = new_row_offset;
+        pos -= drop;
     }
 
     GenotypeMatrixIterator& GenotypeMatrixIterator::operator++() {

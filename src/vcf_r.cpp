@@ -1,13 +1,19 @@
 #include "include/vcf_parser.h"
 #include <Rcpp.h>
 #include <boost/algorithm/string/predicate.hpp>
+#include <cstdlib>
 #include <fstream>
 #include <chrono>
 #include <cmath>
+#include <memory>
+#include <sstream>
+#include <sys/stat.h>
 
 #include "include/vcf_binary.h"
 #include "include/third-party/zstr/zstr.hpp"
 #include "include/third-party/zstr/strict_fstream.hpp"
+#include "include/vcf_bgzf_parser.h"
+#include "include/vcf_checkpoint.h"
 #include "include/vcf_stats.h"
 #include "include/vcf_predicting_handler.h"
 
@@ -16,6 +22,104 @@ namespace {
     using namespace vcf;
     using namespace std;
     using boost::algorithm::ends_with;
+
+    constexpr int BGZF_COMPRESSION_TYPE = 2;
+
+    static void hash_combine(uint64_t& seed, uint64_t value) {
+        seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6U) + (seed >> 2U);
+    }
+
+    static uint64_t stable_string_hash(const std::string& value) {
+        uint64_t seed = 1469598103934665603ULL;
+        for (unsigned char ch : value) {
+            seed ^= static_cast<uint64_t>(ch);
+            seed *= 1099511628211ULL;
+        }
+        return seed;
+    }
+
+    static uint64_t file_signature_bits(const std::string& path) {
+        struct stat st {};
+        if (::stat(path.c_str(), &st) != 0) {
+            throw std::runtime_error("Failed to stat VCF file for checkpoint signature: " + path);
+        }
+        uint64_t seed = 0;
+        hash_combine(seed, static_cast<uint64_t>(st.st_size));
+        hash_combine(seed, static_cast<uint64_t>(st.st_mtime));
+        return seed;
+    }
+
+    static uint64_t checkpoint_signature(const std::string& path,
+                                         const CharacterVector& samples,
+                                         const CharacterVector& bad_positions,
+                                         const CharacterVector& variants,
+                                         int dp,
+                                         int gq,
+                                         double missing_rate_threshold,
+                                         unsigned int random_seed,
+                                         int window_size,
+                                         int rf_ntrees) {
+        uint64_t seed = file_signature_bits(path);
+        hash_combine(seed, stable_string_hash(path));
+        hash_combine(seed, static_cast<uint64_t>(dp));
+        hash_combine(seed, static_cast<uint64_t>(gq));
+        hash_combine(seed, static_cast<uint64_t>(std::llround(missing_rate_threshold * 1e9)));
+        hash_combine(seed, static_cast<uint64_t>(random_seed));
+        hash_combine(seed, static_cast<uint64_t>(window_size));
+        hash_combine(seed, static_cast<uint64_t>(rf_ntrees));
+        for (auto sample : samples) {
+            hash_combine(seed, stable_string_hash(Rcpp::as<std::string>(sample)));
+        }
+        for (auto position : bad_positions) {
+            hash_combine(seed, stable_string_hash(Rcpp::as<std::string>(position)));
+        }
+        for (auto variant : variants) {
+            hash_combine(seed, stable_string_hash(Rcpp::as<std::string>(variant)));
+        }
+        return seed;
+    }
+
+    static std::string checkpoint_prefix_from_dir(const std::string& checkpoint_dir) {
+        return checkpoint_dir + "/predict_missing_checkpoint";
+    }
+
+    static bool checkpoint_crash_requested(const char* envvar, std::size_t generation) {
+        const char* value = std::getenv(envvar);
+        if (value == nullptr || *value == '\0') {
+            return false;
+        }
+        try {
+            return static_cast<std::size_t>(std::stoull(value)) == generation;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    static DataFrame make_loo_dataframe(const std::vector<ImputationLooRow>& rows) {
+        CharacterVector variant(rows.size());
+        IntegerVector n_observed(rows.size());
+        IntegerVector n_missing(rows.size());
+        NumericVector oob_mae(rows.size());
+        NumericVector oob_rmse(rows.size());
+        NumericVector rounded_acc(rows.size());
+        for (size_t i = 0; i < rows.size(); i++) {
+            variant[i] = rows[i].variant;
+            n_observed[i] = static_cast<int>(rows[i].n_observed);
+            n_missing[i] = static_cast<int>(rows[i].n_missing);
+            oob_mae[i] = rows[i].oob_mae;
+            oob_rmse[i] = rows[i].oob_rmse;
+            rounded_acc[i] = rows[i].rounded_acc;
+        }
+        return DataFrame::create(
+            _["variant"] = variant,
+            _["n_observed"] = n_observed,
+            _["n_missing"] = n_missing,
+            _["oob_mae"] = oob_mae,
+            _["oob_rmse"] = oob_rmse,
+            _["rounded_acc"] = rounded_acc,
+            _["stringsAsFactors"] = false
+        );
+    }
 
     class ProgressBar {
         bool enabled = false;
@@ -126,23 +230,231 @@ namespace {
     };
 
     class RGenotypeMatrixHandler: public GenotypeMatrixHandler {
+        bool checkpoint_enabled = false;
+        bool checkpoint_complete = false;
+        int64_t checkpoint_resume_offset = -1;
+        int64_t first_data_offset = -1;
+        std::size_t checkpoint_interval = 0;
+        std::size_t loo_row_offset = 0;
+        std::unique_ptr<PredictMissingCheckpoint> checkpoint;
+        PredictMissingCheckpointManifest checkpoint_manifest;
     public:
         using GenotypeMatrixHandler::GenotypeMatrixHandler;
 
+        void configure_checkpoint(const std::string& checkpoint_dir,
+                                 std::size_t interval,
+                                 uint64_t signature,
+                                 bool resume_checkpoint,
+                                 int compression,
+                                 int64_t parser_first_data_offset) {
+            if (compression != BGZF_COMPRESSION_TYPE) {
+                throw std::runtime_error("checkpointDir requires a BGZF-compressed .vcf.gz input file");
+            }
+
+            checkpoint_enabled = true;
+            checkpoint_interval = interval;
+            first_data_offset = parser_first_data_offset;
+            checkpoint.reset(new PredictMissingCheckpoint(checkpoint_prefix_from_dir(checkpoint_dir)));
+
+            if (!resume_checkpoint) {
+                checkpoint->reset();
+            }
+
+            checkpoint_manifest = PredictMissingCheckpointManifest();
+            checkpoint_manifest.signature = signature;
+            checkpoint_manifest.sample_count = samples.size();
+            checkpoint_manifest.next_segment_id = 0;
+
+            PredictMissingCheckpointManifest loaded_manifest;
+            std::size_t visible_versions = 0;
+            bool recovered_from_previous = false;
+            std::string diagnostics;
+            if (checkpoint->load_manifest(loaded_manifest, &visible_versions, &recovered_from_previous, &diagnostics)) {
+                if (loaded_manifest.signature != signature) {
+                    throw std::runtime_error("Existing checkpoint is incompatible with the current predictMissing request; rerun with resumeCheckpoint = FALSE or use a different checkpointDir");
+                }
+                if (loaded_manifest.sample_count != samples.size()) {
+                    throw std::runtime_error("Existing checkpoint sample count does not match the current VCF header");
+                }
+                checkpoint_manifest = loaded_manifest;
+                checkpoint_complete = loaded_manifest.complete;
+                row_offset = loaded_manifest.flushed_rows;
+                next_row_index = row_offset;
+                loo_row_offset = loaded_manifest.flushed_loo_rows;
+                checkpoint_resume_offset = loaded_manifest.flushed_rows == 0
+                    ? first_data_offset
+                    : loaded_manifest.resume_offset;
+                if (!diagnostics.empty() && recovered_from_previous) {
+                    Rcpp::warning(diagnostics);
+                }
+            } else {
+                loo_row_offset = 0;
+                checkpoint_resume_offset = first_data_offset;
+            }
+        }
+
+        bool checkpoint_is_complete() const {
+            return checkpoint_enabled && checkpoint_complete;
+        }
+
+        bool checkpoint_is_enabled() const {
+            return checkpoint_enabled;
+        }
+
+        int64_t resume_offset() const {
+            return checkpoint_resume_offset;
+        }
+
+        bool should_flush_checkpoint(const PredictingHandler& predicting_handler) const {
+            return checkpoint_enabled && !checkpoint_complete &&
+                predicting_handler.finalized_rows() >= checkpoint_manifest.flushed_rows + checkpoint_interval;
+        }
+
+        void flush_checkpoint(PredictingHandler* predicting_handler, bool complete) {
+            if (!checkpoint_enabled || checkpoint_complete) {
+                return;
+            }
+
+            std::vector<ImputationLooRow> empty_loo;
+            const std::vector<ImputationLooRow>* loo_rows = &empty_loo;
+            std::size_t stable_row_end = logical_size();
+            int64_t next_resume_offset = -1;
+            if (!complete && predicting_handler != nullptr) {
+                predicting_handler->synchronize_loo();
+                stable_row_end = predicting_handler->resume_row_index();
+                next_resume_offset = predicting_handler->resume_offset();
+                loo_rows = &predicting_handler->imputation_loo();
+            } else if (!complete) {
+                next_resume_offset = first_data_offset;
+            }
+
+            if (!complete && stable_row_end < checkpoint_manifest.flushed_rows) {
+                throw std::runtime_error("Checkpoint resume row index moved backwards");
+            }
+
+            std::size_t stable_loo_end = checkpoint_manifest.flushed_loo_rows;
+            std::size_t local_loo_index = stable_loo_end - loo_row_offset;
+            while (local_loo_index < loo_rows->size() &&
+                   (complete || (*loo_rows)[local_loo_index].logical_index < stable_row_end)) {
+                ++stable_loo_end;
+                ++local_loo_index;
+            }
+
+            PredictMissingCheckpointManifest next_manifest = checkpoint_manifest;
+            next_manifest.generation += 1;
+
+            if (stable_row_end > checkpoint_manifest.flushed_rows || stable_loo_end > checkpoint_manifest.flushed_loo_rows) {
+                const std::size_t local_loo_from = checkpoint_manifest.flushed_loo_rows - loo_row_offset;
+                const std::size_t local_loo_to = stable_loo_end - loo_row_offset;
+                auto segment = checkpoint->write_segment(
+                    next_manifest.next_segment_id,
+                    variants,
+                    gmatrix,
+                    missing,
+                    *loo_rows,
+                    checkpoint_manifest.flushed_rows,
+                    stable_row_end,
+                    row_offset,
+                    local_loo_from,
+                    local_loo_to
+                );
+                next_manifest.segments.push_back(segment);
+                next_manifest.next_segment_id += 1;
+                next_manifest.flushed_rows = stable_row_end;
+                next_manifest.flushed_loo_rows = stable_loo_end;
+
+                if (checkpoint_crash_requested("SVDF_CHECKPOINT_TEST_ABORT_AFTER_SEGMENT_WRITE", next_manifest.generation)) {
+                    throw std::runtime_error("Simulated checkpoint crash after segment write");
+                }
+            }
+
+            next_manifest.complete = complete;
+            next_manifest.resume_row_index = complete ? next_manifest.flushed_rows : stable_row_end;
+            next_manifest.resume_offset = complete ? -1 : (next_manifest.flushed_rows == 0 ? first_data_offset : next_resume_offset);
+            checkpoint->save_manifest(next_manifest);
+
+            if (checkpoint_crash_requested("SVDF_CHECKPOINT_TEST_ABORT_AFTER_SAVE", next_manifest.generation)) {
+                throw std::runtime_error("Simulated checkpoint crash after manifest save");
+            }
+
+            checkpoint_manifest = next_manifest;
+            checkpoint_complete = complete;
+            checkpoint_resume_offset = checkpoint_manifest.resume_offset;
+
+            if (predicting_handler != nullptr && checkpoint_manifest.flushed_rows > row_offset) {
+                predicting_handler->discard_checkpointed_prefix(checkpoint_manifest.flushed_rows);
+            }
+            if (predicting_handler != nullptr && checkpoint_manifest.flushed_loo_rows > loo_row_offset) {
+                predicting_handler->discard_checkpointed_loo_prefix(checkpoint_manifest.flushed_loo_rows - loo_row_offset);
+            }
+            loo_row_offset = checkpoint_manifest.flushed_loo_rows;
+
+            if (complete && predicting_handler != nullptr && !predicting_handler->imputation_loo().empty()) {
+                PredictMissingCheckpointManifest tail_manifest = checkpoint_manifest;
+                tail_manifest.generation += 1;
+                auto tail_segment = checkpoint->write_segment(
+                    tail_manifest.next_segment_id,
+                    variants,
+                    gmatrix,
+                    missing,
+                    predicting_handler->imputation_loo(),
+                    checkpoint_manifest.flushed_rows,
+                    checkpoint_manifest.flushed_rows,
+                    row_offset,
+                    0,
+                    predicting_handler->imputation_loo().size()
+                );
+                tail_manifest.segments.push_back(tail_segment);
+                tail_manifest.next_segment_id += 1;
+                tail_manifest.flushed_loo_rows += predicting_handler->imputation_loo().size();
+                checkpoint->replace_current_manifest(tail_manifest);
+                predicting_handler->discard_checkpointed_loo_prefix(predicting_handler->imputation_loo().size());
+                checkpoint_manifest = tail_manifest;
+                loo_row_offset = checkpoint_manifest.flushed_loo_rows;
+            }
+        }
+
+        std::vector<ImputationLooRow> load_checkpoint_loo() const {
+            std::vector<ImputationLooRow> rows;
+            if (checkpoint_enabled) {
+                checkpoint->load_loo(rows);
+            }
+            return rows;
+        }
+
         List result() {
-            NumericMatrix res(gmatrix.size(), samples.size());
-            LogicalMatrix predicted(missing.size(), samples.size());
+            std::vector<std::string> row_names;
+            std::vector<float> prefix_genotypes;
+            std::vector<uint8_t> prefix_predicted;
+            if (checkpoint_enabled) {
+                checkpoint->load_prefix(samples.size(), row_names, prefix_genotypes, prefix_predicted);
+            }
+
+            const std::size_t prefix_rows = row_names.size();
+            NumericMatrix res(prefix_rows + gmatrix.size(), samples.size());
+            LogicalMatrix predicted(prefix_rows + missing.size(), samples.size());
+
+            for (size_t i = 0; i < prefix_rows; i++) {
+                for (size_t j = 0; j < samples.size(); j++) {
+                    float val = prefix_genotypes[i * samples.size() + j];
+                    if (val == to_int(vcf::MISSING)) {
+                        val = NA_REAL;
+                    }
+                    res[j * (prefix_rows + gmatrix.size()) + i] = val;
+                    predicted[j * (prefix_rows + missing.size()) + i] = prefix_predicted[i * samples.size() + j] != 0;
+                }
+            }
+
             for (size_t i = 0; i < gmatrix.size(); i++) {
                 for (size_t j = 0; j < samples.size(); j++) {
                     float val = gmatrix[i][j];
                     if (val == to_int(vcf::MISSING)) {
                         val = NA_REAL;
                     }
-                    res[j * gmatrix.size() + i] = val;
-                    predicted[j * missing.size() + i] = missing[i][j];
+                    res[j * (prefix_rows + gmatrix.size()) + prefix_rows + i] = val;
+                    predicted[j * (prefix_rows + missing.size()) + prefix_rows + i] = missing[i][j];
                 }
             }
-            vector<string> row_names;
             for_each(variants.begin(), variants.end(), [&row_names](Variant& v){
                 row_names.push_back((string)v);
             });
@@ -219,7 +531,8 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
                const LogicalVector& predictMissing, const CharacterVector& regions,
                const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold,
                Rcpp::Nullable<int> seed, const IntegerVector& window_size,
-               const IntegerVector& rf_ntrees) {
+               const IntegerVector& rf_ntrees, const CharacterVector& checkpoint_dir,
+               const IntegerVector& checkpoint_interval, const LogicalVector& resume_checkpoint) {
     List ret;
     unsigned int random_seed = 42;
     if (seed.isNotNull()) {
@@ -239,104 +552,142 @@ List parse_vcf(const CharacterVector& filename, const CharacterVector& samples,
     if (ntrees < 1) {
         Rcpp::stop("rf_ntrees must be >= 1");
     }
+    std::string checkpoint_dir_value;
+    if (checkpoint_dir.length() > 0) {
+        checkpoint_dir_value = Rcpp::as<std::string>(checkpoint_dir[0]);
+    }
+    const std::size_t checkpoint_interval_value = checkpoint_interval.length() > 0
+        ? static_cast<std::size_t>(checkpoint_interval[0])
+        : 1000U;
+    const bool resume_checkpoint_value = resume_checkpoint.length() == 0 || resume_checkpoint[0];
     try {
         const char *name = filename[0];
-    auto file = std::make_shared<strict_fstream::ifstream>(name, std::ios::in | std::ios::binary);
-    file->seekg(0, std::ios::end);
-    std::streamoff total_bytes = file->tellg();
-    file->seekg(0, std::ios::beg);
-    file->clear();
-
-    auto zbuf = std::make_shared<zstr::istreambuf>(file->rdbuf());
-    std::unique_ptr<std::istream> in(new std::istream(zbuf.get()));
-    in->exceptions(std::ios_base::badbit);
-
         VCFFilterStats stats;
-        Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]), stats);
-        parser.parse_header();
-        auto ss = parser.sample_names();
         shared_ptr<RGenotypeMatrixHandler> gmatrix_handler;
         shared_ptr<BinaryFileHandler> binary_handler;
         shared_ptr<RCallRateHandler> callrate_handler;
         shared_ptr<PredictingHandler> predicting_handler;
 
-        Rcpp::Environment base = Rcpp::Environment::base_env();
-        Rcpp::Function getOption = base["getOption"];
-        Rcpp::Function interactive = base["interactive"];
-        bool show_progress = Rcpp::as<bool>(getOption("svdf.progress", false));
-        bool is_interactive = Rcpp::as<bool>(interactive());
+        vector<Variant> vs;
+        for_each(variants.begin(), variants.end(), [&vs](const char *s) {
+            vector<Variant> parsed = Variant::parseVariants(string(s));
+            vs.insert(vs.end(), parsed.begin(), parsed.end());
+        });
 
-        ProgressBar progress(show_progress && is_interactive, total_bytes, file);
-        parser.set_progress_callback([&progress](const std::string& label) { progress.tick(label); }, 2000);
-        parser.set_interrupt_every(2000);
-
-        if (gmatrix[0]) {
-            vector<Variant> vs;
-            for_each(variants.begin(), variants.end(), [&vs](const char *s) {
-                vector<Variant> variants = Variant::parseVariants(string(s));
-                vs.insert(vs.end(), variants.begin(), variants.end());
-            });
-            gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
-            parser.register_handler(gmatrix_handler, 1);
-            if (predictMissing[0]) {
-                predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, ws,
-                                                                    (std::size_t)ntrees, random_seed);
-                parser.register_handler(predicting_handler, 2);
+        if (predictMissing[0]) {
+            std::unique_ptr<BGZF, decltype(&bgzf_close)> bgzf_input(bgzf_open(name, "r"), &bgzf_close);
+            if (!bgzf_input) {
+                Rcpp::stop("Failed to open VCF file with BGZF reader");
             }
-        }
 
-        if (regions.length() > 0) {
-            callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
-            parser.register_handler(callrate_handler, 1);
-        }
+            BGZFVCFParser parser(bgzf_input.get(), filter(samples, bad_positions, DP[0], GQ[0]), stats,
+                                 [](const vcf::ParserException& e) { Rcpp::warning(e.get_message()); });
+            parser.parse_header();
+            auto ss = parser.sample_names();
+            parser.set_interrupt_every(2000);
 
-        if (binary_prefix.length() > 0) {
-            string prefix = string(binary_prefix[0]);
-            binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
-            parser.register_handler(binary_handler, 1);
-        }
-
-        if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
-            parser.parse_genotypes();
-        }
-        progress.finish();
-        ret["samples"] = CharacterVector(ss.begin(), ss.end());
-        if (gmatrix[0]) {
-            if (predictMissing[0]) {
-                predicting_handler->cleanup();
-            }
-            List geno = gmatrix_handler->result();
-            if (predictMissing[0]) {
-                const auto& rows = predicting_handler->imputation_loo();
-                CharacterVector variant(rows.size());
-                IntegerVector n_observed(rows.size());
-                IntegerVector n_missing(rows.size());
-                NumericVector oob_mae(rows.size());
-                NumericVector oob_rmse(rows.size());
-                NumericVector rounded_acc(rows.size());
-                for (size_t i = 0; i < rows.size(); i++) {
-                    variant[i] = rows[i].variant;
-                    n_observed[i] = (int)rows[i].n_observed;
-                    n_missing[i] = (int)rows[i].n_missing;
-                    oob_mae[i] = rows[i].oob_mae;
-                    oob_rmse[i] = rows[i].oob_rmse;
-                    rounded_acc[i] = rows[i].rounded_acc;
+            if (gmatrix[0]) {
+                gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
+                if (!checkpoint_dir_value.empty()) {
+                    gmatrix_handler->configure_checkpoint(
+                        checkpoint_dir_value,
+                        checkpoint_interval_value,
+                        checkpoint_signature(name, samples, bad_positions, variants, DP[0], GQ[0],
+                                             missingRateThreshold[0], random_seed, ws, ntrees),
+                        resume_checkpoint_value,
+                        parser.compression(),
+                        parser.first_data_offset()
+                    );
                 }
-                DataFrame loo = DataFrame::create(
-                        _["variant"] = variant,
-                        _["n_observed"] = n_observed,
-                        _["n_missing"] = n_missing,
-                        _["oob_mae"] = oob_mae,
-                        _["oob_rmse"] = oob_rmse,
-                        _["rounded_acc"] = rounded_acc,
-                        _["stringsAsFactors"] = false
-                );
-                geno["loo"] = loo;
+                parser.register_handler(gmatrix_handler, 1);
+                if (!gmatrix_handler->checkpoint_is_complete()) {
+                    predicting_handler = make_shared<PredictingHandler>(ss, *gmatrix_handler, 250000, ws,
+                                                                        static_cast<std::size_t>(ntrees), random_seed);
+                    parser.register_handler(predicting_handler, 2);
+                }
             }
-            ret["genotype"] = geno;
-        }
-        if (regions.length() > 0) {
-            ret["callrate"] = callrate_handler->result();
+
+            if (!gmatrix_handler || !gmatrix_handler->checkpoint_is_complete()) {
+                parser.parse_genotypes(gmatrix_handler && gmatrix_handler->checkpoint_is_enabled()
+                                           ? gmatrix_handler->resume_offset()
+                                           : -1,
+                                       [&]() {
+                                           if (gmatrix_handler && predicting_handler &&
+                                               gmatrix_handler->should_flush_checkpoint(*predicting_handler)) {
+                                               gmatrix_handler->flush_checkpoint(predicting_handler.get(), false);
+                                           }
+                                       });
+                if (predicting_handler) {
+                    predicting_handler->cleanup();
+                }
+                if (gmatrix_handler && gmatrix_handler->checkpoint_is_enabled()) {
+                    gmatrix_handler->flush_checkpoint(predicting_handler.get(), true);
+                }
+            }
+
+            ret["samples"] = CharacterVector(ss.begin(), ss.end());
+            if (gmatrix[0]) {
+                List geno = gmatrix_handler->result();
+                if (predictMissing[0]) {
+                    std::vector<ImputationLooRow> loo_rows = gmatrix_handler->checkpoint_is_enabled()
+                        ? gmatrix_handler->load_checkpoint_loo()
+                        : predicting_handler->imputation_loo();
+                    geno["loo"] = make_loo_dataframe(loo_rows);
+                }
+                ret["genotype"] = geno;
+            }
+        } else {
+            auto file = std::make_shared<strict_fstream::ifstream>(name, std::ios::in | std::ios::binary);
+            file->seekg(0, std::ios::end);
+            std::streamoff total_bytes = file->tellg();
+            file->seekg(0, std::ios::beg);
+            file->clear();
+
+            auto zbuf = std::make_shared<zstr::istreambuf>(file->rdbuf());
+            std::unique_ptr<std::istream> in(new std::istream(zbuf.get()));
+            in->exceptions(std::ios_base::badbit);
+
+            Parser parser(*in, filter(samples, bad_positions, DP[0], GQ[0]), stats);
+            parser.parse_header();
+            auto ss = parser.sample_names();
+
+            Rcpp::Environment base = Rcpp::Environment::base_env();
+            Rcpp::Function getOption = base["getOption"];
+            Rcpp::Function interactive = base["interactive"];
+            bool show_progress = Rcpp::as<bool>(getOption("svdf.progress", false));
+            bool is_interactive = Rcpp::as<bool>(interactive());
+
+            ProgressBar progress(show_progress && is_interactive, total_bytes, file);
+            parser.set_progress_callback([&progress](const std::string& label) { progress.tick(label); }, 2000);
+            parser.set_interrupt_every(2000);
+
+            if (gmatrix[0]) {
+                gmatrix_handler.reset(new RGenotypeMatrixHandler(ss, vs, stats, missingRateThreshold[0]));
+                parser.register_handler(gmatrix_handler, 1);
+            }
+
+            if (regions.length() > 0) {
+                callrate_handler.reset(new RCallRateHandler(ss, parse_regions(regions)));
+                parser.register_handler(callrate_handler, 1);
+            }
+
+            if (binary_prefix.length() > 0) {
+                string prefix = string(binary_prefix[0]);
+                binary_handler.reset(new BinaryFileHandler(ss, prefix + "_bin", prefix + "_meta"));
+                parser.register_handler(binary_handler, 1);
+            }
+
+            if (gmatrix_handler != nullptr || binary_handler != nullptr || callrate_handler != nullptr) {
+                parser.parse_genotypes();
+            }
+            progress.finish();
+            ret["samples"] = CharacterVector(ss.begin(), ss.end());
+            if (gmatrix[0]) {
+                ret["genotype"] = gmatrix_handler->result();
+            }
+            if (regions.length() > 0) {
+                ret["callrate"] = callrate_handler->result();
+            }
         }
         List ret_stats;
         for (Stat stat: vcf::statsList()) {

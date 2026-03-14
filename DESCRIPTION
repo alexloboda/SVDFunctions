@@ -30,9 +30,10 @@ Imports:
     ggplot2
 LazyData: true
 RoxygenNote: 7.3.2
-SystemRequirements: C++14
+SystemRequirements: C++14, GNU make
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
            BH,
-           RcppEigen
+           RcppEigen,
+           Rhtslib
 Suggests: testthat

@@ -149,6 +149,14 @@ sampleNamesVCF <- function(vcf, verbose = FALSE) {
 #' RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 100.
 #' @param rf_ntrees integer: number of trees in the random forest used for
 #' RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 50.
+#' @param checkpointDir character scalar: directory used to store resilient
+#' predictMissing checkpoints. If the directory already contains a compatible
+#' checkpoint it will be resumed.
+#' @param checkpointInterval integer: number of finalized variants between
+#' checkpoint flushes when \code{checkpointDir} is set.
+#' @param resumeCheckpoint logical: whether to resume an existing checkpoint in
+#' \code{checkpointDir}. If FALSE, any existing checkpoint state is discarded
+#' before processing starts.
 #' @return list containing genotype matrix and/or call rate matrix if 
 #' requested. If 
 #' \code{predictMissing = TRUE}, the \code{genotype} element is a list with:
@@ -166,7 +174,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
                     missingRateThreshold = 0.1, 
                     regions = NULL, binaryPathPrefix = NULL,
                     verbose = FALSE, seed = 42L, window_size = 100L,
-                    rf_ntrees = 50L) {
+                    rf_ntrees = 50L, checkpointDir = NULL,
+                    checkpointInterval = 1000L, resumeCheckpoint = TRUE) {
   vcf <- normalizePath(vcf)
   stopifnot(length(DP) > 0)
   stopifnot(length(GQ) > 0)
@@ -182,6 +191,10 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   stopifnot(length(rf_ntrees) > 0)
   stopifnot(!is.na(rf_ntrees[1]))
   stopifnot(rf_ntrees[1] >= 1)
+  checkpointInterval <- as.integer(checkpointInterval)
+  stopifnot(length(checkpointInterval) > 0)
+  stopifnot(!is.na(checkpointInterval[1]))
+  stopifnot(checkpointInterval[1] >= 1)
   stopifnot(file.exists(vcf))
   tbi <- paste0(vcf, ".tbi")
   if (!is.null(binaryPathPrefix) || !file.exists(tbi)) {
@@ -200,10 +213,29 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   variants <- fixChar(variants)
   regions <- fixChar(regions)
   binaryPathPrefix <- fixChar(binaryPathPrefix)
+  checkpointDir <- fixChar(checkpointDir)
+
+  if (length(checkpointDir) > 0) {
+    if (!isTRUE(predictMissing)) {
+      stop("checkpointDir is only supported when predictMissing = TRUE", call. = FALSE)
+    }
+    if (!isTRUE(returnGenotypeMatrix)) {
+      stop("checkpointDir requires returnGenotypeMatrix = TRUE", call. = FALSE)
+    }
+    if (length(regions) > 0) {
+      stop("checkpointDir is only supported for genotypeMatrixVCF-style scans without regions", call. = FALSE)
+    }
+    if (length(binaryPathPrefix) > 0) {
+      stop("checkpointDir is not supported together with binaryPathPrefix", call. = FALSE)
+    }
+    dir.create(checkpointDir[1], recursive = TRUE, showWarnings = FALSE)
+    checkpointDir <- normalizePath(checkpointDir, mustWork = TRUE)
+  }
 
   seed <- as.integer(seed)
   stopifnot(length(seed) > 0)
   stopifnot(!is.na(seed[1]))
+  resumeCheckpoint <- isTRUE(resumeCheckpoint)
 
   progress_opts <- options(svdf.progress = isTRUE(verbose))
   on.exit(options(progress_opts), add = TRUE)
@@ -212,7 +244,8 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
     res <- parse_vcf(vcf, samples, bannedPositions, variants, DP, GQ, 
                      returnGenotypeMatrix, isTRUE(predictMissing), regions, 
                      binaryPathPrefix, missingRateThreshold, seed,
-                     window_size[1], rf_ntrees[1]),
+                     window_size[1], rf_ntrees[1], checkpointDir,
+                     checkpointInterval[1], resumeCheckpoint),
     error = function(c) {
       suffix <- ""
       if (!is.null(tbi)) {

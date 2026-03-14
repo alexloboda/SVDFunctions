@@ -19,7 +19,10 @@ scanVCF(
   verbose = FALSE,
   seed = 42L,
   window_size = 100L,
-  rf_ntrees = 50L
+  rf_ntrees = 50L,
+  checkpointDir = NULL,
+  checkpointInterval = 1000L,
+  resumeCheckpoint = TRUE
 )
 }
 \arguments{
@@ -63,6 +66,20 @@ RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default 
 
 \item{rf_ntrees}{integer: number of trees in the random forest used for
 RF-based missing genotype prediction when \code{predictMissing = TRUE}. Default is 50.}
+
+\item{checkpointDir}{character scalar: directory used to store resilient
+predictMissing checkpoints. If the directory already contains a compatible
+checkpoint it will be resumed. This is only supported for
+\code{genotypeMatrixVCF}-style scans with \code{predictMissing = TRUE},
+\code{returnGenotypeMatrix = TRUE}, no \code{regions}, and
+\code{binaryPathPrefix = NULL}.}
+
+\item{checkpointInterval}{integer: number of finalized variants between
+checkpoint flushes when \code{checkpointDir} is set.}
+
+\item{resumeCheckpoint}{logical: whether to resume an existing checkpoint in
+\code{checkpointDir}. If FALSE, any existing checkpoint state is discarded
+before processing starts.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 

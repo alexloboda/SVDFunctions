@@ -43,7 +43,7 @@ namespace vcf {
     PredictingHandler::PredictingHandler(const std::vector<std::string>& samples, GenotypeMatrixHandler& gh,
                                          int window_size_kb, int window_size,
                                          std::size_t rf_ntrees, unsigned int seed)
-                                         :VariantsHandler(samples), curr_chr(-1), iterator{gh},
+                                         :VariantsHandler(samples), curr_chr(-1), genotype_handler(gh), iterator{gh},
                                           window(window_size),
                                           thread_pool(safe_hardware_threads()),
                                           metrics_thread_pool(metrics_threads_for(safe_hardware_threads())),
@@ -68,7 +68,8 @@ namespace vcf {
         return ranges.includes(pos);
     }
 
-    void PredictingHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles) {
+    void PredictingHandler::processVariant(const Variant& variant, std::shared_ptr<AlleleVector>& alleles,
+                                           int64_t line_offset) {
         if (!isOfInterest(variant)) {
             return;
         }
@@ -81,7 +82,12 @@ namespace vcf {
             curr_chr = pos.chromosome();
         }
 
-        window.add(alleles, variant);
+        std::size_t logical_index = genotype_handler.next_row_position();
+        if (genotype_handler.last_variant_consumed_row() && logical_index > 0) {
+            --logical_index;
+        }
+
+        window.add(alleles, variant, line_offset, logical_index);
         if (window.is_full()) {
             while (iterator.dereferencable() && (*iterator).position().position() <= window.middle_point()) {
                 auto dataset = window.dataset(*iterator);
@@ -110,6 +116,36 @@ namespace vcf {
         window.clear();
     }
 
+    std::size_t PredictingHandler::finalized_rows() const {
+        return iterator.position();
+    }
+
+    int64_t PredictingHandler::resume_offset() const {
+        return window.front_offset();
+    }
+
+    std::size_t PredictingHandler::resume_row_index() const {
+        return window.front_logical_index();
+    }
+
+    void PredictingHandler::synchronize_loo() {
+        collect_ready_loo_rows(true);
+    }
+
+    void PredictingHandler::discard_checkpointed_prefix(std::size_t new_row_offset) {
+        iterator.discard_prefix(new_row_offset);
+    }
+
+    void PredictingHandler::discard_checkpointed_loo_prefix(std::size_t count) {
+        if (count == 0) {
+            return;
+        }
+        if (count > loo_rows.size()) {
+            throw std::runtime_error("Attempted to discard more loo rows than are buffered");
+        }
+        loo_rows.erase(loo_rows.begin(), loo_rows.begin() + static_cast<std::ptrdiff_t>(count));
+    }
+
     void PredictingHandler::collect_ready_loo_rows(bool wait_all) {
         while (!pending_loo_rows.empty()) {
             auto& next = pending_loo_rows.front();
@@ -130,6 +166,7 @@ namespace vcf {
     }
 
     void PredictingHandler::fix_labels(const Variant& variant, std::pair<Features, Labels> dataset) {
+        const std::size_t logical_index = iterator.position();
         bool missing = false;
         for (auto l: dataset.second) {
             if (l == MISSING) {
@@ -184,6 +221,7 @@ namespace vcf {
         auto variant_name = (std::string)variant;
         pending_loo_rows.push_back(metrics_thread_pool.push([
             variant_name = std::move(variant_name),
+            logical_index,
             n_observed,
             n_missing,
             tree_pool_threads,
@@ -202,6 +240,7 @@ namespace vcf {
 
             ImputationLooRow row;
             row.variant = std::move(variant_name);
+            row.logical_index = logical_index;
             row.n_observed = n_observed;
             row.n_missing = n_missing;
 
@@ -278,6 +317,8 @@ namespace vcf {
     void Window::clear() {
         features.clear();
         variants.clear();
+        line_offsets.clear();
+        logical_indices.clear();
         start = 0;
     }
 
@@ -311,15 +352,22 @@ namespace vcf {
         return {std::move(fs), std::move(lbls)};
     }
 
-    void Window::add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant) {
+    void Window::add(std::shared_ptr<AlleleVector>& alleles, const Variant& variant,
+                     int64_t line_offset, std::size_t logical_index) {
         if (features.size() < max_size) {
             variants.push_back(variant);
             features.push_back(alleles);
+            line_offsets.push_back(line_offset);
+            logical_indices.push_back(logical_index);
         } else {
             variants.pop_front();
             features.pop_front();
+            line_offsets.pop_front();
+            logical_indices.pop_front();
             variants.push_back(variant);
             features.push_back(alleles);
+            line_offsets.push_back(line_offset);
+            logical_indices.push_back(logical_index);
         }
     }
 
@@ -332,5 +380,23 @@ namespace vcf {
 
     bool Window::is_full() {
         return features.size() == max_size;
+    }
+
+    bool Window::empty() const {
+        return variants.empty();
+    }
+
+    int64_t Window::front_offset() const {
+        if (line_offsets.empty()) {
+            return -1;
+        }
+        return line_offsets.front();
+    }
+
+    std::size_t Window::front_logical_index() const {
+        if (logical_indices.empty()) {
+            return 0;
+        }
+        return logical_indices.front();
     }
 }
