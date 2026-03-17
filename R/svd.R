@@ -1,4 +1,4 @@
-truncatedSvd <- function(x, k, nu = k, nv = k) {
+truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
   dims <- dim(x)
 
   if (length(dims) != 2L) {
@@ -26,6 +26,13 @@ truncatedSvd <- function(x, k, nu = k, nv = k) {
     stop("nv must be a non-negative integer.", call. = FALSE)
   }
 
+  if (!is.null(work)) {
+    work <- as.integer(work)[1]
+    if (is.na(work) || work < 1L) {
+      stop("work must be a positive integer.", call. = FALSE)
+    }
+  }
+
   targetRank <- min(k, maxRank)
   nu <- min(nu, nrow(x), targetRank)
   nv <- min(nv, ncol(x), targetRank)
@@ -36,7 +43,15 @@ truncatedSvd <- function(x, k, nu = k, nv = k) {
     return(svdResult)
   }
 
-  svdResult <- irlba::irlba(x, nu = targetRank, nv = targetRank)
+  if (!is.null(work)) {
+    work <- max(work, targetRank + 7L)
+  }
+
+  svdResult <- if (is.null(work)) {
+    irlba::irlba(x, nu = targetRank, nv = targetRank)
+  } else {
+    irlba::irlba(x, nu = targetRank, nv = targetRank, work = work)
+  }
   list(
     u = svdResult$u[, seq_len(nu), drop = FALSE],
     d = svdResult$d[seq_len(targetRank)],

@@ -111,10 +111,17 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   }
 
   if (is.null(SVDReference)) {
+    irlbaWork <- NULL
+    if (ncol(gmatrix) > 5000L) {
+      # A wider Krylov subspace reduces restarts on large sample sets.
+      irlbaWork <- max(32L, 2L * as.integer(components) + 1L)
+    }
+
     SVDReference <- truncatedSvd(gmatrix - referenceMean,
                                  k = components,
                                  nu = components,
-                                 nv = 0L)$u
+                                 nv = 0L,
+                                 work = irlbaWork)$u
     rownames(SVDReference) <- rownames(gmatrix)
   }
 
