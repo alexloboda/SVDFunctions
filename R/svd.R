@@ -1,3 +1,29 @@
+exactWideSvd <- function(x, targetRank, nu, nv) {
+  basisRank <- max(nu, nv)
+  gram <- tcrossprod(x)
+  eigenResult <- eigen(gram, symmetric = TRUE)
+
+  singularValues <- sqrt(pmax(eigenResult$values[seq_len(targetRank)], 0))
+  leftBasis <- eigenResult$vectors[, seq_len(basisRank), drop = FALSE]
+
+  rightBasis <- matrix(numeric(0), nrow = ncol(x), ncol = 0L)
+  if (nv > 0L) {
+    rightBasis <- matrix(0, nrow = ncol(x), ncol = nv)
+    stable <- singularValues[seq_len(nv)] > (.Machine$double.eps^0.5) * max(1, singularValues[1])
+    if (any(stable)) {
+      stableIds <- which(stable)
+      projected <- crossprod(x, leftBasis[, stableIds, drop = FALSE])
+      rightBasis[, stableIds] <- sweep(projected, 2L, singularValues[stableIds], "/")
+    }
+  }
+
+  list(
+    u = leftBasis[, seq_len(nu), drop = FALSE],
+    d = singularValues,
+    v = rightBasis
+  )
+}
+
 truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
   dims <- dim(x)
 
@@ -36,8 +62,13 @@ truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
   targetRank <- min(k, maxRank)
   nu <- min(nu, nrow(x), targetRank)
   nv <- min(nv, ncol(x), targetRank)
+  useExactWideFallback <- ncol(x) > nrow(x)
 
   if (targetRank == maxRank || (2L * targetRank) >= maxRank) {
+    if (useExactWideFallback) {
+      return(exactWideSvd(x, targetRank = targetRank, nu = nu, nv = nv))
+    }
+
     svdResult <- base::svd(x, nu = nu, nv = nv)
     svdResult$d <- svdResult$d[seq_len(targetRank)]
     return(svdResult)
@@ -47,11 +78,20 @@ truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
     work <- max(work, targetRank + 7L)
   }
 
-  svdResult <- if (is.null(work)) {
-    irlba::irlba(x, nu = targetRank, nv = targetRank)
-  } else {
-    irlba::irlba(x, nu = targetRank, nv = targetRank, work = work)
-  }
+  svdResult <- tryCatch(
+    if (is.null(work)) {
+      irlba::irlba(x, nu = targetRank, nv = targetRank)
+    } else {
+      irlba::irlba(x, nu = targetRank, nv = targetRank, work = work)
+    },
+    error = function(err) {
+      if (useExactWideFallback) {
+        return(exactWideSvd(x, targetRank = targetRank, nu = nu, nv = nv))
+      }
+
+      stop(err)
+    }
+  )
   list(
     u = svdResult$u[, seq_len(nu), drop = FALSE],
     d = svdResult$d[seq_len(targetRank)],
