@@ -25,7 +25,7 @@ Imports:
     data.table,
     methods,
     seqminer,
-    RSpectra,
+    irlba,
     pracma,
     ggplot2
 LazyData: true

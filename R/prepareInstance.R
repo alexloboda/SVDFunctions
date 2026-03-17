@@ -111,9 +111,14 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   }
 
   if (is.null(SVDReference)) {
-    SVDReference <- RSpectra::svds(gmatrix - referenceMean, k = components)$u
+    SVDReference <- truncatedSvd(gmatrix - referenceMean,
+                                 k = components,
+                                 nu = components,
+                                 nv = 0L)$u
     rownames(SVDReference) <- rownames(gmatrix)
   }
+
+  components <- min(components, ncol(SVDReference))
 
   variants <- intersect(rownames(SVDReference), rownames(gmatrix))
   gmatrix <- gmatrix[variants, ]
@@ -127,7 +132,7 @@ gmatrixPCA <- function(gmatrix, SVDReference = NULL, referenceMean = NULL, compo
   gmatrix <- gmatrix - referenceMean
   pca <- t(SVDReference) %*% gmatrix
 
-  pca <- pca[1:components, ]
+  pca <- pca[1:components, , drop = FALSE]
   pca <- t(pca)
   colnames(pca) <- c(paste("PC", 1:components, sep = ""))
   rownames(pca) <- colnames(gmatrix)
@@ -359,7 +364,7 @@ prepareInstance <- function(
     clusterMeans <- rowMeans(clusterGenotypes)
     k <- min(nrow(clusterGenotypes), ncol(clusterGenotypes))
     clusterGenotypes <- clusterGenotypes - clusterMeans
-    svdResult <- suppressWarnings(RSpectra::svds(A = clusterGenotypes, k = k))
+    svdResult <- suppressWarnings(truncatedSvd(clusterGenotypes, k = k))
     US <- svdResult$u %*% diag(svdResult$d)
     US <- US / sqrt(length(cluster))
 
