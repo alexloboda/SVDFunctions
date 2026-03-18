@@ -62,13 +62,13 @@ truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
   targetRank <- min(k, maxRank)
   nu <- min(nu, nrow(x), targetRank)
   nv <- min(nv, ncol(x), targetRank)
-  useExactWideFallback <- ncol(x) > nrow(x)
+  useExactWidePath <- ncol(x) > nrow(x)
+
+  if (useExactWidePath) {
+    return(exactWideSvd(x, targetRank = targetRank, nu = nu, nv = nv))
+  }
 
   if (targetRank == maxRank || (2L * targetRank) >= maxRank) {
-    if (useExactWideFallback) {
-      return(exactWideSvd(x, targetRank = targetRank, nu = nu, nv = nv))
-    }
-
     svdResult <- base::svd(x, nu = nu, nv = nv)
     svdResult$d <- svdResult$d[seq_len(targetRank)]
     return(svdResult)
@@ -85,10 +85,6 @@ truncatedSvd <- function(x, k, nu = k, nv = k, work = NULL) {
       irlba::irlba(x, nu = targetRank, nv = targetRank, work = work)
     },
     error = function(err) {
-      if (useExactWideFallback) {
-        return(exactWideSvd(x, targetRank = targetRank, nu = nu, nv = nv))
-      }
-
       stop(err)
     }
   )
