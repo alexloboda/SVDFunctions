@@ -206,6 +206,14 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     IntegerVector sa_exact_failures((R_xlen_t)n_sa);
     IntegerVector sa_primary_calibration_points((R_xlen_t)n_sa);
     IntegerVector sa_aux_calibration_points((R_xlen_t)n_sa);
+    IntegerVector sa_primary_local_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_primary_side_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_primary_global_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_primary_insufficient_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_aux_local_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_aux_side_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_aux_global_calibration_lookups((R_xlen_t)n_sa);
+    IntegerVector sa_aux_insufficient_calibration_lookups((R_xlen_t)n_sa);
     NumericVector sa_mean_primary_ci_width((R_xlen_t)n_sa);
     NumericVector sa_mean_aux_ci_width((R_xlen_t)n_sa);
     NumericVector sa_mean_selected_ci_width((R_xlen_t)n_sa);
@@ -219,8 +227,12 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     IntegerVector sa_shadow_full_scan_better_swaps((R_xlen_t)n_sa);
     NumericVector sa_mean_shadow_selected_regret((R_xlen_t)n_sa);
     NumericVector sa_mean_shadow_primary_abs_delta_error((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_primary_delta_bias((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_primary_p_bias((R_xlen_t)n_sa);
     NumericVector sa_mean_shadow_selected_abs_delta_error((R_xlen_t)n_sa);
     NumericVector sa_mean_shadow_selected_abs_p_error((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_selected_delta_bias((R_xlen_t)n_sa);
+    NumericVector sa_mean_shadow_selected_p_bias((R_xlen_t)n_sa);
     CharacterVector sa_names((R_xlen_t)n_sa);
     const size_t n_aux_levels = matcher.sa_aux_ladder_levels();
     List sa_aux_level_resolved((R_xlen_t)n_aux_levels);
@@ -234,6 +246,13 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_aux_level_names[(R_xlen_t)level] = "f" + std::to_string(matcher.sa_aux_level_dim(level));
     }
     sa_aux_level_resolved.attr("names") = sa_aux_level_names;
+
+    const size_t n_shadow_sources = 4;
+    const char* shadow_source_names_raw[] = {"local", "side", "global", "insufficient"};
+    CharacterVector sa_shadow_source_names((R_xlen_t)n_shadow_sources);
+    for (size_t source = 0; source < n_shadow_sources; ++source) {
+        sa_shadow_source_names[(R_xlen_t)source] = shadow_source_names_raw[source];
+    }
 
     const size_t n_temp_bins = matcher.sa_temperature_bins();
     List sa_temperature_bins((R_xlen_t)n_temp_bins);
@@ -252,6 +271,14 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_exact_failures[(R_xlen_t)i] = (int)matcher.sa_exact_failures(i);
         sa_primary_calibration_points[(R_xlen_t)i] = (int)matcher.sa_primary_calibration_points(i);
         sa_aux_calibration_points[(R_xlen_t)i] = (int)matcher.sa_aux_calibration_points(i);
+        sa_primary_local_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_primary_local_calibration_lookups(i);
+        sa_primary_side_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_primary_side_calibration_lookups(i);
+        sa_primary_global_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_primary_global_calibration_lookups(i);
+        sa_primary_insufficient_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_primary_insufficient_calibration_lookups(i);
+        sa_aux_local_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_aux_local_calibration_lookups(i);
+        sa_aux_side_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_aux_side_calibration_lookups(i);
+        sa_aux_global_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_aux_global_calibration_lookups(i);
+        sa_aux_insufficient_calibration_lookups[(R_xlen_t)i] = (int)matcher.sa_aux_insufficient_calibration_lookups(i);
         sa_mean_primary_ci_width[(R_xlen_t)i] = matcher.sa_mean_primary_ci_width(i);
         sa_mean_aux_ci_width[(R_xlen_t)i] = matcher.sa_mean_aux_ci_width(i);
         sa_mean_selected_ci_width[(R_xlen_t)i] = matcher.sa_mean_selected_ci_width(i);
@@ -269,8 +296,12 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_shadow_full_scan_better_swaps[(R_xlen_t)i] = (int)matcher.sa_shadow_full_scan_better_swaps(i);
         sa_mean_shadow_selected_regret[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_regret(i);
         sa_mean_shadow_primary_abs_delta_error[(R_xlen_t)i] = matcher.sa_mean_shadow_primary_abs_delta_error(i);
+        sa_mean_shadow_primary_delta_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_primary_delta_bias(i);
+        sa_mean_shadow_primary_p_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_primary_p_bias(i);
         sa_mean_shadow_selected_abs_delta_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_abs_delta_error(i);
         sa_mean_shadow_selected_abs_p_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_abs_p_error(i);
+        sa_mean_shadow_selected_delta_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_delta_bias(i);
+        sa_mean_shadow_selected_p_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_p_bias(i);
         sa_names[(R_xlen_t)i] = std::to_string(size);
     }
     for (size_t level = 0; level < n_aux_levels; ++level) {
@@ -289,7 +320,8 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
             Named("exact_failures") = IntegerVector((R_xlen_t)n_sa),
             Named("shadow_audits") = IntegerVector((R_xlen_t)n_sa),
             Named("shadow_selected_decision_mismatches") = IntegerVector((R_xlen_t)n_sa),
-            Named("shadow_exact_failures") = IntegerVector((R_xlen_t)n_sa)
+            Named("shadow_exact_failures") = IntegerVector((R_xlen_t)n_sa),
+            Named("shadow_selected_by_source") = List::create()
         );
         IntegerVector total_swaps = bin_stats["total_swaps"];
         IntegerVector accepted_swaps = bin_stats["accepted_swaps"];
@@ -324,6 +356,29 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         shadow_audits.attr("names") = sa_names;
         shadow_selected_decision_mismatches.attr("names") = sa_names;
         shadow_exact_failures.attr("names") = sa_names;
+
+        List shadow_selected_by_source((R_xlen_t)n_shadow_sources);
+        for (size_t source = 0; source < n_shadow_sources; ++source) {
+            IntegerVector source_audits((R_xlen_t)n_sa);
+            IntegerVector source_exact_failures((R_xlen_t)n_sa);
+            IntegerVector source_successful_audits((R_xlen_t)n_sa);
+            for (size_t i = 0; i < n_sa; ++i) {
+                const size_t audits = matcher.sa_temperature_bin_shadow_selected_source_audits(i, bin, source);
+                const size_t exact_failures_by_source = matcher.sa_temperature_bin_shadow_selected_source_exact_failures(i, bin, source);
+                source_audits[(R_xlen_t)i] = (int)audits;
+                source_exact_failures[(R_xlen_t)i] = (int)exact_failures_by_source;
+                source_successful_audits[(R_xlen_t)i] = (int)(audits - exact_failures_by_source);
+            }
+            source_audits.attr("names") = sa_names;
+            source_exact_failures.attr("names") = sa_names;
+            source_successful_audits.attr("names") = sa_names;
+            shadow_selected_by_source[(R_xlen_t)source] = List::create(
+                Named("audits") = source_audits,
+                Named("exact_failures") = source_exact_failures,
+                Named("successful_audits") = source_successful_audits
+            );
+        }
+        shadow_selected_by_source.attr("names") = sa_shadow_source_names;
         bin_stats["total_swaps"] = total_swaps;
         bin_stats["accepted_swaps"] = accepted_swaps;
         bin_stats["primary_resolved_swaps"] = primary_resolved_swaps;
@@ -334,10 +389,87 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         bin_stats["shadow_audits"] = shadow_audits;
         bin_stats["shadow_selected_decision_mismatches"] = shadow_selected_decision_mismatches;
         bin_stats["shadow_exact_failures"] = shadow_exact_failures;
+        bin_stats["shadow_selected_by_source"] = shadow_selected_by_source;
         sa_temperature_bins[(R_xlen_t)bin] = bin_stats;
         sa_temperature_bin_names[(R_xlen_t)bin] = "bin_" + std::to_string(bin + 1);
     }
     sa_temperature_bins.attr("names") = sa_temperature_bin_names;
+
+    List sa_shadow_selected_by_source((R_xlen_t)n_shadow_sources);
+    for (size_t source = 0; source < n_shadow_sources; ++source) {
+        IntegerVector source_audits((R_xlen_t)n_sa);
+        IntegerVector source_exact_failures((R_xlen_t)n_sa);
+        IntegerVector source_decision_mismatches((R_xlen_t)n_sa);
+        IntegerVector source_interval_hits((R_xlen_t)n_sa);
+        IntegerVector source_full_scan_better_swaps((R_xlen_t)n_sa);
+        NumericVector source_interval_coverage((R_xlen_t)n_sa);
+        NumericVector source_decision_mismatch_rate((R_xlen_t)n_sa);
+        NumericVector source_full_scan_better_rate((R_xlen_t)n_sa);
+        NumericVector source_mean_regret((R_xlen_t)n_sa);
+        NumericVector source_mean_abs_delta_error((R_xlen_t)n_sa);
+        NumericVector source_mean_abs_p_error((R_xlen_t)n_sa);
+        NumericVector source_mean_delta_bias((R_xlen_t)n_sa);
+        NumericVector source_mean_p_bias((R_xlen_t)n_sa);
+        for (size_t i = 0; i < n_sa; ++i) {
+            const size_t audits = matcher.sa_shadow_selected_source_audits(i, source);
+            const size_t exact_failures = matcher.sa_shadow_selected_source_exact_failures(i, source);
+            const size_t successes = audits - exact_failures;
+            const size_t decision_mismatches = matcher.sa_shadow_selected_source_decision_mismatches(i, source);
+            const size_t interval_hits = matcher.sa_shadow_selected_source_interval_hits(i, source);
+            const size_t full_scan_better_swaps = matcher.sa_shadow_selected_source_full_scan_better_swaps(i, source);
+
+            source_audits[(R_xlen_t)i] = (int)audits;
+            source_exact_failures[(R_xlen_t)i] = (int)exact_failures;
+            source_decision_mismatches[(R_xlen_t)i] = (int)decision_mismatches;
+            source_interval_hits[(R_xlen_t)i] = (int)interval_hits;
+            source_full_scan_better_swaps[(R_xlen_t)i] = (int)full_scan_better_swaps;
+            source_interval_coverage[(R_xlen_t)i] = successes == 0
+                ? NA_REAL
+                : static_cast<double>(interval_hits) / static_cast<double>(successes);
+            source_decision_mismatch_rate[(R_xlen_t)i] = successes == 0
+                ? NA_REAL
+                : static_cast<double>(decision_mismatches) / static_cast<double>(successes);
+            source_full_scan_better_rate[(R_xlen_t)i] = successes == 0
+                ? NA_REAL
+                : static_cast<double>(full_scan_better_swaps) / static_cast<double>(successes);
+            source_mean_regret[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_source_regret(i, source);
+            source_mean_abs_delta_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_source_abs_delta_error(i, source);
+            source_mean_abs_p_error[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_source_abs_p_error(i, source);
+            source_mean_delta_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_source_delta_bias(i, source);
+            source_mean_p_bias[(R_xlen_t)i] = matcher.sa_mean_shadow_selected_source_p_bias(i, source);
+        }
+
+        source_audits.attr("names") = sa_names;
+        source_exact_failures.attr("names") = sa_names;
+        source_decision_mismatches.attr("names") = sa_names;
+        source_interval_hits.attr("names") = sa_names;
+        source_full_scan_better_swaps.attr("names") = sa_names;
+        source_interval_coverage.attr("names") = sa_names;
+        source_decision_mismatch_rate.attr("names") = sa_names;
+        source_full_scan_better_rate.attr("names") = sa_names;
+        source_mean_regret.attr("names") = sa_names;
+        source_mean_abs_delta_error.attr("names") = sa_names;
+        source_mean_abs_p_error.attr("names") = sa_names;
+        source_mean_delta_bias.attr("names") = sa_names;
+        source_mean_p_bias.attr("names") = sa_names;
+
+        sa_shadow_selected_by_source[(R_xlen_t)source] = List::create(
+            Named("audits") = source_audits,
+            Named("exact_failures") = source_exact_failures,
+            Named("decision_mismatches") = source_decision_mismatches,
+            Named("interval_hits") = source_interval_hits,
+            Named("full_scan_better_swaps") = source_full_scan_better_swaps,
+            Named("interval_coverage") = source_interval_coverage,
+            Named("decision_mismatch_rate") = source_decision_mismatch_rate,
+            Named("full_scan_better_rate") = source_full_scan_better_rate,
+            Named("mean_regret") = source_mean_regret,
+            Named("mean_abs_delta_error") = source_mean_abs_delta_error,
+            Named("mean_abs_p_error") = source_mean_abs_p_error,
+            Named("mean_delta_bias") = source_mean_delta_bias,
+            Named("mean_p_bias") = source_mean_p_bias
+        );
+    }
+    sa_shadow_selected_by_source.attr("names") = sa_shadow_source_names;
 
     lambda.attr("names") = names;
     stats.attr("names") = names;
@@ -353,6 +485,14 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     sa_exact_failures.attr("names") = sa_names;
     sa_primary_calibration_points.attr("names") = sa_names;
     sa_aux_calibration_points.attr("names") = sa_names;
+    sa_primary_local_calibration_lookups.attr("names") = sa_names;
+    sa_primary_side_calibration_lookups.attr("names") = sa_names;
+    sa_primary_global_calibration_lookups.attr("names") = sa_names;
+    sa_primary_insufficient_calibration_lookups.attr("names") = sa_names;
+    sa_aux_local_calibration_lookups.attr("names") = sa_names;
+    sa_aux_side_calibration_lookups.attr("names") = sa_names;
+    sa_aux_global_calibration_lookups.attr("names") = sa_names;
+    sa_aux_insufficient_calibration_lookups.attr("names") = sa_names;
     sa_mean_primary_ci_width.attr("names") = sa_names;
     sa_mean_aux_ci_width.attr("names") = sa_names;
     sa_mean_selected_ci_width.attr("names") = sa_names;
@@ -366,8 +506,12 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     sa_shadow_full_scan_better_swaps.attr("names") = sa_names;
     sa_mean_shadow_selected_regret.attr("names") = sa_names;
     sa_mean_shadow_primary_abs_delta_error.attr("names") = sa_names;
+    sa_mean_shadow_primary_delta_bias.attr("names") = sa_names;
+    sa_mean_shadow_primary_p_bias.attr("names") = sa_names;
     sa_mean_shadow_selected_abs_delta_error.attr("names") = sa_names;
     sa_mean_shadow_selected_abs_p_error.attr("names") = sa_names;
+    sa_mean_shadow_selected_delta_bias.attr("names") = sa_names;
+    sa_mean_shadow_selected_p_bias.attr("names") = sa_names;
     ret["lambda"] = lambda;
     ret["optimal_lambda"] = optimal_lambda;
     ret["statistics"] = stats;
@@ -388,6 +532,14 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         Named("exact_failures") = sa_exact_failures,
         Named("primary_calibration_points") = sa_primary_calibration_points,
         Named("aux_calibration_points") = sa_aux_calibration_points,
+        Named("primary_local_calibration_lookups") = sa_primary_local_calibration_lookups,
+        Named("primary_side_calibration_lookups") = sa_primary_side_calibration_lookups,
+        Named("primary_global_calibration_lookups") = sa_primary_global_calibration_lookups,
+        Named("primary_insufficient_calibration_lookups") = sa_primary_insufficient_calibration_lookups,
+        Named("aux_local_calibration_lookups") = sa_aux_local_calibration_lookups,
+        Named("aux_side_calibration_lookups") = sa_aux_side_calibration_lookups,
+        Named("aux_global_calibration_lookups") = sa_aux_global_calibration_lookups,
+        Named("aux_insufficient_calibration_lookups") = sa_aux_insufficient_calibration_lookups,
         Named("mean_primary_ci_width") = sa_mean_primary_ci_width,
         Named("mean_aux_ci_width") = sa_mean_aux_ci_width,
         Named("mean_selected_ci_width") = sa_mean_selected_ci_width,
@@ -401,8 +553,13 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         Named("shadow_full_scan_better_swaps") = sa_shadow_full_scan_better_swaps,
         Named("mean_shadow_selected_regret") = sa_mean_shadow_selected_regret,
         Named("mean_shadow_primary_abs_delta_error") = sa_mean_shadow_primary_abs_delta_error,
+        Named("mean_shadow_primary_delta_bias") = sa_mean_shadow_primary_delta_bias,
+        Named("mean_shadow_primary_p_bias") = sa_mean_shadow_primary_p_bias,
         Named("mean_shadow_selected_abs_delta_error") = sa_mean_shadow_selected_abs_delta_error,
         Named("mean_shadow_selected_abs_p_error") = sa_mean_shadow_selected_abs_p_error,
+        Named("mean_shadow_selected_delta_bias") = sa_mean_shadow_selected_delta_bias,
+        Named("mean_shadow_selected_p_bias") = sa_mean_shadow_selected_p_bias,
+        Named("shadow_selected_by_source") = sa_shadow_selected_by_source,
         Named("temperature_bins") = sa_temperature_bins
     );
     return ret;

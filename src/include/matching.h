@@ -162,6 +162,38 @@ public:
         return subsampling.aux_calibration_points(k);
     }
 
+    size_t sa_primary_local_calibration_lookups(size_t k) const {
+        return subsampling.primary_local_calibration_lookups(k);
+    }
+
+    size_t sa_primary_side_calibration_lookups(size_t k) const {
+        return subsampling.primary_side_calibration_lookups(k);
+    }
+
+    size_t sa_primary_global_calibration_lookups(size_t k) const {
+        return subsampling.primary_global_calibration_lookups(k);
+    }
+
+    size_t sa_primary_insufficient_calibration_lookups(size_t k) const {
+        return subsampling.primary_insufficient_calibration_lookups(k);
+    }
+
+    size_t sa_aux_local_calibration_lookups(size_t k) const {
+        return subsampling.aux_local_calibration_lookups(k);
+    }
+
+    size_t sa_aux_side_calibration_lookups(size_t k) const {
+        return subsampling.aux_side_calibration_lookups(k);
+    }
+
+    size_t sa_aux_global_calibration_lookups(size_t k) const {
+        return subsampling.aux_global_calibration_lookups(k);
+    }
+
+    size_t sa_aux_insufficient_calibration_lookups(size_t k) const {
+        return subsampling.aux_insufficient_calibration_lookups(k);
+    }
+
     double sa_mean_primary_ci_width(size_t k) const {
         return subsampling.mean_primary_ci_width(k);
     }
@@ -210,12 +242,68 @@ public:
         return subsampling.mean_shadow_primary_abs_delta_error(k);
     }
 
+    double sa_mean_shadow_primary_delta_bias(size_t k) const {
+        return subsampling.mean_shadow_primary_delta_bias(k);
+    }
+
+    double sa_mean_shadow_primary_p_bias(size_t k) const {
+        return subsampling.mean_shadow_primary_p_bias(k);
+    }
+
     double sa_mean_shadow_selected_abs_delta_error(size_t k) const {
         return subsampling.mean_shadow_selected_abs_delta_error(k);
     }
 
     double sa_mean_shadow_selected_abs_p_error(size_t k) const {
         return subsampling.mean_shadow_selected_abs_p_error(k);
+    }
+
+    double sa_mean_shadow_selected_delta_bias(size_t k) const {
+        return subsampling.mean_shadow_selected_delta_bias(k);
+    }
+
+    double sa_mean_shadow_selected_p_bias(size_t k) const {
+        return subsampling.mean_shadow_selected_p_bias(k);
+    }
+
+    size_t sa_shadow_selected_source_audits(size_t k, size_t source) const {
+        return subsampling.shadow_selected_source_audits(k, source);
+    }
+
+    size_t sa_shadow_selected_source_exact_failures(size_t k, size_t source) const {
+        return subsampling.shadow_selected_source_exact_failures(k, source);
+    }
+
+    size_t sa_shadow_selected_source_decision_mismatches(size_t k, size_t source) const {
+        return subsampling.shadow_selected_source_decision_mismatches(k, source);
+    }
+
+    size_t sa_shadow_selected_source_interval_hits(size_t k, size_t source) const {
+        return subsampling.shadow_selected_source_interval_hits(k, source);
+    }
+
+    size_t sa_shadow_selected_source_full_scan_better_swaps(size_t k, size_t source) const {
+        return subsampling.shadow_selected_source_full_scan_better_swaps(k, source);
+    }
+
+    double sa_mean_shadow_selected_source_regret(size_t k, size_t source) const {
+        return subsampling.mean_shadow_selected_source_regret(k, source);
+    }
+
+    double sa_mean_shadow_selected_source_abs_delta_error(size_t k, size_t source) const {
+        return subsampling.mean_shadow_selected_source_abs_delta_error(k, source);
+    }
+
+    double sa_mean_shadow_selected_source_abs_p_error(size_t k, size_t source) const {
+        return subsampling.mean_shadow_selected_source_abs_p_error(k, source);
+    }
+
+    double sa_mean_shadow_selected_source_delta_bias(size_t k, size_t source) const {
+        return subsampling.mean_shadow_selected_source_delta_bias(k, source);
+    }
+
+    double sa_mean_shadow_selected_source_p_bias(size_t k, size_t source) const {
+        return subsampling.mean_shadow_selected_source_p_bias(k, source);
     }
 
     size_t sa_temperature_bins() const {
@@ -260,6 +348,14 @@ public:
 
     size_t sa_temperature_bin_shadow_exact_failures(size_t k, size_t bin) const {
         return subsampling.temperature_bin_shadow_exact_failures(k, bin);
+    }
+
+    size_t sa_temperature_bin_shadow_selected_source_audits(size_t k, size_t bin, size_t source) const {
+        return subsampling.temperature_bin_shadow_selected_source_audits(k, bin, source);
+    }
+
+    size_t sa_temperature_bin_shadow_selected_source_exact_failures(size_t k, size_t bin, size_t source) const {
+        return subsampling.temperature_bin_shadow_selected_source_exact_failures(k, bin, source);
     }
 private:
     double get_lambda(std::vector<double>& pvals);

@@ -28,6 +28,14 @@ class subsample {
     std::vector<size_t> exact_eval_failures;
     std::vector<size_t> primary_calibration_points_used;
     std::vector<size_t> aux_calibration_points_used;
+    std::vector<size_t> primary_local_calibration_lookups_used;
+    std::vector<size_t> primary_side_calibration_lookups_used;
+    std::vector<size_t> primary_global_calibration_lookups_used;
+    std::vector<size_t> primary_insufficient_calibration_lookups_used;
+    std::vector<size_t> aux_local_calibration_lookups_used;
+    std::vector<size_t> aux_side_calibration_lookups_used;
+    std::vector<size_t> aux_global_calibration_lookups_used;
+    std::vector<size_t> aux_insufficient_calibration_lookups_used;
     std::vector<double> mean_primary_ci_width_used;
     std::vector<double> mean_aux_ci_width_used;
     std::vector<double> mean_selected_ci_width_used;
@@ -40,8 +48,22 @@ class subsample {
     std::vector<size_t> shadow_full_scan_better_swaps_used;
     std::vector<double> mean_shadow_selected_regret_used;
     std::vector<double> mean_shadow_primary_abs_delta_error_used;
+    std::vector<double> mean_shadow_primary_delta_bias_used;
+    std::vector<double> mean_shadow_primary_p_bias_used;
     std::vector<double> mean_shadow_selected_abs_delta_error_used;
     std::vector<double> mean_shadow_selected_abs_p_error_used;
+    std::vector<double> mean_shadow_selected_delta_bias_used;
+    std::vector<double> mean_shadow_selected_p_bias_used;
+    std::vector<std::vector<size_t>> shadow_selected_source_audits_used;
+    std::vector<std::vector<size_t>> shadow_selected_source_exact_failures_used;
+    std::vector<std::vector<size_t>> shadow_selected_source_decision_mismatches_used;
+    std::vector<std::vector<size_t>> shadow_selected_source_interval_hits_used;
+    std::vector<std::vector<size_t>> shadow_selected_source_full_scan_better_swaps_used;
+    std::vector<std::vector<double>> mean_shadow_selected_source_regret_used;
+    std::vector<std::vector<double>> mean_shadow_selected_source_abs_delta_error_used;
+    std::vector<std::vector<double>> mean_shadow_selected_source_abs_p_error_used;
+    std::vector<std::vector<double>> mean_shadow_selected_source_delta_bias_used;
+    std::vector<std::vector<double>> mean_shadow_selected_source_p_bias_used;
     std::vector<std::vector<size_t>> temperature_bin_total_swaps_used;
     std::vector<std::vector<size_t>> temperature_bin_accepted_swaps_used;
     std::vector<std::vector<size_t>> temperature_bin_primary_resolved_swaps_used;
@@ -52,6 +74,8 @@ class subsample {
     std::vector<std::vector<size_t>> temperature_bin_shadow_audits_used;
     std::vector<std::vector<size_t>> temperature_bin_shadow_selected_decision_mismatches_used;
     std::vector<std::vector<size_t>> temperature_bin_shadow_exact_failures_used;
+    std::vector<std::vector<size_t>> temperature_bin_shadow_selected_source_audits_used;
+    std::vector<std::vector<size_t>> temperature_bin_shadow_selected_source_exact_failures_used;
     Clustering clst;
 
     std::mt19937 wheel;
@@ -86,6 +110,14 @@ public:
     size_t exact_failures(size_t k) const;
     size_t primary_calibration_points(size_t k) const;
     size_t aux_calibration_points(size_t k) const;
+    size_t primary_local_calibration_lookups(size_t k) const;
+    size_t primary_side_calibration_lookups(size_t k) const;
+    size_t primary_global_calibration_lookups(size_t k) const;
+    size_t primary_insufficient_calibration_lookups(size_t k) const;
+    size_t aux_local_calibration_lookups(size_t k) const;
+    size_t aux_side_calibration_lookups(size_t k) const;
+    size_t aux_global_calibration_lookups(size_t k) const;
+    size_t aux_insufficient_calibration_lookups(size_t k) const;
     double mean_primary_ci_width(size_t k) const;
     double mean_aux_ci_width(size_t k) const;
     double mean_selected_ci_width(size_t k) const;
@@ -98,8 +130,22 @@ public:
     size_t shadow_full_scan_better_swaps(size_t k) const;
     double mean_shadow_selected_regret(size_t k) const;
     double mean_shadow_primary_abs_delta_error(size_t k) const;
+    double mean_shadow_primary_delta_bias(size_t k) const;
+    double mean_shadow_primary_p_bias(size_t k) const;
     double mean_shadow_selected_abs_delta_error(size_t k) const;
     double mean_shadow_selected_abs_p_error(size_t k) const;
+    double mean_shadow_selected_delta_bias(size_t k) const;
+    double mean_shadow_selected_p_bias(size_t k) const;
+    size_t shadow_selected_source_audits(size_t k, size_t source) const;
+    size_t shadow_selected_source_exact_failures(size_t k, size_t source) const;
+    size_t shadow_selected_source_decision_mismatches(size_t k, size_t source) const;
+    size_t shadow_selected_source_interval_hits(size_t k, size_t source) const;
+    size_t shadow_selected_source_full_scan_better_swaps(size_t k, size_t source) const;
+    double mean_shadow_selected_source_regret(size_t k, size_t source) const;
+    double mean_shadow_selected_source_abs_delta_error(size_t k, size_t source) const;
+    double mean_shadow_selected_source_abs_p_error(size_t k, size_t source) const;
+    double mean_shadow_selected_source_delta_bias(size_t k, size_t source) const;
+    double mean_shadow_selected_source_p_bias(size_t k, size_t source) const;
     size_t temperature_bins() const;
     size_t temperature_bin_total_swaps(size_t k, size_t bin) const;
     size_t temperature_bin_accepted_swaps(size_t k, size_t bin) const;
@@ -111,6 +157,8 @@ public:
     size_t temperature_bin_shadow_audits(size_t k, size_t bin) const;
     size_t temperature_bin_shadow_selected_decision_mismatches(size_t k, size_t bin) const;
     size_t temperature_bin_shadow_exact_failures(size_t k, size_t bin) const;
+    size_t temperature_bin_shadow_selected_source_audits(size_t k, size_t bin, size_t source) const;
+    size_t temperature_bin_shadow_selected_source_exact_failures(size_t k, size_t bin, size_t source) const;
 };
 
 }
