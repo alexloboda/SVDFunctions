@@ -778,7 +778,7 @@ mvn_test::mvn_test(const mvn_test& other)
     rff_pairwise_stats(other.rff_pairwise_stats),
     rff_center_stat(other.rff_center_stat),
     rff_subset_feature_sum(other.rff_subset_feature_sum),
-     wheel{other.wheel()},
+     wheel{std::random_device{}()},
      subset(other.subset) {}
 
 Clustering::Clustering(const std::vector<int>& clustering) {
@@ -1096,7 +1096,7 @@ void RandomSampler::update(size_t node) {
 
 RandomSampler::RandomSampler() :runif(0.0, 1.0), wheel(0), size(0) {}
 
-RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel(other.wheel()),
+RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel(std::random_device{}()),
                                                           original(other.original), segment_tree(other.segment_tree),
                                                           active_tree(other.active_tree), size(other.size) {}
 

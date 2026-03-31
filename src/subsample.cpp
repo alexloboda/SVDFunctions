@@ -823,7 +823,7 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
                                 cheap_accept = primary_interval.accept;
                                 selected_width = primary_interval.width;
                                 selected_lookup_source = primary_lookup.source;
-                            } else {
+                            } else if (local_test->last_swap_has_equal_effect_size()) {
                                 local_test->scan_aux_deltas_last_swap([&](size_t level, double delta_aux) {
                                     scanned_aux_levels++;
                                     const calibration_lookup_result aux_lookup = aux_delta_residuals[level].half_width(
