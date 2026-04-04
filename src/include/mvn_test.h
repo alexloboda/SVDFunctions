@@ -5,6 +5,7 @@
 #include <memory>
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <RcppEigen.h>
 
 // [[Rcpp::depends(RcppEigen)]]
@@ -35,6 +36,7 @@ public:
     void enable(size_t n);
     size_t sample();
     size_t n_active() const;
+    bool debug_is_active(size_t n) const;
 private:
     std::pair<size_t, size_t> children(size_t node) const;
     static bool is_root(size_t node);
@@ -197,6 +199,9 @@ public:
     std::unique_ptr<mvn_test> clone();
 
 protected:
+    void validate_point_index(size_t point) const;
+    void validate_subset_indices() const;
+    void debug_verify_state(const char* context, bool check_statistics = false) const;
     void check_aux_state() const;
     void check_aux_delta_request() const;
     void remove(unsigned i);

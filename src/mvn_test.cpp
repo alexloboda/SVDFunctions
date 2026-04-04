@@ -3,6 +3,8 @@
 #include <unordered_set>
 #include <numeric>
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include "include/third-party/cxxpool.h"
 
 #include "include/mvn_test.h"
@@ -143,6 +145,18 @@ Eigen::MatrixXd sample_orf_basis(Eigen::Index dimension, Eigen::Index pair_count
     }
 
     return basis;
+}
+
+bool mvn_debug_checks_enabled()
+{
+    const char* value = std::getenv("SVDFUNCTIONS_DEBUG_MVN");
+    if (value == nullptr) {
+        return false;
+    }
+    return std::strcmp(value, "") != 0 &&
+           std::strcmp(value, "0") != 0 &&
+           std::strcmp(value, "false") != 0 &&
+           std::strcmp(value, "FALSE") != 0;
 }
 
 } // namespace
@@ -638,7 +652,7 @@ double mvn_stats::pairwise_stat(size_t i, size_t j) const {
     }
 
     if (!mahalanobis_pairwise.empty()) {
-        return mahalanobis_pairwise[i][j];
+        return mahalanobis_pairwise.at(i).at(j);
     }
 
     if (!distances || !clustering) {
@@ -660,7 +674,7 @@ double mvn_stats::pairwise_stat(size_t i, size_t j) const {
 }
 
 double mvn_stats::centered_stat(size_t i) const {
-    return mahalanobis_centered[i];
+    return mahalanobis_centered.at(i);
 }
 
 double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) const {
@@ -674,9 +688,9 @@ double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) cons
 
     if (!mahalanobis_pairwise.empty()) {
         double ret = 0.0;
-        const auto& pairwise_row = mahalanobis_pairwise[point];
+        const auto& pairwise_row = mahalanobis_pairwise.at(point);
         for (auto s: ss) {
-            ret += pairwise_row[s];
+            ret += pairwise_row.at(s);
         }
         return ret;
     }
@@ -700,10 +714,112 @@ size_t mvn_test::sample_size() const {
     return n;
 }
 
+void mvn_test::validate_point_index(size_t point) const {
+    if (point >= sample_size()) {
+        throw std::out_of_range("Point index is out of range for mvn_test state");
+    }
+}
+
+void mvn_test::validate_subset_indices() const {
+    for (size_t point : subset) {
+        validate_point_index(point);
+    }
+}
+
+void mvn_test::debug_verify_state(const char* context, bool check_statistics) const {
+    if (!mvn_debug_checks_enabled()) {
+        return;
+    }
+
+    if (pairwise_stat.size() != stats.size()) {
+        throw std::logic_error(std::string(context) + ": pairwise_stat size mismatch");
+    }
+    if (center_stat.size() != stats.size()) {
+        throw std::logic_error(std::string(context) + ": center_stat size mismatch");
+    }
+    if (subset.size() + sampler.n_active() != sample_size()) {
+        throw std::logic_error(std::string(context) + ": subset/active partition size mismatch");
+    }
+
+    std::vector<unsigned char> seen(sample_size(), 0);
+    size_t recomputed_effect_size = 0;
+    for (size_t point : subset) {
+        validate_point_index(point);
+        if (seen[point] != 0) {
+            throw std::logic_error(std::string(context) + ": duplicate point in subset");
+        }
+        seen[point] = 1;
+        if (sampler.debug_is_active(point)) {
+            throw std::logic_error(std::string(context) + ": subset point still marked active");
+        }
+        recomputed_effect_size += clustering->cluster_size(point);
+    }
+
+    size_t recomputed_active_count = 0;
+    for (size_t point = 0; point < sample_size(); ++point) {
+        const bool active = sampler.debug_is_active(point);
+        recomputed_active_count += active ? 1u : 0u;
+        if (active && seen[point] != 0) {
+            throw std::logic_error(std::string(context) + ": point marked both active and selected");
+        }
+        if (!active && seen[point] == 0) {
+            throw std::logic_error(std::string(context) + ": point marked neither active nor selected");
+        }
+    }
+    if (recomputed_active_count != sampler.n_active()) {
+        throw std::logic_error(std::string(context) + ": active count mismatch");
+    }
+    if (recomputed_effect_size != effect_size) {
+        throw std::logic_error(std::string(context) + ": effect size mismatch");
+    }
+    if (latest_subset_point >= 0) {
+        validate_point_index((size_t)latest_subset_point);
+    }
+    if (latest_replacing_point >= 0) {
+        validate_point_index((size_t)latest_replacing_point);
+    }
+
+    for (size_t i = 0; i < stats.size(); ++i) {
+        if (!std::isfinite(pairwise_stat.at(i)) || !std::isfinite(center_stat.at(i))) {
+            throw std::logic_error(std::string(context) + ": non-finite cached statistic");
+        }
+    }
+
+    if (!check_statistics) {
+        return;
+    }
+
+    for (size_t stat_index = 0; stat_index < stats.size(); ++stat_index) {
+        double recomputed_pairwise = 0.0;
+        for (size_t lhs_index = 0; lhs_index < subset.size(); ++lhs_index) {
+            const size_t lhs = subset[lhs_index];
+            recomputed_pairwise += 2.0 * stats[stat_index]->pairwise_stat(lhs, lhs);
+            for (size_t rhs_index = lhs_index + 1; rhs_index < subset.size(); ++rhs_index) {
+                const size_t rhs = subset[rhs_index];
+                recomputed_pairwise += 2.0 * stats[stat_index]->pairwise_stat(lhs, rhs);
+            }
+        }
+
+        double recomputed_center = 0.0;
+        for (size_t point : subset) {
+            recomputed_center += stats[stat_index]->centered_stat(point);
+        }
+
+        const double pairwise_diff = std::abs(recomputed_pairwise - pairwise_stat.at(stat_index));
+        const double center_diff = std::abs(recomputed_center - center_stat.at(stat_index));
+        if (pairwise_diff > 1e-8 || center_diff > 1e-8) {
+            throw std::logic_error(std::string(context) + ": cached statistics diverged from recomputed values");
+        }
+    }
+}
+
 void mvn_test::swap_once(bool reject_last) {
     if (subset.empty() || sampler.n_active() == 0) {
         throw std::logic_error("Unable to swap points.");
     }
+
+    validate_subset_indices();
+    debug_verify_state("swap_once:before");
 
     int replacing_point = -1;
     if (reject_last) {
@@ -720,10 +836,16 @@ void mvn_test::swap_once(bool reject_last) {
     }
 
     auto subset_point = subset.back();
+    validate_point_index(subset_point);
     if (!reject_last) {
         latest_subset_point = subset_point;
         latest_replacing_point = replacing_point;
     }
+
+    if (replacing_point < 0) {
+        throw std::logic_error("Replacing point must be non-negative");
+    }
+    validate_point_index((size_t)replacing_point);
 
     effect_size += clustering->cluster_size(replacing_point) - clustering->cluster_size(subset_point);
 
@@ -736,6 +858,7 @@ void mvn_test::swap_once(bool reject_last) {
     subset.push_back(replacing_point);
 
     add(replacing_point);
+    debug_verify_state(reject_last ? "swap_once:after_reject" : "swap_once:after", true);
 }
 
 void mvn_test::add_one() {
@@ -745,11 +868,13 @@ void mvn_test::add_one() {
     latest_subset_point = -1;
 
     size_t point = sampler.sample();
+    validate_point_index(point);
     effect_size += clustering->cluster_size(point);
     sampler.disable(point);
 
     subset.push_back(point);
     add(point);
+    debug_verify_state("add_one:after", true);
 }
 
 bool operator<(mvn_test& lhs, mvn_test& rhs) {
@@ -851,25 +976,28 @@ double mahalanobis_distances::distance(unsigned i) const {
 }
 
 void mvn_test::remove(unsigned point) {
+    validate_point_index(point);
+    validate_subset_indices();
+
     for (size_t i = 0; i < stats.size(); i++) {
         if (stats[i]->is_feature_mode()) {
             const float* phi = stats[i]->features_ptr(point);
-            auto& sum = subset_feature_sum[i];
+            auto& sum = subset_feature_sum.at(i);
             const size_t dim = stats[i]->features_dim();
             const double dot = dot_float_double_sse(phi, sum.data(), dim);
             const double self = dot_float_sse(phi, phi, dim);
             const double sp = dot - 0.5 * self;
-            pairwise_stat[i] -= 2.0 * sp;
+            pairwise_stat.at(i) -= 2.0 * sp;
             for (size_t d = 0; d < dim; ++d) {
-                sum[d] -= phi[d];
+                sum.at(d) -= phi[d];
             }
         } else {
-            pairwise_stat[i] -= 2.0 * stats[i]->sum_pairwise(point, subset);
+            pairwise_stat.at(i) -= 2.0 * stats[i]->sum_pairwise(point, subset);
         }
     }
 
     for (size_t i = 0; i < stats.size(); i++) {
-        center_stat[i] -= stats[i]->centered_stat(point);
+        center_stat.at(i) -= stats[i]->centered_stat(point);
     }
 
     if (has_aux_statistic()) {
@@ -897,24 +1025,27 @@ void mvn_test::remove(unsigned point) {
 }
 
 void mvn_test::add(unsigned int point) {
+    validate_point_index(point);
+    validate_subset_indices();
+
     for (size_t i = 0; i < stats.size(); i++) {
         if (stats[i]->is_feature_mode()) {
             const float* phi = stats[i]->features_ptr(point);
-            auto& sum = subset_feature_sum[i];
+            auto& sum = subset_feature_sum.at(i);
             const size_t dim = stats[i]->features_dim();
             for (size_t d = 0; d < dim; ++d) {
-                sum[d] += phi[d];
+                sum.at(d) += phi[d];
             }
             const double dot = dot_float_double_sse(phi, sum.data(), dim);
             const double self = dot_float_sse(phi, phi, dim);
             const double sp = dot - 0.5 * self;
-            pairwise_stat[i] += 2.0 * sp;
+            pairwise_stat.at(i) += 2.0 * sp;
         } else {
-            pairwise_stat[i] += 2.0 * stats[i]->sum_pairwise(point, subset);
+            pairwise_stat.at(i) += 2.0 * stats[i]->sum_pairwise(point, subset);
         }
     }
     for (size_t i = 0; i < stats.size(); i++) {
-        center_stat[i] += stats[i]->centered_stat(point);
+        center_stat.at(i) += stats[i]->centered_stat(point);
     }
 
     if (has_aux_statistic()) {
@@ -980,6 +1111,10 @@ RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :ru
 
 bool RandomSampler::is_active(size_t n) const {
     return active_tree.at(el_pos(n));
+}
+
+bool RandomSampler::debug_is_active(size_t n) const {
+    return is_active(n);
 }
 
 void RandomSampler::disable(size_t n) {
