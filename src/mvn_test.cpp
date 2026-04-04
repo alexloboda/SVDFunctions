@@ -801,11 +801,11 @@ size_t Clustering::size() const {
 }
 
 const std::vector<int>& Clustering::elements(size_t i) const {
-    return clusters[i];
+    return clusters.at(i);
 }
 
 size_t Clustering::cluster_size(size_t i) const {
-    return clusters[i].size();
+    return clusters.at(i).size();
 }
 
 mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean)
@@ -836,12 +836,18 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
 }
 
 double mahalanobis_distances::interpoint_distance(unsigned i, unsigned j) const {
+    if ((Eigen::Index)i >= X->cols() || (Eigen::Index)j >= X->cols()) {
+        throw std::out_of_range("Interpoint distance index is out of range");
+    }
     const double xixj = (*X).col((Eigen::Index)i).dot(S_inv_X.col((Eigen::Index)j));
-    return quad_x[i] - 2.0 * xixj + quad_x[j];
+    return quad_x.at((size_t)i) - 2.0 * xixj + quad_x.at((size_t)j);
 }
 
 double mahalanobis_distances::distance(unsigned i) const {
-    return quad_x[i] - 2.0 * x_mu[i] + mu_mu;
+    if ((Eigen::Index)i >= X->cols()) {
+        throw std::out_of_range("Distance index is out of range");
+    }
+    return quad_x.at((size_t)i) - 2.0 * x_mu.at((size_t)i) + mu_mu;
 }
 
 void mvn_test::remove(unsigned point) {
@@ -973,7 +979,7 @@ RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :ru
 
 
 bool RandomSampler::is_active(size_t n) const {
-    return active_tree[el_pos(n)];
+    return active_tree.at(el_pos(n));
 }
 
 void RandomSampler::disable(size_t n) {
@@ -991,8 +997,8 @@ void RandomSampler::enable(size_t n) {
         throw std::logic_error("Enabling active element.");
     }
     auto pos = el_pos(n);
-    segment_tree[pos] = original[n];
-    active_tree[pos] = true;
+    segment_tree.at(pos) = original.at(n);
+    active_tree.at(pos) = true;
     update(pos);
 }
 
@@ -1003,16 +1009,16 @@ size_t RandomSampler::sample() {
     size_t node = 0;
     while (!is_leaf(node)) {
         auto chld = children(node);
-        if (active_tree[chld.first] == 0) {
-            if (active_tree[chld.second] == 0) {
+        if (active_tree.at(chld.first) == 0) {
+            if (active_tree.at(chld.second) == 0) {
                 throw std::logic_error("No active elements in subtree");
             }
             node = chld.second;
-        } else if(active_tree[chld.second] == 0) {
+        } else if(active_tree.at(chld.second) == 0) {
             node = chld.first;
         } else {
-            double l = segment_tree[chld.first];
-            double r = segment_tree[chld.second];
+            double l = segment_tree.at(chld.first);
+            double r = segment_tree.at(chld.second);
             double maxL = std::max(l, r);
             l = std::exp(l - maxL);
             r = std::exp(r - maxL);
@@ -1027,10 +1033,13 @@ size_t RandomSampler::sample() {
     }
 
     int aug_nodes = segment_tree.size() - original.size();
-    if (!active_tree[node]) {
+    if (!active_tree.at(node)) {
         throw std::logic_error("Sampled element is not active.");
     }
     int element = node - aug_nodes;
+    if (element < 0) {
+        throw std::logic_error("Sampled invalid element index");
+    }
     return element;
 }
 
@@ -1076,8 +1085,8 @@ size_t RandomSampler::parent(size_t node) {
 
 void RandomSampler::update_inner_node(size_t node) {
     auto chs = children(node);
-    segment_tree[node] = sum_log(segment_tree[chs.first], segment_tree[chs.second]);
-    active_tree[node] = active_tree[chs.first] + active_tree[chs.second];
+    segment_tree.at(node) = sum_log(segment_tree.at(chs.first), segment_tree.at(chs.second));
+    active_tree.at(node) = active_tree.at(chs.first) + active_tree.at(chs.second);
 }
 
 void RandomSampler::update(size_t node) {
@@ -1111,7 +1120,7 @@ RandomSampler& RandomSampler::operator=(RandomSampler&& other) {
 }
 
 size_t RandomSampler::n_active() const {
-    return active_tree[0];
+    return active_tree.at(0);
 }
 
 }

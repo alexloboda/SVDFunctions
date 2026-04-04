@@ -4,3 +4,8 @@ CXX_STD = CXX14
 PKG_CPPFLAGS = -pthread
 PKG_CXXFLAGS = -Wno-ignored-attributes
 PKG_LIBS = -pthread -lz
+
+ifneq ($(SANITIZERS),)
+PKG_CXXFLAGS += -O1 -g -fno-omit-frame-pointer -fno-sanitize-recover=all -fsanitize=$(SANITIZERS)
+PKG_LIBS += -fsanitize=$(SANITIZERS)
+endif
