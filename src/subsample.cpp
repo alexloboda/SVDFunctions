@@ -10,8 +10,9 @@
 namespace mvn {
 
 subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& clst, const mvn::Vector& mean,
-                     const mvn::Matrix& cov)
-        : test{std::make_shared<mvn_test>(mvn_test(X, clst, cov, mean))},
+                                         const mvn::Matrix& cov,
+                                         const PrecomputeConfig& config)
+                : test{std::make_shared<mvn_test>(mvn_test(X, clst, cov, mean, config))},
           clst(clst),
           wheel(std::random_device()()) {
 }

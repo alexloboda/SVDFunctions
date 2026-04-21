@@ -14,6 +14,11 @@ namespace mvn {
 using Matrix = Eigen::MatrixXd;
 using Vector = Eigen::VectorXd;
 
+struct PrecomputeConfig {
+    size_t threads = 0;
+    size_t cluster_tile_size = 32;
+};
+
 class RandomSampler {
     std::uniform_real_distribution<double> runif;
     mutable std::mt19937 wheel;
@@ -59,20 +64,26 @@ public:
 };
 
 class mahalanobis_distances {
-    std::vector<std::vector<double>> inter;
-    std::vector<double> dist;
+    std::shared_ptr<const Matrix> X;
+    Matrix transformed;
+    std::vector<double> quadratic_form;
+    std::vector<double> centered_distance;
 
 public:
     mahalanobis_distances(std::shared_ptr<const Matrix> X, const Matrix& cov, const Vector& mean);
     double distance(unsigned i) const;
     double interpoint_distance(unsigned i, unsigned j) const;
+    const Matrix& samples() const;
+    const Matrix& transformed_samples() const;
+    const std::vector<double>& quadratic_forms() const;
 };
 
 class mvn_stats {
     std::vector<double> mahalanobis_centered;
     std::vector<std::vector<double>> mahalanobis_pairwise;
 public:
-    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta);
+    mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
+              const PrecomputeConfig& config);
     mvn_stats() = default;
 
     double pairwise_stat(size_t i, size_t j) const;
@@ -104,7 +115,8 @@ protected:
     std::vector<size_t> subset;
 
 public:
-    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean);
+    mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
+             const PrecomputeConfig& config = {});
     mvn_test(const mvn_test&);
 
     size_t dimensions() const;

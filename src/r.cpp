@@ -115,7 +115,10 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      double min_lambda, double lb_lambda,
                      double max_lambda, double ub_lambda,
                      int min, int max, int step,
-                     int sa_iterations, double min_call_rate) {
+                     int sa_iterations, double min_call_rate,
+                     int sa_threads = 0,
+                     int exact_precompute_threads = 0,
+                     int exact_cluster_tile_size = 32) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
@@ -131,14 +134,19 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     int step_clusters = step;
     int iterations = sa_iterations;
     double mcr = min_call_rate;
+    int sa_pool_size = sa_threads > 0 ? sa_threads : static_cast<int>(std::thread::hardware_concurrency());
+    if (sa_pool_size <= 0) {
+        sa_pool_size = 1;
+    }
     mvn::Clustering cl(clust_vec);
 
     matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
-    matcher.process_mvn(*principal_directions, r_to_cpp(mean), std::thread::hardware_concurrency(),
-                        min_controls, max_controls, step_clusters, iterations);
+    matcher.process_mvn(*principal_directions, r_to_cpp(mean), sa_pool_size,
+                        min_controls, max_controls, step_clusters, iterations,
+                        exact_precompute_threads, exact_cluster_tile_size);
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);

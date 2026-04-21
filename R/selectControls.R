@@ -54,6 +54,13 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param step perform matching with the step.
 #' @param iterations number of simulated annealing iterations per each subset
 #' @param minCallRate numeric minimal call rate for SNP to be considered.   
+#' @param saThreads optional integer number of threads for the simulated
+#' annealing restarts. By default uses all available hardware threads.
+#' @param exactPrecomputeThreads optional integer number of threads used to
+#' precompute exact cluster-level Mahalanobis aggregates. By default uses all
+#' available hardware threads.
+#' @param exactClusterTileSize optional integer tile size used for exact
+#' blocked aggregation across samples inside each cluster pair.
 #' size.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
@@ -61,9 +68,17 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
                             min = 500, max = 1000, step = 50, iterations = 100000, 
-                            minCallRate = 0.98) {
+                            minCallRate = 0.98, saThreads = NULL,
+                            exactPrecomputeThreads = NULL,
+                            exactClusterTileSize = 32L) {
   iterations <- as.integer(iterations)
   stopifnot(iterations > 0)
+  saThreads <- if (is.null(saThreads)) 0L else as.integer(saThreads)
+  exactPrecomputeThreads <- if (is.null(exactPrecomputeThreads)) 0L else as.integer(exactPrecomputeThreads)
+  exactClusterTileSize <- as.integer(exactClusterTileSize)
+  stopifnot(saThreads >= 0L)
+  stopifnot(exactPrecomputeThreads >= 0L)
+  stopifnot(exactClusterTileSize > 0L)
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
@@ -103,7 +118,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 stats::qchisq(stats::ppoints(1e+07), df = 1), 
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step, iterations, minCallRate)
+                                max, step, iterations, minCallRate,
+                                saThreads, exactPrecomputeThreads,
+                                exactClusterTileSize)
   if (length(result$controls) > 0) {
     result$controls <- colnames(gmatrix)[result$controls]
   }

@@ -15,7 +15,8 @@ class subsample {
     std::mt19937 wheel;
 public:
     subsample();
-    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov);
+    subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov,
+              const PrecomputeConfig& config = {});
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 

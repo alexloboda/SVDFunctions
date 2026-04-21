@@ -21,7 +21,10 @@ selectControls(
   max = 1000,
   step = 50,
   iterations = 1e+05,
-  minCallRate = 0.98
+  minCallRate = 0.98,
+  saThreads = NULL,
+  exactPrecomputeThreads = NULL,
+  exactClusterTileSize = 32L
 )
 }
 \arguments{
@@ -59,7 +62,17 @@ principal directions of the data in case dataset.}
 
 \item{iterations}{number of simulated annealing iterations per each subset}
 
-\item{minCallRate}{numeric minimal call rate for SNP to be considered.
+\item{minCallRate}{numeric minimal call rate for SNP to be considered.}
+
+\item{saThreads}{optional integer number of threads for the simulated
+annealing restarts. By default uses all available hardware threads.}
+
+\item{exactPrecomputeThreads}{optional integer number of threads used to
+precompute exact cluster-level Mahalanobis aggregates. By default uses all
+available hardware threads.}
+
+\item{exactClusterTileSize}{optional integer tile size used for exact
+blocked aggregation across samples inside each cluster pair.
 size.}
 }
 \description{
