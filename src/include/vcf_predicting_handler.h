@@ -26,7 +26,7 @@ namespace vcf {
         GenotypeMatrixIterator iterator;
         Window window;
         cxxpool::thread_pool thread_pool;
-        unsigned int random_seed; // добавлено поле для seed
+        unsigned int random_seed; 
 
         TreeBuilder make_tree_builder(const std::pair<Features, Labels>& dataset);
     public:

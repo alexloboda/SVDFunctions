@@ -59,7 +59,7 @@ plotMatching <- function(popObj, variants, controlsU, meanControl,
     
     ggplot() + 
      geom_point(aes(PC1, PC2, colour = "matched controls"), df[df$color == "selected",], alpha = 0.1, color = "darkred") +
-     geom_point(aes(PC1, PC2, colour = "available controls"), df[df$color == "control",], alpha = 0.01)  +
+     geom_point(aes(PC1, PC2, colour = "available controls"), df[df$color == "control",], alpha = 0.03)  +
      geom_point(aes(PC1, PC2, colour = "cases"), casesDF, alpha = 1.1, color = "darkblue") + 
      geom_segment(aes(x = startx, y = starty, xend = endx, yend = endy, color = "PC loadings projections"), arrows, 
                   arrow = arrow(length = unit(0.1, "inches")), size = 1.5, alpha = 0.8) +

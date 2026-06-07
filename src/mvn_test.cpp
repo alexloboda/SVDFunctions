@@ -137,6 +137,31 @@ double accumulate_pairwise_cluster(const mahalanobis_distances& distances,
     return sum;
 }
 
+void precompute_cluster_range(std::vector<double>& mahalanobis_centered,
+                              std::vector<std::vector<double>>& mahalanobis_pairwise,
+                              const mahalanobis_distances& distances,
+                              const Clustering& clst,
+                              double k_center,
+                              double k_pw,
+                              size_t begin,
+                              size_t end,
+                              size_t cluster_tile_size) {
+    size_t n = clst.size();
+    for (size_t cl = begin; cl < end; cl++) {
+        auto& pairwise_row = mahalanobis_pairwise[cl];
+        const auto& cluster = clst.elements(cl);
+        mahalanobis_centered[cl] = accumulate_centered_cluster(distances, cluster, k_center);
+        for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
+            pairwise_row[pair_cl] = accumulate_pairwise_cluster(distances,
+                                                                cluster,
+                                                                clst.elements(pair_cl),
+                                                                k_pw,
+                                                                cl == pair_cl,
+                                                                cluster_tile_size);
+        }
+    }
+}
+
 }
 
 mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
@@ -208,19 +233,15 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
 
     size_t workers = precompute_workers(n, config.threads);
     if (workers == 1) {
-        for (size_t cl = 0; cl < n; cl++) {
-            auto& pairwise_row = mahalanobis_pairwise[cl];
-            const auto& cluster = clst.elements(cl);
-            mahalanobis_centered[cl] = accumulate_centered_cluster(distances, cluster, k_center);
-            for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
-                pairwise_row[pair_cl] = accumulate_pairwise_cluster(distances,
-                                                                    cluster,
-                                                                    clst.elements(pair_cl),
-                                                                    k_pw,
-                                                                    cl == pair_cl,
-                                                                    cluster_tile_size);
-            }
-        }
+        precompute_cluster_range(mahalanobis_centered,
+                                 mahalanobis_pairwise,
+                                 distances,
+                                 clst,
+                                 k_center,
+                                 k_pw,
+                                 0,
+                                 n,
+                                 cluster_tile_size);
         return;
     }
 
@@ -231,20 +252,16 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     futures.reserve(workers);
     for (size_t block_begin = 0; block_begin < n; block_begin += block_size) {
         size_t block_end = std::min(n, block_begin + block_size);
-        futures.push_back(pool.push([this, &clst, &distances, k_center, k_pw, n, block_begin, block_end, cluster_tile_size]() {
-            for (size_t cl = block_begin; cl < block_end; cl++) {
-                auto& pairwise_row = mahalanobis_pairwise[cl];
-                const auto& cluster = clst.elements(cl);
-                mahalanobis_centered[cl] = accumulate_centered_cluster(distances, cluster, k_center);
-                for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
-                    pairwise_row[pair_cl] = accumulate_pairwise_cluster(distances,
-                                                                        cluster,
-                                                                        clst.elements(pair_cl),
-                                                                        k_pw,
-                                                                        cl == pair_cl,
-                                                                        cluster_tile_size);
-                }
-            }
+        futures.push_back(pool.push([this, &clst, &distances, k_center, k_pw, block_begin, block_end, cluster_tile_size]() {
+            precompute_cluster_range(mahalanobis_centered,
+                                     mahalanobis_pairwise,
+                                     distances,
+                                     clst,
+                                     k_center,
+                                     k_pw,
+                                     block_begin,
+                                     block_end,
+                                     cluster_tile_size);
         }));
     }
 

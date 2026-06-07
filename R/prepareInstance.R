@@ -435,7 +435,7 @@ readMatrix <- function(obj, nvars, name) {
 #' population description.
 #' @export
 readInstanceFromYml <- function(filename) {
-  tryCatch(inst <- yaml::read_yaml(filename), 
+  tryCatch(inst <- yaml::read_yaml(filename, eval.expr = FALSE), 
            error = function(e) userError("File is not a correct YML file"))
   cols <- c("title", "salt", "version", "hierarchy", "variants", "population")
   if (!setequal(names(inst), cols)) {
