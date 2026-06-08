@@ -29,10 +29,10 @@ Imports:
     pracma,
     ggplot2
 LazyData: true
-RoxygenNote: 7.3.3
 SystemRequirements: C++14
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
            BH,
            RcppEigen
 Suggests: testthat
+Config/roxygen2/version: 8.0.0

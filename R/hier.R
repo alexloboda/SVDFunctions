@@ -141,10 +141,12 @@ filter_variants <- function(population, ids) {
 }
 
 #' Select a set of controls that populationally matches a set of cases.
-#' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt). 
-#' Intermediate values are allowed, NAs are not.
+#' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt).
+#' Intermediate values are allowed, NAs are not. Rows must already be filtered
+#' to \\code{cases$variants} and be in the same order.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt)
-#' Missing values are allowed.
+#' with missing values allowed. Rows must already match \\code{controlGMatrix}
+#' and therefore \\code{cases$variants}.
 #' @param cases result of calling function readInstanceFromYml.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
@@ -157,28 +159,12 @@ selectControlsHier <- function(controlGMatrix, originalControlGMatrix,
                                ...) {
   stopifnot(all(!is.na(controlGMatrix)))
   stopifnot(all(rownames(controlGMatrix) == rownames(originalControlGMatrix)))
-  
-  #check if all sites from cases are found in controls
-  
-  extra_variants <- which(!(cases$variants %in% rownames(controlGMatrix)))
-  if (length(extra_variants) != 0) {
-    num <- min(5, length(extra_variants))
-    userError(paste("Not all case sites are found in controls. Please use",
-               "list of available sites to create your case genotype",
-               "matrix. These variants must not be present: ", 
-               paste(cases$variants[extra_variants][1:num], 
-                     collapse = ", ")))
+  if (!identical(rownames(controlGMatrix), cases$variants)) {
+    stop(paste(
+      "controlGMatrix and originalControlGMatrix must already be filtered to cases$variants",
+      "and use the same row order"
+    ))
   }
-  
-  variants <- intersect(cases$variants, rownames(controlGMatrix))
-  controlGMatrix <- controlGMatrix[variants, ]
-  originalControlGMatrix <- originalControlGMatrix[variants, ]
-  
-  cases_variants_ids <- setNames(1:length(variants), variants)[cases$variants] 
-  cases$population <- lapply(cases$population, function(population) {
-    population$counts <- population$counts[cases_variants_ids, ]
-    population
-  })
   
   ret <- recSelect(controlGMatrix, originalControlGMatrix,  
                    cases, SVDReference, controlsMean, cases$hierarchy, 

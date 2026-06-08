@@ -31,7 +31,9 @@ selectControls(
 \item{genotypeMatrix}{numeric matrix where rows are variants and columns are
 samples. The missing values should be imputed prior calling this function.}
 
-\item{originalGenotypeMatrix}{genotype matrix with missing values.}
+\item{originalGenotypeMatrix}{integer genotype matrix with missing values.
+The matrix must already use integer storage mode; \\code{selectControls}
+throws an error instead of coercing it to avoid an additional full copy.}
 
 \item{casesPDs}{numeric matrix where rows are variants and columns are 
 principal directions of the data in case dataset.}
@@ -44,7 +46,9 @@ principal directions of the data in case dataset.}
 
 \item{caseCounts}{matrix with summary genotype counts from cases.}
 
-\item{controlsClustering}{cluster names for controls.}
+\item{controlsClustering}{cluster names for controls. Each cluster must
+contain at most 255 samples because per-cluster allele counts are stored
+in one byte during matching.}
 
 \item{minLambda}{minimum possible lambda.}
 

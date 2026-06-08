@@ -1,6 +1,7 @@
 #include <Rcpp.h>
 #include <vector>
 #include <RcppEigen.h>
+#include <limits>
 
 // [[Rcpp::depends(RcppEigen)]]
 
@@ -32,6 +33,8 @@ LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const Numer
 
 namespace {
 
+constexpr size_t max_stored_cluster_size = std::numeric_limits<std::uint8_t>::max();
+
 template<typename F, typename T, typename D>
 std::shared_ptr<T> r_to_cpp_impl(const F& matrix, D default_value) {
     std::shared_ptr<T> eigen_matrix = std::make_shared<T>(matrix.nrow(), matrix.ncol());
@@ -60,6 +63,14 @@ std::vector<matching::Counts> matrix_to_counts(const Eigen::MatrixXi& matrix) {
     return ret;
 }
 
+void validate_cluster_sizes(const mvn::Clustering& clustering) {
+    for (size_t cluster = 0; cluster < clustering.size(); cluster++) {
+        if (clustering.cluster_size(cluster) > max_stored_cluster_size) {
+            Rcpp::stop("Each control cluster must contain at most 255 samples");
+        }
+    }
+}
+
 }
 
 std::shared_ptr<Eigen::MatrixXi> r_to_cpp(const IntegerMatrix& matrix) {
@@ -79,15 +90,23 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 }
 
 
-std::vector<std::vector<int>> r_to_cpp_vector(IntegerMatrix& matrix) {
-    std::vector<std::vector<int>> ret(matrix.nrow());
-    for (int i = 0; i < matrix.nrow(); i++) {
-        ret[i].resize(matrix.ncol());
-        for (int j = 0; j < matrix.ncol(); j++) {
-            ret[i][j] = (matrix(i, j) == Rcpp::NA) ? -1 : matrix(i, j);
+std::vector<std::vector<matching::ClusterCounts>> build_cluster_counts(const IntegerMatrix& matrix,
+                                                                       const std::vector<int>& clustering,
+                                                                       size_t n_clusters) {
+    int n_variants = matrix.nrow();
+    int n_samples = matrix.ncol();
+    std::vector<std::vector<matching::ClusterCounts>> counts(n_clusters,
+                                                             std::vector<matching::ClusterCounts>(n_variants));
+    for (int j = 0; j < n_samples; j++) {
+        int cluster = clustering[j];
+        for (int i = 0; i < n_variants; i++) {
+            int value = matrix(i, j);
+            if (!(value == Rcpp::NA)) {
+                counts[cluster][i][value] += 1;
+            }
         }
     }
-    return ret;
+    return counts;
 }
 
 // [[Rcpp::export]]
@@ -122,7 +141,6 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
-    auto gmatrix_counts = r_to_cpp_vector(gmatrix);
     auto case_counts = r_to_cpp(cc);
     auto principal_directions = r_to_cpp(directions);
     auto gm_rs = r_to_cpp(gmatrix_rs);
@@ -139,17 +157,22 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
         sa_pool_size = 1;
     }
     mvn::Clustering cl(clust_vec);
+    validate_cluster_sizes(cl);
 
-    matching::matching matcher(std::move(gmatrix_counts), gm_rs, cl);
+    auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size());
+    matching::matching matcher(std::move(cluster_counts), std::move(gm_rs), cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), sa_pool_size,
                         min_controls, max_controls, step_clusters, iterations,
                         exact_precompute_threads, exact_cluster_tile_size);
+    principal_directions.reset();
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
-    auto result = matcher.match(matrix_to_counts(*case_counts), min_controls, mcr);
+    auto counts = matrix_to_counts(*case_counts);
+    case_counts.reset();
+    auto result = matcher.match(counts, min_controls, mcr);
 
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());

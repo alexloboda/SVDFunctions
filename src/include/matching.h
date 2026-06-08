@@ -1,6 +1,7 @@
 #ifndef SRC_MATCHING_H
 #define SRC_MATCHING_H
 
+#include <cstdint>
 #include <vector>
 #include <RcppEigen.h>
 
@@ -42,6 +43,28 @@ private:
     }
 };
 
+class ClusterCounts {
+    std::uint8_t counts[3];
+public:
+    ClusterCounts() :counts{0, 0, 0} {}
+
+    const std::uint8_t& operator[] (size_t i) const {
+        check_bounds(i);
+        return counts[i];
+    }
+    std::uint8_t& operator[] (size_t i) {
+        check_bounds(i);
+        return counts[i];
+    }
+
+private:
+    void check_bounds(size_t i) const {
+        if (i > 2) {
+            throw std::domain_error("Out of bound");
+        }
+    }
+};
+
 class lambda_range {
     double lb;
     double ub;
@@ -69,7 +92,7 @@ struct matching_results {
 class matching {
     static constexpr double EPS = 1e-6;
 
-    std::vector<std::vector<int>> controls_gmatrix;
+    std::vector<std::vector<ClusterCounts>> cluster_counts;
     std::shared_ptr<Eigen::MatrixXd> controls_space;
 
     mvn::Clustering clustering;
@@ -81,7 +104,7 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(std::vector<std::vector<int>>&& controls, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
+    matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int sa_threads, int start, int size_ub, int step, int iterations,
                      int exact_precompute_threads = 0, int exact_cluster_tile_size = 32);
@@ -97,7 +120,7 @@ public:
 private:
     double get_lambda(std::vector<double>& pvals);
 
-    Counts count_controls(const std::vector<int>& vector, size_t j);
+    Counts count_controls(const std::vector<size_t>& groups, size_t variant);
 };
 
 }

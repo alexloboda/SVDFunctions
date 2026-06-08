@@ -39,10 +39,10 @@ using Vector = Eigen::VectorXd;
 
 namespace matching {
 
-matching::matching(std::vector<std::vector<int>>&& controls_gmatrix,
+matching::matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts,
                    std::shared_ptr<Eigen::MatrixXd> controls_space,
-                   mvn::Clustering clustering) : controls_gmatrix(std::move(controls_gmatrix)),
-                                            controls_space(controls_space),
+                   mvn::Clustering clustering) : cluster_counts(std::move(cluster_counts)),
+                                            controls_space(std::move(controls_space)),
                                             clustering(std::move(clustering)) {}
 
 void matching::set_soft_threshold(lambda_range range) {
@@ -69,6 +69,13 @@ std::vector<lm> init_lms(const std::vector<Counts>& case_counts) {
 
 matching_results matching::match(const std::vector<Counts>& case_counts, unsigned min_controls, double min_call_rate) {
     size_t n_variants = case_counts.size();
+    auto control_sample_size = [this](const std::vector<size_t>& groups) {
+        size_t total = 0;
+        for (size_t group: groups) {
+            total += clustering.cluster_size(group);
+        }
+        return total;
+    };
 
     std::vector<bool> snp_mask = check_user_counts(case_counts);
     auto lms = init_lms(case_counts);
@@ -79,6 +86,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     std::vector<double> stats;
 
     std::vector<int> optimal_controls;
+    std::vector<size_t> optimal_groups;
     std::vector<int> lambda_i;
     std::vector<int> pvals_num;
     std::vector<double> optimal_pvals;
@@ -96,21 +104,17 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
         if (control_groups.size() < min_controls) {
             continue;
         }
-        std::vector<int> controls;
-        for (int group: control_groups) {
-            auto group_elements = clustering.elements(group);
-            controls.insert(controls.end(), group_elements.begin(), group_elements.end());
-        }
+        size_t controls_size = control_sample_size(control_groups);
 
         for (size_t j = 0; j < n_variants; j++) {
             if (!snp_mask[j]) {
                 continue;
             }
 
-            Counts controls_counts = count_controls(controls, j);
+            Counts controls_counts = count_controls(control_groups, j);
 
             auto overall = controls_counts[0] + controls_counts[1] + controls_counts[2];
-            if ((double)overall / (double)(controls.size()) < min_call_rate) {
+            if ((double)overall / (double)controls_size < min_call_rate) {
                 continue;
             }
 
@@ -127,24 +131,33 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
             pvals.push_back(pval_t(lms[j].compute_t(rank - 2), rank - 2));
         }
 
-        if (controls.size() >= min_controls && pvals.size() > 10) {
+        if (controls_size >= min_controls && pvals.size() > 10) {
             double cur_lambda = get_lambda(pvals);
 
             lambdas.push_back(cur_lambda);
-            lambda_i.push_back(controls.size());
+            lambda_i.push_back(static_cast<int>(controls_size));
             pvals_num.push_back(pvals.size());
 
             if (hard_threshold.in(cur_lambda)) {
                 if (soft_threshold.in(cur_lambda) ||
                         (!soft_threshold.in(lambda) &&
                         soft_threshold.distance(cur_lambda) < soft_threshold.distance(lambda))) {
-                    optimal_controls = controls;
+                    optimal_groups = control_groups;
                     lambda = cur_lambda;
                     optimal_pvals = pvals;
                 }
             }
         }
     }
+
+    if (!optimal_groups.empty()) {
+        optimal_controls.reserve(control_sample_size(optimal_groups));
+        for (size_t group: optimal_groups) {
+            const auto& group_elements = clustering.elements(group);
+            optimal_controls.insert(optimal_controls.end(), group_elements.begin(), group_elements.end());
+        }
+    }
+
     return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas),
             std::move(stats), std::move(lambda_i), std::move(pvals_num), lambda};
 }
@@ -156,8 +169,6 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
     Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
 
-    Matrix rs_cov = directions * directions.transpose();
-
     mvn::PrecomputeConfig config;
     if (exact_precompute_threads > 0) {
         config.threads = static_cast<size_t>(exact_precompute_threads);
@@ -166,19 +177,23 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
         config.cluster_tile_size = static_cast<size_t>(exact_cluster_tile_size);
     }
 
-    subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, config);
+    {
+        Matrix rs_cov = directions * directions.transpose();
+        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, config);
+    }
+    controls_space.reset();
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
     double c = std::pow(EPS, 1.0 / (double)iterations);
     subsampling.run(iterations, 4, 1.0 , c, sa_threads, start, ub, step);
 }
 
-Counts matching::count_controls(const std::vector<int>& controls, size_t variant) {
+Counts matching::count_controls(const std::vector<size_t>& groups, size_t variant) {
     Counts counts;
-    for (int sample: controls) {
-        int value = controls_gmatrix[variant][sample];
-        if (value != -1) {
-            ++counts[value];
-        }
+    for (size_t group: groups) {
+        const ClusterCounts& cluster = cluster_counts[group][variant];
+        counts[0] += cluster[0];
+        counts[1] += cluster[1];
+        counts[2] += cluster[2];
     }
     return counts;
 }

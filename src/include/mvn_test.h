@@ -80,7 +80,8 @@ public:
 
 class mvn_stats {
     std::vector<double> mahalanobis_centered;
-    std::vector<std::vector<double>> mahalanobis_pairwise;
+    std::vector<double> mahalanobis_pairwise;
+    size_t n_clusters = 0;
 public:
     mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
               const PrecomputeConfig& config);

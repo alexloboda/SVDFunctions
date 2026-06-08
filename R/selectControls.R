@@ -37,14 +37,18 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' is \code{min} samples for privacy preservation reasons.
 #' @param genotypeMatrix numeric matrix where rows are variants and columns are
 #' samples. The missing values should be imputed prior calling this function.
-#' @param originalGenotypeMatrix genotype matrix with missing values.
+#' @param originalGenotypeMatrix integer genotype matrix with missing values.
+#' The matrix must already use integer storage mode; \\code{selectControls}
+#' throws an error instead of coercing it to avoid an additional full copy.
 #' @param casesPDs numeric matrix where rows are variants and columns are 
 #' principal directions of the data in case dataset.
 #' @param casesMean numeric vector representing mean per-variant genotype value.
 #' @param SVDReference reference basis of the left singular vectors.
 #' @param controlsMean mean value of the reference genotypes.
 #' @param caseCounts matrix with summary genotype counts from cases.
-#' @param controlsClustering cluster names for controls.
+#' @param controlsClustering cluster names for controls. Each cluster must
+#' contain at most 255 samples because per-cluster allele counts are stored
+#' in one byte during matching.
 #' @param minLambda minimum possible lambda.
 #' @param softMinLambda desirable minimum for lambda.
 #' @param softMaxLambda desirable maximum for lambda.
@@ -83,7 +87,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
   mode(genotypeMatrix) <- "numeric"
-  mode(originalGenotypeMatrix) <- "integer"
+  if (!is.integer(originalGenotypeMatrix)) {
+    stop("originalGenotypeMatrix must already be stored as an integer matrix")
+  }
   stopifnot(all(!is.na(genotypeMatrix)))
   if (nrow(genotypeMatrix) != nrow(caseCounts)) {
     stop("Check dimensions of the matrices")
@@ -96,6 +102,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
     cl <- as.integer(as.factor(cl)) - 1
   }
   stopifnot(all(!is.na(cl)))
+  if (any(tabulate(cl + 1L) > 255L)) {
+    stop("Each control cluster must contain at most 255 samples")
+  }
   
   names(controlsMean) <- rownames(SVDReference)
   controlsMean <- controlsMean[rownames(genotypeMatrix)]
@@ -103,8 +112,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   transition <- pracma::pinv(SVDReference)
   rm(SVDReference)
   
-  genotypeMatrix <- genotypeMatrix - controlsMean
+  meanOffset <- as.vector(transition %*% controlsMean)
   genotypeMatrix <- transition %*% genotypeMatrix
+  genotypeMatrix <- genotypeMatrix - meanOffset
   
   caseCounts <- as.matrix(caseCounts)
   gmatrix <- originalGenotypeMatrix

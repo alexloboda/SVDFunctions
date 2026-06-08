@@ -33,6 +33,13 @@ size_t effective_cluster_tile_size(size_t requested_tile_size) {
     return requested_tile_size == 0 ? 32 : requested_tile_size;
 }
 
+size_t packed_pairwise_index(size_t i, size_t j, size_t n) {
+    if (i > j) {
+        std::swap(i, j);
+    }
+    return i * n - (i * (i - 1)) / 2 + (j - i);
+}
+
 Matrix gather_columns(const Matrix& matrix, const std::vector<int>& cluster, size_t begin, size_t end) {
     Matrix gathered(matrix.rows(), end - begin);
     for (size_t offset = 0; offset < end - begin; offset++) {
@@ -138,7 +145,8 @@ double accumulate_pairwise_cluster(const mahalanobis_distances& distances,
 }
 
 void precompute_cluster_range(std::vector<double>& mahalanobis_centered,
-                              std::vector<std::vector<double>>& mahalanobis_pairwise,
+                              std::vector<double>& mahalanobis_pairwise,
+                              size_t n_clusters,
                               const mahalanobis_distances& distances,
                               const Clustering& clst,
                               double k_center,
@@ -146,18 +154,17 @@ void precompute_cluster_range(std::vector<double>& mahalanobis_centered,
                               size_t begin,
                               size_t end,
                               size_t cluster_tile_size) {
-    size_t n = clst.size();
     for (size_t cl = begin; cl < end; cl++) {
-        auto& pairwise_row = mahalanobis_pairwise[cl];
         const auto& cluster = clst.elements(cl);
         mahalanobis_centered[cl] = accumulate_centered_cluster(distances, cluster, k_center);
-        for (size_t pair_cl = 0; pair_cl < n; pair_cl++) {
-            pairwise_row[pair_cl] = accumulate_pairwise_cluster(distances,
-                                                                cluster,
-                                                                clst.elements(pair_cl),
-                                                                k_pw,
-                                                                cl == pair_cl,
-                                                                cluster_tile_size);
+        for (size_t pair_cl = cl; pair_cl < n_clusters; pair_cl++) {
+            double value = accumulate_pairwise_cluster(distances,
+                                                       cluster,
+                                                       clst.elements(pair_cl),
+                                                       k_pw,
+                                                       cl == pair_cl,
+                                                       cluster_tile_size);
+            mahalanobis_pairwise[packed_pairwise_index(cl, pair_cl, n_clusters)] = value;
         }
     }
 }
@@ -224,7 +231,8 @@ const std::vector<size_t>& mvn_test::current_subset() const {
 mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& clst, double beta,
                      const PrecomputeConfig& config)
     :mahalanobis_centered(clst.size(), 0.0),
-     mahalanobis_pairwise(clst.size(), std::vector<double>(clst.size(), 0.0)) {
+     mahalanobis_pairwise(clst.size() * (clst.size() + 1) / 2, 0.0),
+     n_clusters(clst.size()) {
     size_t n = clst.size();
     size_t cluster_tile_size = effective_cluster_tile_size(config.cluster_tile_size);
 
@@ -235,6 +243,7 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     if (workers == 1) {
         precompute_cluster_range(mahalanobis_centered,
                                  mahalanobis_pairwise,
+                                 n,
                                  distances,
                                  clst,
                                  k_center,
@@ -252,9 +261,10 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
     futures.reserve(workers);
     for (size_t block_begin = 0; block_begin < n; block_begin += block_size) {
         size_t block_end = std::min(n, block_begin + block_size);
-        futures.push_back(pool.push([this, &clst, &distances, k_center, k_pw, block_begin, block_end, cluster_tile_size]() {
+        futures.push_back(pool.push([this, &clst, &distances, k_center, k_pw, block_begin, block_end, cluster_tile_size, n]() {
             precompute_cluster_range(mahalanobis_centered,
                                      mahalanobis_pairwise,
+                                     n,
                                      distances,
                                      clst,
                                      k_center,
@@ -269,7 +279,7 @@ mvn_stats::mvn_stats(const mahalanobis_distances& distances, const Clustering& c
 }
 
 double mvn_stats::pairwise_stat(size_t i, size_t j) const {
-    return mahalanobis_pairwise[i][j];
+    return mahalanobis_pairwise[packed_pairwise_index(i, j, n_clusters)];
 }
 
 double mvn_stats::centered_stat(size_t i) const {
@@ -279,7 +289,7 @@ double mvn_stats::centered_stat(size_t i) const {
 double mvn_stats::sum_pairwise(size_t point, const std::vector<size_t>& ss) const {
     double ret = 0.0;
     for (auto s: ss) {
-        ret += mahalanobis_pairwise[point][s];
+        ret += mahalanobis_pairwise[packed_pairwise_index(point, s, n_clusters)];
     }
     return ret;
 }
