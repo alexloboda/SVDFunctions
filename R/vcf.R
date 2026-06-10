@@ -181,7 +181,7 @@ scanVCF <- function(vcf, DP = 10L, GQ = 20L, samples = NULL,
   binaryPathPrefix <- fixChar(binaryPathPrefix)
 
   if (is.null(seed)) {
-    seed <- as.integer(runif(1, 0, .Machine$integer.max))
+    seed <- as.integer(stats::runif(1, 0, .Machine$integer.max))
   }
 
   tryCatch( 

@@ -28,7 +28,7 @@ genoPhenoLM <- function(case_0, case_1, case_2, control_0, control_1, control_2)
   ws <- c(control_0, control_1, control_2, case_0, case_1, case_2)
   table <- data.frame(geno = geno, phe = phe)
   # Fit model
-  m <- lm(phe ~ geno, data = table, weights = ws)
+  m <- stats::lm(phe ~ geno, data = table, weights = ws)
   m$df.residual <- sum(ws) - 2
   ks <- summary(m)$coefficients
   list(
@@ -67,8 +67,8 @@ calcLambda <- function(pvals, fractionSmallest = 1.0) {
   EPS <- 1e-20
   mask_zero <- pvals < EPS
   mask_one <- pvals > (1 - EPS)
-  pvals[mask_zero] <- runif(sum(mask_zero), 0, min(pvals[pvals >= EPS], na.rm = TRUE))
-  pvals[mask_one] <- runif(sum(mask_one), max(pvals[pvals <= (1 - EPS)], na.rm = TRUE), 1)
+  pvals[mask_zero] <- stats::runif(sum(mask_zero), 0, min(pvals[pvals >= EPS], na.rm = TRUE))
+  pvals[mask_one] <- stats::runif(sum(mask_one), max(pvals[pvals <= (1 - EPS)], na.rm = TRUE), 1)
 
   n_obs <- min(length(pvals), max(1, round(length(pvals) * fractionSmallest)))
   pvals <- sort(pvals)[1:n_obs]
@@ -76,9 +76,9 @@ calcLambda <- function(pvals, fractionSmallest = 1.0) {
   if (length(pvals) == 0) {
     return(NA)
   }
-  chisq <- qchisq(1 - pvals, df = 1)
-  expected_median <- qchisq(1.0 - fractionSmallest / 2.0, df = 1)
-  lambda_val <- median(chisq) / expected_median
+  chisq <- stats::qchisq(1 - pvals, df = 1)
+  expected_median <- stats::qchisq(1.0 - fractionSmallest / 2.0, df = 1)
+  lambda_val <- stats::median(chisq) / expected_median
   if (is.nan(lambda_val) || is.infinite(lambda_val)) {
     return(NA)
   }
@@ -96,22 +96,22 @@ qqPlot <- function(pvals, title = "QQ Plot") {
   lambda_val <- calcLambda(pvals)
 
   pvals1 <- pvals
-  pvals2 <- ppoints(length(pvals))
+  pvals2 <- stats::ppoints(length(pvals))
   pvals.data <- data.frame(X = -log10(sort(pvals)),
                            Y = -log10(sort(pvals2)), 
-                           expected = -log10(ppoints(length(pvals1))),
-                           clower   = -log10(qbeta(p = (1 - 0.95) / 2, shape1 = 1:length(pvals1),
+                           expected = -log10(stats::ppoints(length(pvals1))),
+                           clower   = -log10(stats::qbeta(p = (1 - 0.95) / 2, shape1 = 1:length(pvals1),
                                                    shape2 = length(pvals1):1)),
-                           cupper   = -log10(qbeta(p = (1 + 0.95) / 2, shape1 = 1:length(pvals1),
+                           cupper   = -log10(stats::qbeta(p = (1 + 0.95) / 2, shape1 = 1:length(pvals1),
                                                    shape2 = length(pvals1):1)))
 
   ggplot2::ggplot(pvals.data) +
   ggplot2::ggtitle(title) + 
   ggplot2::geom_abline(intercept = 0,
               slope = 1, 
-              alpha = 0.5,color=adjustcolor("grey",alpha.f = 1)) +
-  ggplot2::geom_line(ggplot2::aes(expected, cupper), linetype = 2,color=adjustcolor("grey",alpha.f = 0.5)) +
-  ggplot2::geom_line(ggplot2::aes(expected, clower), linetype = 2,color=adjustcolor("grey",alpha.f = 0.5)) +
+              alpha = 0.5,color=grDevices::adjustcolor("grey",alpha.f = 1)) +
+  ggplot2::geom_line(ggplot2::aes(expected, cupper), linetype = 2,color=grDevices::adjustcolor("grey",alpha.f = 0.5)) +
+  ggplot2::geom_line(ggplot2::aes(expected, clower), linetype = 2,color=grDevices::adjustcolor("grey",alpha.f = 0.5)) +
   ggplot2::geom_point(data = pvals.data, ggplot2::aes(x = expected, 
                                     y = X,
                                     colour="External"),
@@ -133,7 +133,7 @@ qqPlot <- function(pvals, title = "QQ Plot") {
   ggplot2::labs(fill="Genomic inflation")+
   ggplot2::scale_colour_manual(name="Genomic Inflation",
                       guide='legend',
-                      labels=c(paste("λ", "=", format(lambda_val, digits = 3))),
+                      labels=c(paste("\u03bb", "=", format(lambda_val, digits = 3))),
                       values=c("black"))
 }
 

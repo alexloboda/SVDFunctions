@@ -3,7 +3,7 @@
 #' Requires several left singular vector bases from every ancestry to be detected. 
 #' 1000 genomes data could be used as training set for creation of reference SVD bases. 
 #' Sample genotypes vector is reconstructed from every supplied basis and basis
-#'  with a smallest relative residual vector norm is chosen as sample’s ancestry.
+#'  with a smallest relative residual vector norm is chosen as sample's ancestry.
 #' @param genotypeMatrix Vector of genotypes for a sample.
 #' @param referenceUList List object containing matrices of the left singular
 #'  vectors for every ancestry reference.
@@ -12,7 +12,7 @@
 #' @export
 predictAncestry <- function(genotypeMatrix, referenceUList, SV, ancestryList){
   gmatrix <- genotypeMatrix
-  if(class(referenceUList)!="list"){
+  if(!is.list(referenceUList)){
     stop("Collection of U-bases must be supplied as list object")
   }
   if(length(which(is.na(gmatrix)==TRUE,arr.ind = TRUE))>0){

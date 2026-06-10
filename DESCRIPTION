@@ -13,23 +13,20 @@ Description: Package contains set of functions used for building SVD-based
 Depends: R (>= 3.1.0)
 License: MIT + file LICENSE
 Encoding: UTF-8
-biocViews: 
 Imports:
     Rcpp,
     adamethods,
-    data.tree, 
+    data.tree,
     plotly,
     mclust,
     yaml,
-    magrittr,
-    data.table,
-    methods,
     seqminer,
     RSpectra,
-    pracma,
-    ggplot2
+    ggplot2,
+    grid,
+    stringi,
+    expm
 LazyData: true
-SystemRequirements: C++14
 BugReports: https://github.com/alexloboda/SVDFunctions/issues
 LinkingTo: Rcpp, 
            BH,

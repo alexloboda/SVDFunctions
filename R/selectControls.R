@@ -1,5 +1,4 @@
-#' @useDynLib SVDFunctions
-#' @importFrom Rcpp sourceCpp
+#' @useDynLib SVDFunctions, .registration = TRUE
 NULL
 
 #' Perform quality control on a set of allele counts.
@@ -30,7 +29,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' 
 #' Finds an optimal set of controls satisfying 
 #' \eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}
-#' or if none exists – will select a set of controls with
+#' or if none exists -- will select a set of controls with
 #'  closest \eqn{\lambda_GC} to the range \eqn{[softmin_lambda; softmax_lambda]} 
 #'  satisfying \eqn{\lambda_GC < max_lambda} and \eqn{\lambda_GC > min_lambda}.
 #' Otherwise no results will be returned. Minimal size of control set 
@@ -38,7 +37,7 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param genotypeMatrix numeric matrix where rows are variants and columns are
 #' samples. The missing values should be imputed prior calling this function.
 #' @param originalGenotypeMatrix integer genotype matrix with missing values.
-#' The matrix must already use integer storage mode; \\code{selectControls}
+#' The matrix must already use integer storage mode; \code{selectControls}
 #' throws an error instead of coercing it to avoid an additional full copy.
 #' @param casesPDs numeric matrix where rows are variants and columns are 
 #' principal directions of the data in case dataset.
@@ -109,7 +108,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   names(controlsMean) <- rownames(SVDReference)
   controlsMean <- controlsMean[rownames(genotypeMatrix)]
   SVDReference <- SVDReference[rownames(genotypeMatrix), ]
-  transition <- pracma::pinv(SVDReference)
+  transition <- pinv(SVDReference)
   rm(SVDReference)
   
   meanOffset <- as.vector(transition %*% controlsMean)

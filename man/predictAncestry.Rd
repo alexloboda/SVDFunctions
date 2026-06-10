@@ -20,5 +20,5 @@ vectors for every ancestry reference.}
 Requires several left singular vector bases from every ancestry to be detected. 
 1000 genomes data could be used as training set for creation of reference SVD bases. 
 Sample genotypes vector is reconstructed from every supplied basis and basis
- with a smallest relative residual vector norm is chosen as sample’s ancestry.
+ with a smallest relative residual vector norm is chosen as sample's ancestry.
 }

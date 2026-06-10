@@ -1,4 +1,5 @@
 ^.*\.Rproj$
-^\.Rproj\.user$
-^\.travis\.yml$
-^src/CMakeLists.txt$
+^src/CMakeLists\.txt$
+^src/test$
+^src/include/third-party/catch\.hpp$
+^\.gitignore$

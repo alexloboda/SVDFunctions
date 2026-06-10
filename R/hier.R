@@ -37,7 +37,7 @@ matchControlsCluster <- function(cases, gmatrix, original, SVD, mean, ...) {
     good <- lam > softMinLambda && lam < softMaxLambda
     list(table = df, pvals = pvals, lambdas = lambdas, 
          minL = results$optimal_lambda, cases = cases, 
-         clusters = setNames(good, cases$id), 
+         clusters = stats::setNames(good, cases$id), 
          ncontrols = if(good) length(results$controls) else 0)
   } else {
     list(table = data.frame(), pvals = c(), lambdas = c(), minL = Inf, 
@@ -143,10 +143,10 @@ filter_variants <- function(population, ids) {
 #' Select a set of controls that populationally matches a set of cases.
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt).
 #' Intermediate values are allowed, NAs are not. Rows must already be filtered
-#' to \\code{cases$variants} and be in the same order.
+#' to \code{cases$variants} and be in the same order.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt)
-#' with missing values allowed. Rows must already match \\code{controlGMatrix}
-#' and therefore \\code{cases$variants}.
+#' with missing values allowed. Rows must already match \code{controlGMatrix}
+#' and therefore \code{cases$variants}.
 #' @param cases result of calling function readInstanceFromYml.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.

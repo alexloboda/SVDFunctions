@@ -3,7 +3,7 @@
 #' from Mclust package
 #' @param combiM combiM output of clustCombi() function
 dendrogramEstimate <- function(combiM){
-  stopifnot(class(combiM) == "list")
+  stopifnot(is.list(combiM))
   G <- length(combiM)
   curr <- 1:G
   merged <- -(1:G)
@@ -56,7 +56,7 @@ collapsingToTree <- function(collapsing) {
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
                                    minClusters = 1, clusters = 20, keepSamples = NULL) {
-  stopifnot(class(PCA) %in% c("matrix", "data.frame", "array"))
+  stopifnot(inherits(PCA, c("matrix", "data.frame", "array")))
   clResults <- mclust::Mclust(data = PCA, G = minClusters:clusters, modelNames = "VVV")
   if (is.null(clResults)) {
     stop("Couldn't fit gaussian mixed model to data. Try another range of clusters.") 
@@ -286,7 +286,6 @@ drop <- function(pca, knn_rate, mvn_rate) {
 #' @param keptSamplesFile Optional. File to save the names of kept samples.
 #' @param seed integer random seed for reproducibility. In case of 
 #' normalize_drop != 0 the seed doesn't garantee reproducibility.
-#' @import mclust
 #' @export
 prepareInstance <- function(
   gmatrix, imputationResults, controlsU, meanControl,
@@ -297,13 +296,13 @@ prepareInstance <- function(
   seed = NULL
 ) {
   if (is.null(seed)) {
-    seed <- as.integer(runif(1, 1, .Machine$integer.max))
+    seed <- as.integer(stats::runif(1, 1, .Machine$integer.max))
   }
   set.seed(seed)
 
   if (is.null(clusters)) {
     classes <- rep("Main", ncol(gmatrix))
-    clusters <- clustering(setNames(classes, colnames(gmatrix)),
+    clusters <- clustering(stats::setNames(classes, colnames(gmatrix)),
                            "Main")
   }
 
@@ -331,7 +330,7 @@ prepareInstance <- function(
 
   names(meanControl) <- rownames(controlsU)
   controlsU <- controlsU[rownames(gmatrix), ]
-  controlsU <- pracma::pinv(controlsU)
+  controlsU <- pinv(controlsU)
   meanControl <- meanControl[rownames(gmatrix)]
 
   numberOfClusters <- 2 * length(clusters$classes) - 1
@@ -399,7 +398,7 @@ getNamesFromHier <- function(hier) {
     ret <- c(getNamesFromHier(hier$split$left), 
              getNamesFromHier(hier$split$right))
     name <- paste(ret, collapse = " & ")
-    c(ret, setNames(name, hier$split$id))
+    c(ret, stats::setNames(name, hier$split$id))
   }  else {
     if (!setequal(names(hier$cluster), c("id", "name"))) {
       userError("Incorrect hierarchy section in the input YML file.")
@@ -408,7 +407,7 @@ getNamesFromHier <- function(hier) {
   }
 }
 
-readMatrix <- function(obj, nvars, name) {
+readMatrix <- function(obj, nvars, name, err) {
   raw <- obj
   if (length(obj) == 0) {
     err(paste("Missing", name, "matrix."))
@@ -447,7 +446,7 @@ readInstanceFromYml <- function(filename) {
       userError(paste0(x, " The error occurred while processing population #", i, "."))
     }
     for (obj in c("counts", "US")) {
-      x[[obj]] <- readMatrix(x[[obj]], length(inst$variants), obj)
+      x[[obj]] <- readMatrix(x[[obj]], length(inst$variants), obj, err)
     }
     if (ncol(x$counts) != 3) {
       userError("Number of columns of counts matrix in the YML file must be three.")

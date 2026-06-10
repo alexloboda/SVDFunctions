@@ -55,7 +55,7 @@ recTree <- function(tree, hier, classes) {
   }
 }
 
-update.nodes <- function(cl) {
+updateNodes <- function(cl) {
   i <- cl$hier$leafCount + 1
   cl$hier$Do(function(node) {
     if (!node$isRoot && !node$isLeaf) {
@@ -78,8 +78,8 @@ update.nodes <- function(cl) {
 #' @export
 clustering <- function(classification, hierarchy) {
   classes <- as.character(unique(classification))
-  map <- setNames(1:length(classes), classes)
-  classification <- setNames(map[as.character(classification)], names(classification))
+  map <- stats::setNames(1:length(classes), classes)
+  classification <- stats::setNames(map[as.character(classification)], names(classification))
   left <- checkTree(hierarchy, classes)
   if(length(left) != 0) {
     stop(paste0("Following classes are not mentioned in herarchy: ", left))
@@ -89,7 +89,7 @@ clustering <- function(classification, hierarchy) {
   recTree(tree, hierarchy, classes)
   obj <- structure(list(classes = classes, samples = classification,
                  hier = tree), class = "clustering")
-  update.nodes(obj)
+  updateNodes(obj)
   obj
 }
 
@@ -106,7 +106,7 @@ normalizeClustering <- function(clustering) {
   names(clustering$samples) <- samples
   clustering$hier$Do(function(node) node$id = map[[node$id]], 
                      filterFun = data.tree::isLeaf)
-  update.nodes(clustering)
+  updateNodes(clustering)
   clustering
 }
 

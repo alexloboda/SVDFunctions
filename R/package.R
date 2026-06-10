@@ -9,6 +9,3 @@
 #' A dataset containing all required information that is necessary for
 #' creating an instance that can be submitted to website \url{http://dnascore.net}.
 "publicExomesDataset"
-
-#' @importFrom stats setNames
-NULL

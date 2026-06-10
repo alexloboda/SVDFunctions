@@ -27,7 +27,7 @@ plotMatching <- function(popObj, variants, controlsU, meanControl,
   casesGenotypeMatrix <- casesGenotypeMatrix[reduced_vars, ]
   controlsGenotypeMatrix <- controlsGenotypeMatrix[reduced_vars, ]
   
-  Uinv = pracma::pinv(controlsU)
+  Uinv = pinv(controlsU)
   casesGenotypeMatrix <- casesGenotypeMatrix - meanControl
   controlsGenotypeMatrix <- controlsGenotypeMatrix - meanControl
   
@@ -57,14 +57,14 @@ plotMatching <- function(popObj, variants, controlsU, meanControl,
     
     casesDF <- data.frame(PC1 = rsCases[pc1, ], PC2 = rsCases[pc2, ], color = "case")
     
-    ggplot() + 
-     geom_point(aes(PC1, PC2, colour = "matched controls"), df[df$color == "selected",], alpha = 0.1, color = "darkred") +
-     geom_point(aes(PC1, PC2, colour = "available controls"), df[df$color == "control",], alpha = 0.03)  +
-     geom_point(aes(PC1, PC2, colour = "cases"), casesDF, alpha = 1.1, color = "darkblue") + 
-     geom_segment(aes(x = startx, y = starty, xend = endx, yend = endy, color = "PC loadings projections"), arrows, 
-                  arrow = arrow(length = unit(0.1, "inches")), size = 1.5, alpha = 0.8) +
-     geom_segment(aes(x = startx, y = starty, xend = endx, yend = endy, color = "novel PC loadings"), main_arrows, 
-                  arrow = arrow(length = unit(0.1, "inches")), size = 1.5) + 
-     xlab(paste0("PC", pc1)) + ylab(paste0("PC", pc2)) + theme_bw() 
-  } 
+    ggplot2::ggplot() +
+     ggplot2::geom_point(ggplot2::aes(PC1, PC2, colour = "matched controls"), df[df$color == "selected",], alpha = 0.1, color = "darkred") +
+     ggplot2::geom_point(ggplot2::aes(PC1, PC2, colour = "available controls"), df[df$color == "control",], alpha = 0.03)  +
+     ggplot2::geom_point(ggplot2::aes(PC1, PC2, colour = "cases"), casesDF, alpha = 1.1, color = "darkblue") +
+     ggplot2::geom_segment(ggplot2::aes(x = startx, y = starty, xend = endx, yend = endy, color = "PC loadings projections"), arrows,
+                  arrow = grid::arrow(length = grid::unit(0.1, "inches")), size = 1.5, alpha = 0.8) +
+     ggplot2::geom_segment(ggplot2::aes(x = startx, y = starty, xend = endx, yend = endy, color = "novel PC loadings"), main_arrows,
+                  arrow = grid::arrow(length = grid::unit(0.1, "inches")), size = 1.5) +
+     ggplot2::xlab(paste0("PC", pc1)) + ggplot2::ylab(paste0("PC", pc2)) + ggplot2::theme_bw()
+  }
 }

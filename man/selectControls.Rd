@@ -32,7 +32,7 @@ selectControls(
 samples. The missing values should be imputed prior calling this function.}
 
 \item{originalGenotypeMatrix}{integer genotype matrix with missing values.
-The matrix must already use integer storage mode; \\code{selectControls}
+The matrix must already use integer storage mode; \code{selectControls}
 throws an error instead of coercing it to avoid an additional full copy.}
 
 \item{casesPDs}{numeric matrix where rows are variants and columns are 
@@ -82,7 +82,7 @@ size.}
 \description{
 Finds an optimal set of controls satisfying 
 \eqn{\lambda_GC < softmax_lambda} and \eqn{\lambda_GC > softmin_lambda}
-or if none exists – will select a set of controls with
+or if none exists -- will select a set of controls with
  closest \eqn{\lambda_GC} to the range \eqn{[softmin_lambda; softmax_lambda]} 
  satisfying \eqn{\lambda_GC < max_lambda} and \eqn{\lambda_GC > min_lambda}.
 Otherwise no results will be returned. Minimal size of control set 
