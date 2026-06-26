@@ -24,7 +24,8 @@ selectControls(
   minCallRate = 0.98,
   saThreads = NULL,
   exactPrecomputeThreads = NULL,
-  exactClusterTileSize = 32L
+  exactClusterTileSize = 32L,
+  returnClusters = FALSE
 )
 }
 \arguments{
@@ -78,6 +79,18 @@ available hardware threads.}
 \item{exactClusterTileSize}{optional integer tile size used for exact
 blocked aggregation across samples inside each cluster pair.
 size.}
+
+\item{returnClusters}{logical; controls the form of the returned
+\code{controls} element. When \code{FALSE} (default) it contains sample
+names. When \code{TRUE} it contains the
+cluster identifiers instead -- the original labels supplied via
+\code{controlsClustering}, or sample names when no clusters were provided.}
+}
+\value{
+a list with the matching diagnostics (\code{lambda},
+\code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
+\code{controls} element holding either the selected sample names or, when
+\code{returnClusters = TRUE}, the selected cluster identifiers.
 }
 \description{
 Finds an optimal set of controls satisfying 

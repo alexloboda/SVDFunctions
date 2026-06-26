@@ -85,7 +85,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     std::vector<double> lambdas;
     std::vector<double> stats;
 
-    std::vector<int> optimal_controls;
+    std::vector<int> optimal_clusters;
     std::vector<size_t> optimal_groups;
     std::vector<int> lambda_i;
     std::vector<int> pvals_num;
@@ -151,14 +151,13 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     }
 
     if (!optimal_groups.empty()) {
-        optimal_controls.reserve(control_sample_size(optimal_groups));
+        optimal_clusters.reserve(optimal_groups.size());
         for (size_t group: optimal_groups) {
-            const auto& group_elements = clustering.elements(group);
-            optimal_controls.insert(optimal_controls.end(), group_elements.begin(), group_elements.end());
+            optimal_clusters.push_back(static_cast<int>(group));
         }
     }
 
-    return {std::move(optimal_controls), std::move(optimal_pvals), std::move(lambdas),
+    return {std::move(optimal_clusters), std::move(optimal_pvals), std::move(lambdas),
             std::move(stats), std::move(lambda_i), std::move(pvals_num), lambda};
 }
 

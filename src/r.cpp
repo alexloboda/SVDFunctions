@@ -180,7 +180,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     NumericVector stats(result.statistics.begin(), result.statistics.end());
     IntegerVector names(result.lambda_i.begin(), result.lambda_i.end());
     IntegerVector pvals_num(result.pvals_num.begin(), result.pvals_num.end());
-    IntegerVector optimal_controls(result.optimal_prefix.begin(), result.optimal_prefix.end());
+    IntegerVector optimal_clusters(result.optimal_prefix.begin(), result.optimal_prefix.end());
     NumericVector optimal_lambda = {result.optimal_lambda};
 
     lambda.attr("names") = names;
@@ -189,7 +189,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     ret["lambda"] = lambda;
     ret["optimal_lambda"] = optimal_lambda;
     ret["statistics"] = stats;
-    ret["controls"] = optimal_controls + 1;
+    ret["controls"] = optimal_clusters + 1;
     ret["pvals"] = pvals;
     ret["snps"] = pvals_num;
     return ret;

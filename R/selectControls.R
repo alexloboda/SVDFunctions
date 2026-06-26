@@ -1,4 +1,5 @@
 #' @useDynLib SVDFunctions, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
 NULL
 
 #' Perform quality control on a set of allele counts.
@@ -23,6 +24,30 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   stopifnot(all(!is.na(countsMatrix)))
   chisq_threshold <- stats::qchisq(1 - significance, 1)
   quality_control_impl(countsMatrix, maf, mac, chisq_threshold)
+}
+
+prepareControlsClustering <- function(controlsClustering, controlNames) {
+  if (is.null(controlsClustering)) {
+    return(list(sampleClusterIds = seq_along(controlNames) - 1L,
+                clusterLabels = controlNames))
+  }
+
+  factoredClustering <- as.factor(controlsClustering)
+  list(sampleClusterIds = as.integer(factoredClustering) - 1L,
+       clusterLabels = levels(factoredClustering))
+}
+
+resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
+                                    controlNames, returnClusters = FALSE) {
+  if (isTRUE(returnClusters)) {
+    return(clusterLabels[clusterIds])
+  }
+  if (is.null(controlNames)) {
+    return(controlNames)
+  }
+
+  samplesByCluster <- split(controlNames, sampleClusterIds)
+  unlist(samplesByCluster[as.character(clusterIds - 1L)], use.names = FALSE)
 }
 
 #' Select a set of controls that matches to a set of cases.
@@ -65,6 +90,15 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
 #' @param exactClusterTileSize optional integer tile size used for exact
 #' blocked aggregation across samples inside each cluster pair.
 #' size.
+#' @param returnClusters logical; controls the form of the returned
+#' \code{controls} element. When \code{FALSE} (default) it contains sample
+#' names. When \code{TRUE} it contains the
+#' cluster identifiers instead -- the original labels supplied via
+#' \code{controlsClustering}, or sample names when no clusters were provided.
+#' @return a list with the matching diagnostics (\code{lambda},
+#' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
+#' \code{controls} element holding either the selected sample names or, when
+#' \code{returnClusters = TRUE}, the selected cluster identifiers.
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 
@@ -73,9 +107,11 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             min = 500, max = 1000, step = 50, iterations = 100000, 
                             minCallRate = 0.98, saThreads = NULL,
                             exactPrecomputeThreads = NULL,
-                            exactClusterTileSize = 32L) {
+                            exactClusterTileSize = 32L,
+                            returnClusters = FALSE) {
   iterations <- as.integer(iterations)
   stopifnot(iterations > 0)
+  returnClusters <- isTRUE(returnClusters)
   saThreads <- if (is.null(saThreads)) 0L else as.integer(saThreads)
   exactPrecomputeThreads <- if (is.null(exactPrecomputeThreads)) 0L else as.integer(exactPrecomputeThreads)
   exactClusterTileSize <- as.integer(exactClusterTileSize)
@@ -93,13 +129,10 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   if (nrow(genotypeMatrix) != nrow(caseCounts)) {
     stop("Check dimensions of the matrices")
   }
-  cl <- controlsClustering
-  if (is.null(cl)) {
-    cl <- 0:(ncol(genotypeMatrix) - 1)
-  }
-  else {
-    cl <- as.integer(as.factor(cl)) - 1
-  }
+  clusteringInfo <- prepareControlsClustering(controlsClustering,
+                                              colnames(genotypeMatrix))
+  cl <- clusteringInfo$sampleClusterIds
+  clusterLabels <- clusteringInfo$clusterLabels
   stopifnot(all(!is.na(cl)))
   if (any(tabulate(cl + 1L) > 255L)) {
     stop("Each control cluster must contain at most 255 samples")
@@ -131,7 +164,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 saThreads, exactPrecomputeThreads,
                                 exactClusterTileSize)
   if (length(result$controls) > 0) {
-    result$controls <- colnames(gmatrix)[result$controls]
+    result$controls <- resolveSelectedControls(result$controls, cl,
+                                               clusterLabels, colnames(gmatrix),
+                                               returnClusters)
   }
   else {
     result$controls <- c()

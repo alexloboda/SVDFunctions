@@ -1,5 +1,57 @@
 context("selectControls end-to-end")
 
+test_that("internal clustering helpers preserve factor ids and legacy order", {
+  prepareControlsClustering <- getFromNamespace("prepareControlsClustering",
+                                                "SVDFunctions")
+  resolveSelectedControls <- getFromNamespace("resolveSelectedControls",
+                                              "SVDFunctions")
+
+  controlNames <- c("ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5")
+  clusteringInfo <- prepareControlsClustering(c("b", "a", "b", "c", "a"),
+                                              controlNames)
+
+  expect_equal(clusteringInfo$sampleClusterIds, c(1L, 0L, 1L, 2L, 0L))
+  expect_equal(clusteringInfo$clusterLabels, c("a", "b", "c"))
+
+  # Old C++ behaviour expanded each selected cluster in the returned order,
+  # preserving sample order within every cluster.
+  expect_equal(resolveSelectedControls(c(2L, 1L),
+                                       clusteringInfo$sampleClusterIds,
+                                       clusteringInfo$clusterLabels,
+                                       controlNames),
+               c("ctrl1", "ctrl3", "ctrl2", "ctrl5"))
+  expect_equal(resolveSelectedControls(c(2L, 1L),
+                                       clusteringInfo$sampleClusterIds,
+                                       clusteringInfo$clusterLabels,
+                                       controlNames,
+                                       returnClusters = TRUE),
+               c("b", "a"))
+})
+
+test_that("internal clustering helpers handle NULL clustering", {
+  prepareControlsClustering <- getFromNamespace("prepareControlsClustering",
+                                                "SVDFunctions")
+  resolveSelectedControls <- getFromNamespace("resolveSelectedControls",
+                                              "SVDFunctions")
+
+  controlNames <- c("ctrl1", "ctrl2", "ctrl3", "ctrl4")
+  clusteringInfo <- prepareControlsClustering(NULL, controlNames)
+
+  expect_equal(clusteringInfo$sampleClusterIds, 0:3)
+  expect_equal(clusteringInfo$clusterLabels, controlNames)
+  expect_equal(resolveSelectedControls(c(3L, 1L),
+                                       clusteringInfo$sampleClusterIds,
+                                       clusteringInfo$clusterLabels,
+                                       controlNames),
+               c("ctrl3", "ctrl1"))
+  expect_equal(resolveSelectedControls(c(3L, 1L),
+                                       clusteringInfo$sampleClusterIds,
+                                       clusteringInfo$clusterLabels,
+                                       controlNames,
+                                       returnClusters = TRUE),
+               c("ctrl3", "ctrl1"))
+})
+
 # Build a self-consistent toy problem where cases and controls are drawn from
 # the same per-variant allele frequencies. In that situation a subset of the
 # controls matches the cases well, so the matching should return a non-empty
@@ -76,3 +128,4 @@ test_that("selectControls returns a non-empty set with low lambda", {
   # stability across platforms and RNG streams.
   expect_lt(lambda, 1.3)
 })
+

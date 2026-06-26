@@ -3,3 +3,4 @@
 ^src/test$
 ^src/include/third-party/catch\.hpp$
 ^\.gitignore$
+^\.Rproj\.user$
