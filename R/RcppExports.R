@@ -13,11 +13,19 @@ select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, clust
     .Call(`_SVDFunctions_select_controls_cpp`, gmatrix, gmatrix_rs, mean, directions, cc, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, sa_threads, exact_precompute_threads, exact_cluster_tile_size)
 }
 
-parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed) {
-    .Call(`_SVDFunctions_parse_vcf`, filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed)
-}
-
 parse_binary_file <- function(variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, requiredDP, requiredGQ) {
     .Call(`_SVDFunctions_parse_binary_file`, variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, requiredDP, requiredGQ)
+}
+
+convert_to_cluster_binary <- function(binary_file, metafile, samples, sample_clusters, cluster_labels, out_binary, out_meta, requiredDP, requiredGQ) {
+    .Call(`_SVDFunctions_convert_to_cluster_binary`, binary_file, metafile, samples, sample_clusters, cluster_labels, out_binary, out_meta, requiredDP, requiredGQ)
+}
+
+parse_cluster_binary_file <- function(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons) {
+    .Call(`_SVDFunctions_parse_cluster_binary_file`, variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons)
+}
+
+parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed) {
+    .Call(`_SVDFunctions_parse_vcf`, filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed)
 }
 

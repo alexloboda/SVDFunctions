@@ -68,28 +68,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// parse_vcf
-List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix, const LogicalVector& predictMissing, const CharacterVector& regions, const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold, Rcpp::Nullable<int> seed);
-RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP gmatrixSEXP, SEXP predictMissingSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP, SEXP missingRateThresholdSEXP, SEXP seedSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const CharacterVector& >::type filename(filenameSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type samples(samplesSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type bad_positions(bad_positionsSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
-    Rcpp::traits::input_parameter< const IntegerVector& >::type DP(DPSEXP);
-    Rcpp::traits::input_parameter< const IntegerVector& >::type GQ(GQSEXP);
-    Rcpp::traits::input_parameter< const LogicalVector& >::type gmatrix(gmatrixSEXP);
-    Rcpp::traits::input_parameter< const LogicalVector& >::type predictMissing(predictMissingSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type regions(regionsSEXP);
-    Rcpp::traits::input_parameter< const CharacterVector& >::type binary_prefix(binary_prefixSEXP);
-    Rcpp::traits::input_parameter< const NumericVector& >::type missingRateThreshold(missingRateThresholdSEXP);
-    Rcpp::traits::input_parameter< Rcpp::Nullable<int> >::type seed(seedSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed));
-    return rcpp_result_gen;
-END_RCPP
-}
 // parse_binary_file
 List parse_binary_file(const CharacterVector& variants, const CharacterVector& samples, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons, const IntegerVector& requiredDP, const IntegerVector requiredGQ);
 RcppExport SEXP _SVDFunctions_parse_binary_file(SEXP variantsSEXP, SEXP samplesSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
@@ -113,13 +91,77 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// convert_to_cluster_binary
+List convert_to_cluster_binary(const CharacterVector& binary_file, const CharacterVector& metafile, const CharacterVector& samples, const IntegerVector& sample_clusters, const CharacterVector& cluster_labels, const CharacterVector& out_binary, const CharacterVector& out_meta, const IntegerVector& requiredDP, const IntegerVector& requiredGQ);
+RcppExport SEXP _SVDFunctions_convert_to_cluster_binary(SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP samplesSEXP, SEXP sample_clustersSEXP, SEXP cluster_labelsSEXP, SEXP out_binarySEXP, SEXP out_metaSEXP, SEXP requiredDPSEXP, SEXP requiredGQSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const CharacterVector& >::type binary_file(binary_fileSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type metafile(metafileSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type samples(samplesSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type sample_clusters(sample_clustersSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type cluster_labels(cluster_labelsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type out_binary(out_binarySEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type out_meta(out_metaSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type requiredDP(requiredDPSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type requiredGQ(requiredGQSEXP);
+    rcpp_result_gen = Rcpp::wrap(convert_to_cluster_binary(binary_file, metafile, samples, sample_clusters, cluster_labels, out_binary, out_meta, requiredDP, requiredGQ));
+    return rcpp_result_gen;
+END_RCPP
+}
+// parse_cluster_binary_file
+List parse_cluster_binary_file(const CharacterVector& variants, const CharacterVector& clusters, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons);
+RcppExport SEXP _SVDFunctions_parse_cluster_binary_file(SEXP variantsSEXP, SEXP clustersSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type clusters(clustersSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type regions(regionsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type binary_file(binary_fileSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type metafile(metafileSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type r_min_maf(r_min_mafSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type r_max_maf(r_max_mafSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type r_min_cr(r_min_crSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type r_min_mac(r_min_macSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type r_max_mac(r_max_macSEXP);
+    Rcpp::traits::input_parameter< const LogicalVector& >::type report_singletons(report_singletonsSEXP);
+    rcpp_result_gen = Rcpp::wrap(parse_cluster_binary_file(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons));
+    return rcpp_result_gen;
+END_RCPP
+}
+// parse_vcf
+List parse_vcf(const CharacterVector& filename, const CharacterVector& samples, const CharacterVector& bad_positions, const CharacterVector& variants, const IntegerVector& DP, const IntegerVector& GQ, const LogicalVector& gmatrix, const LogicalVector& predictMissing, const CharacterVector& regions, const CharacterVector& binary_prefix, const NumericVector& missingRateThreshold, Rcpp::Nullable<int> seed);
+RcppExport SEXP _SVDFunctions_parse_vcf(SEXP filenameSEXP, SEXP samplesSEXP, SEXP bad_positionsSEXP, SEXP variantsSEXP, SEXP DPSEXP, SEXP GQSEXP, SEXP gmatrixSEXP, SEXP predictMissingSEXP, SEXP regionsSEXP, SEXP binary_prefixSEXP, SEXP missingRateThresholdSEXP, SEXP seedSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const CharacterVector& >::type filename(filenameSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type samples(samplesSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type bad_positions(bad_positionsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type variants(variantsSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type DP(DPSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type GQ(GQSEXP);
+    Rcpp::traits::input_parameter< const LogicalVector& >::type gmatrix(gmatrixSEXP);
+    Rcpp::traits::input_parameter< const LogicalVector& >::type predictMissing(predictMissingSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type regions(regionsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type binary_prefix(binary_prefixSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type missingRateThreshold(missingRateThresholdSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<int> >::type seed(seedSEXP);
+    rcpp_result_gen = Rcpp::wrap(parse_vcf(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 4},
     {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 19},
-    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 12},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
+    {"_SVDFunctions_convert_to_cluster_binary", (DL_FUNC) &_SVDFunctions_convert_to_cluster_binary, 9},
+    {"_SVDFunctions_parse_cluster_binary_file", (DL_FUNC) &_SVDFunctions_parse_cluster_binary_file, 11},
+    {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 12},
     {NULL, NULL, 0}
 };
 

@@ -329,3 +329,274 @@ test_that("parsing multivariant lines works", {
   rownames(expected) <- c("chr1:1\tT\tG", "chr1:2\tT\t*")
   expect_equal(GT, expected)
 })
+
+# Helper that splits sample names into k clusters in a round-robin fashion and
+# returns a named vector (names = samples, values = cluster labels).
+assign_round_robin_clusters <- function(samples, k) {
+  labels <- paste0("cl", seq_len(k))
+  assignment <- labels[((seq_along(samples) - 1) %% k) + 1]
+  names(assignment) <- samples
+  assignment
+}
+
+test_that("per-cluster binary aggregation matches sample-level scan", {
+  set.seed(7)
+  srcPrefix <- paste0(tempdir(), "/cluster_src")
+  srcBin <- paste0(srcPrefix, "_bin")
+  srcMeta <- paste0(srcPrefix, "_meta")
+
+  # Canonical source binary keeps every genotype (DP = 0, GQ = 0) so that the
+  # DP/GQ thresholds applied at conversion time are exactly reproducible.
+  vcf <- scanVCF(file, DP = 0, GQ = 0, binaryPathPrefix = srcPrefix)
+  samples <- vcf$samples
+
+  clusters <- assign_round_robin_clusters(samples, 4)
+  clusterPrefix <- paste0(tempdir(), "/cluster_dst")
+  buildDP <- 20L
+
+  info <- buildClusterBinaryFromBinary(srcBin, srcMeta, clusters, clusterPrefix,
+                                       DP = buildDP, GQ = 0L)
+  clBin <- info$binaryFile
+  clMeta <- info$metafile
+
+  expect_true(file.exists(clBin))
+  expect_true(file.exists(clMeta))
+  expect_equal(sort(info$clusters), sort(unique(clusters)))
+  # On-disk layout: variants x clusters x sizeof(ClusterCounts) (3 bytes).
+  expect_equal(file.size(clBin),
+               info$variants * length(info$clusters) * 3)
+
+  regions <- c("chr2 148943492 234267016",
+               "chr7 102949810 149848267",
+               "chr10 46506985 46507378")
+
+  selectedClusters <- c("cl1", "cl3")
+  selectedSamples <- names(clusters)[clusters %in% selectedClusters]
+
+  for (mcr in c(0, 0.9)) {
+    actual <- scanClusterBinaryFile(clBin, clMeta, clusters = selectedClusters,
+                                    regions = regions, minCallRate = mcr)
+    expected <- scanBinaryFile(srcBin, srcMeta, selectedSamples,
+                               regions = regions, DP = buildDP, GQ = 0,
+                               minCallRate = mcr)
+    expect_equal(actual, expected)
+  }
+})
+
+test_that("per-cluster scan reproduces variant-level counts and MAF filters", {
+  srcPrefix <- paste0(tempdir(), "/cluster_src2")
+  srcBin <- paste0(srcPrefix, "_bin")
+  srcMeta <- paste0(srcPrefix, "_meta")
+
+  vcf <- scanVCF(file, DP = 0, GQ = 0, binaryPathPrefix = srcPrefix)
+  samples <- vcf$samples
+  storedVariants <- rownames(vcf$genotype)
+
+  clusters <- assign_round_robin_clusters(samples, 3)
+  clusterPrefix <- paste0(tempdir(), "/cluster_dst2")
+  buildDP <- 20L
+  info <- buildClusterBinaryFromBinary(srcBin, srcMeta, clusters, clusterPrefix,
+                                       DP = buildDP, GQ = 0L)
+
+  reqVariants <- head(storedVariants, 25)
+  selectedClusters <- c("cl2", "cl3")
+  selectedSamples <- names(clusters)[clusters %in% selectedClusters]
+
+  actual <- scanClusterBinaryFile(info$binaryFile, info$metafile,
+                                  clusters = selectedClusters,
+                                  variants = reqVariants, minCallRate = 0,
+                                  minMAF = 0.04)
+  expected <- scanBinaryFile(srcBin, srcMeta, selectedSamples,
+                             variants = reqVariants, DP = buildDP, GQ = 0,
+                             minCallRate = 0, minMAF = 0.04)
+  expect_equal(actual, expected)
+})
+
+test_that("per-cluster scan with all clusters equals full sample scan", {
+  srcPrefix <- paste0(tempdir(), "/cluster_src3")
+  srcBin <- paste0(srcPrefix, "_bin")
+  srcMeta <- paste0(srcPrefix, "_meta")
+
+  vcf <- scanVCF(file, DP = 0, GQ = 0, binaryPathPrefix = srcPrefix)
+  samples <- vcf$samples
+
+  clusters <- assign_round_robin_clusters(samples, 5)
+  clusterPrefix <- paste0(tempdir(), "/cluster_dst3")
+  buildDP <- 20L
+  info <- buildClusterBinaryFromBinary(srcBin, srcMeta, clusters, clusterPrefix,
+                                       DP = buildDP, GQ = 0L)
+
+  regions <- c("chr2 148943492 234267016", "chr7 102949810 149848267")
+
+  # clusters = NULL aggregates every cluster, i.e. every sample.
+  actual <- scanClusterBinaryFile(info$binaryFile, info$metafile,
+                                  clusters = NULL, regions = regions,
+                                  minCallRate = 0)
+  expected <- scanBinaryFile(srcBin, srcMeta, samples, regions = regions,
+                             DP = buildDP, GQ = 0, minCallRate = 0)
+  expect_equal(actual, expected)
+})
+
+test_that("per-cluster binary input is validated", {
+  srcPrefix <- paste0(tempdir(), "/cluster_src4")
+  srcBin <- paste0(srcPrefix, "_bin")
+  srcMeta <- paste0(srcPrefix, "_meta")
+
+  vcf <- scanVCF(file, DP = 0, GQ = 0, binaryPathPrefix = srcPrefix)
+  samples <- vcf$samples
+  clusters <- assign_round_robin_clusters(samples, 3)
+  clusterPrefix <- paste0(tempdir(), "/cluster_dst4")
+  info <- buildClusterBinaryFromBinary(srcBin, srcMeta, clusters, clusterPrefix,
+                                       DP = 20L, GQ = 0L)
+
+  # Unnamed clustering is rejected.
+  expect_error(
+    buildClusterBinaryFromBinary(srcBin, srcMeta, unname(clusters),
+                                 paste0(tempdir(), "/cluster_dst_bad"),
+                                 DP = 20L, GQ = 0L),
+    "named vector"
+  )
+
+  # Sample absent from the metadata is rejected.
+  badClusters <- clusters
+  names(badClusters)[1] <- "definitely_not_a_sample"
+  expect_error(
+    buildClusterBinaryFromBinary(srcBin, srcMeta, badClusters,
+                                 paste0(tempdir(), "/cluster_dst_bad2"),
+                                 DP = 20L, GQ = 0L),
+    "not found"
+  )
+
+  # Unknown cluster requested at scan time is rejected.
+  expect_error(
+    scanClusterBinaryFile(info$binaryFile, info$metafile,
+                          clusters = "no_such_cluster",
+                          regions = "chr2 148943492 234267016"),
+    "not found"
+  )
+
+  # Truncated cluster-size metadata is rejected.
+  brokenMeta <- paste0(tempdir(), "/cluster_dst4_broken_meta")
+  brokenLines <- readLines(info$metafile)
+  brokenLines[2] <- sub("\t.*$", "\t", brokenLines[2])
+  writeLines(brokenLines, brokenMeta)
+  expect_error(
+    scanClusterBinaryFile(info$binaryFile, brokenMeta,
+                          regions = "chr2 148943492 234267016",
+                          minCallRate = 0),
+    "incomplete cluster sizes"
+  )
+})
+
+test_that("buildClusterBinaryFromBinary warns about dropped samples", {
+  srcPrefix <- paste0(tempdir(), "/cluster_src5")
+  srcBin <- paste0(srcPrefix, "_bin")
+  srcMeta <- paste0(srcPrefix, "_meta")
+
+  vcf <- scanVCF(file, DP = 0, GQ = 0, binaryPathPrefix = srcPrefix)
+  samples <- vcf$samples
+
+  # Covering only a subset of the source samples emits a warning.
+  subset <- samples[seq_len(length(samples) %/% 2)]
+  partialClusters <- assign_round_robin_clusters(subset, 2)
+  expect_warning(
+    buildClusterBinaryFromBinary(srcBin, srcMeta, partialClusters,
+                                 paste0(tempdir(), "/cluster_dst5"),
+                                 DP = 20L, GQ = 0L),
+    "dropped"
+  )
+
+  # Full coverage does not warn.
+  fullClusters <- assign_round_robin_clusters(samples, 2)
+  expect_no_warning(
+    buildClusterBinaryFromBinary(srcBin, srcMeta, fullClusters,
+                                 paste0(tempdir(), "/cluster_dst5b"),
+                                 DP = 20L, GQ = 0L)
+  )
+})
+
+test_that("indels are matched as-is while SNVs may be flipped (binary + cluster)", {
+  # The shared CEU test VCF contains only SNVs, so a bespoke biallelic VCF is
+  # needed to exercise indel handling. It holds one SNV, one insertion and one
+  # deletion, each with both alleles observed (so MAC_filter keeps them) and
+  # counts hom_ref = 2, het = 1, hom_alt = 1.
+  samples4 <- c("S1", "S2", "S3", "S4")
+  vcfLines <- c(
+    "##fileformat=VCFv4.1",
+    paste(c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO",
+            "FORMAT", samples4), collapse = "\t"),
+    paste("1", "100", ".", "A", "G", ".", "PASS", ".", "GT:DP",
+          "0/0:30", "0/1:30", "1/1:30", "0/0:30", sep = "\t"),
+    paste("1", "200", ".", "C", "CAT", ".", "PASS", ".", "GT:DP",
+          "0/1:30", "0/0:30", "0/0:30", "1/1:30", sep = "\t"),
+    paste("1", "300", ".", "GTT", "G", ".", "PASS", ".", "GT:DP",
+          "1/1:30", "0/1:30", "0/0:30", "0/0:30", sep = "\t")
+  )
+  vcfPath <- paste0(tempdir(), "/indel_synth.vcf.gz")
+  con <- gzfile(vcfPath, "w")
+  writeLines(vcfLines, con)
+  close(con)
+
+  prefix <- paste0(tempdir(), "/indel_synth")
+  srcBin <- paste0(prefix, "_bin")
+  srcMeta <- paste0(prefix, "_meta")
+  scanVCF(vcfPath, DP = 0, GQ = 0, binaryPathPrefix = prefix)
+
+  snvAsIs <- "chr1:100\tA\tG"
+  snvFlip <- "chr1:100\tG\tA"
+  insAsIs <- "chr1:200\tC\tCAT"
+  insFlip <- "chr1:200\tCAT\tC"
+  delAsIs <- "chr1:300\tGTT\tG"
+  delFlip <- "chr1:300\tG\tGTT"
+
+  scanBin <- function(variants) {
+    scanBinaryFile(srcBin, srcMeta, samples4, variants = variants,
+                   DP = 0, GQ = 0, minCallRate = 0, minMAC = 0L)
+  }
+
+  # A flipped SNV is answered with the stored variant, reported under the
+  # requested (reversed) name and with hom_ref/hom_alt swapped.
+  asIs <- scanBin(snvAsIs)
+  flip <- scanBin(snvFlip)
+  expect_equal(rownames(asIs), snvAsIs)
+  expect_equal(rownames(flip), snvFlip)
+  expect_equal(unname(asIs[, c("hom_ref", "het", "hom_alt")]), c(2, 1, 1))
+  expect_equal(unname(flip[, "hom_ref"]), unname(asIs[, "hom_alt"]))
+  expect_equal(unname(flip[, "hom_alt"]), unname(asIs[, "hom_ref"]))
+  expect_equal(unname(flip[, "het"]), unname(asIs[, "het"]))
+
+  # Indels are matched in the stored orientation only: swapping their alleles
+  # describes a different event, so a reversed request must not match.
+  expect_equal(rownames(scanBin(insAsIs)), insAsIs)
+  expect_equal(rownames(scanBin(delAsIs)), delAsIs)
+  expect_equal(nrow(scanBin(insFlip)), 0L)
+  expect_equal(nrow(scanBin(delFlip)), 0L)
+
+  # The per-cluster scanner must show the same semantics (flipped SNVs present,
+  # flipped indels absent).
+  clusters4 <- c(S1 = "clA", S2 = "clA", S3 = "clB", S4 = "clB")
+  clPrefix <- paste0(tempdir(), "/indel_synth_cl")
+  info <- buildClusterBinaryFromBinary(srcBin, srcMeta, clusters4, clPrefix,
+                                       DP = 0L, GQ = 0L)
+
+  scanCl <- function(variants) {
+    scanClusterBinaryFile(info$binaryFile, info$metafile,
+                          clusters = c("clA", "clB"), variants = variants,
+                          minCallRate = 0, minMAC = 0L)
+  }
+
+  clAsIs <- scanCl(snvAsIs)
+  clFlip <- scanCl(snvFlip)
+  expect_equal(rownames(clAsIs), snvAsIs)
+  expect_equal(rownames(clFlip), snvFlip)
+  expect_equal(unname(clFlip[, "hom_ref"]), unname(clAsIs[, "hom_alt"]))
+  expect_equal(unname(clFlip[, "hom_alt"]), unname(clAsIs[, "hom_ref"]))
+  expect_equal(unname(clFlip[, "het"]), unname(clAsIs[, "het"]))
+  expect_equal(nrow(scanCl(insFlip)), 0L)
+  expect_equal(nrow(scanCl(delFlip)), 0L)
+
+  # Binary and cluster scans agree on the flipped SNV counts.
+  expect_equal(clFlip[, c("hom_ref", "het", "hom_alt")],
+               flip[, c("hom_ref", "het", "hom_alt")])
+})
+

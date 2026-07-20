@@ -291,3 +291,138 @@ scanBinaryFile <- function(binaryFile, metafile, samples,
   
   res
 }
+
+#' Convert a sample-level binary variant file into a per-cluster binary file.
+#'
+#' Aggregates the per-sample genotypes stored in a binary file produced by
+#' \code{\link{scanVCF}} into per-cluster genotype counts, applying a fixed
+#' read depth (\code{DP}) and genotype quality (\code{GQ}) hard threshold at
+#' conversion time. The resulting per-cluster file can be queried much faster
+#' than the sample-level file with \code{\link{scanClusterBinaryFile}}, at the
+#' cost of baking the quality thresholds into the file.
+#'
+#' Because the quality thresholds are applied while writing the cluster file,
+#' the source binary should be created with \code{DP = 0} and \code{GQ = 0}
+#' (so that no genotype is prematurely turned into a missing value) to make the
+#' aggregation reproducible for any target threshold.
+#'
+#' Per-cluster counts are stored in a single byte each, therefore every cluster
+#' must contain at most 255 samples, the same limit enforced by
+#' \code{\link{selectControls}}.
+#' @param binaryFile the name of the source (sample-level) binary file.
+#' @param metafile the name of the source metadata file.
+#' @param sampleClusters a named vector assigning samples to clusters. The names
+#' must be sample identifiers present in \code{metafile} and the values are the
+#' cluster labels. Samples in the source binary that are not listed are excluded
+#' from the output and a warning is emitted.
+#' @param outputPrefix the path prefix for the generated cluster files
+#' \code{outputPrefix_bin} and \code{outputPrefix_meta}.
+#' @param DP integer: minimum required read depth, genotypes below it are
+#' treated as missing.
+#' @param GQ integer: minimum required genotype quality, genotypes below it are
+#' treated as missing.
+#' @return invisibly, a list with the paths of the generated files
+#' (\code{binaryFile}, \code{metafile}), the number of stored variants
+#' (\code{variants}), the cluster labels (\code{clusters}) and the per-cluster
+#' sample sizes (\code{clusterSizes}).
+#' @seealso \code{\link{scanClusterBinaryFile}}, \code{\link{scanVCF}}
+#' @export
+buildClusterBinaryFromBinary <- function(binaryFile, metafile, sampleClusters,
+                                         outputPrefix, DP = 20L, GQ = 20L) {
+  binaryFile <- normalizePath(binaryFile)
+  metafile <- normalizePath(metafile)
+  stopifnot(file.exists(binaryFile))
+  stopifnot(file.exists(metafile))
+  stopifnot(length(sampleClusters) > 0)
+  if (is.null(names(sampleClusters))) {
+    stop("sampleClusters must be a named vector (names are sample identifiers)")
+  }
+  if (anyDuplicated(names(sampleClusters))) {
+    stop("sampleClusters must not contain duplicated sample identifiers")
+  }
+  DP <- as.integer(DP)
+  GQ <- as.integer(GQ)
+  stopifnot(length(DP) > 0, length(GQ) > 0)
+  stopifnot(!is.na(DP[1]), !is.na(GQ[1]))
+
+  samples <- names(sampleClusters)
+  clusterFactor <- as.factor(sampleClusters)
+  clusterIds <- as.integer(clusterFactor) - 1L
+  clusterLabels <- levels(clusterFactor)
+
+  outBin <- paste0(outputPrefix, "_bin")
+  outMeta <- paste0(outputPrefix, "_meta")
+
+  res <- convert_to_cluster_binary(binaryFile, metafile, samples, clusterIds,
+                                   clusterLabels, outBin, outMeta, DP, GQ)
+
+  totalInBinary <- as.integer(res$total_samples)
+  dropped <- totalInBinary - length(samples)
+  if (dropped > 0) {
+    warning(sprintf(paste0("sampleClusters covers %d of %d samples in the ",
+                           "source binary; %d sample(s) were dropped from the ",
+                           "cluster file."),
+                    length(samples), totalInBinary, dropped))
+  }
+
+  invisible(list(binaryFile = outBin, metafile = outMeta,
+                 variants = as.integer(res$variants),
+                 clusters = clusterLabels,
+                 clusterSizes = as.integer(table(clusterFactor))))
+}
+
+#' Scan a per-cluster binary variant file.
+#'
+#' Scan a per-cluster binary file produced by
+#' \code{\link{buildClusterBinaryFromBinary}} and collect per-variant allele
+#' counts summed over a chosen set of clusters, after applying the same quality
+#' control filters as \code{\link{scanBinaryFile}}. The read depth and genotype
+#' quality thresholds were already applied when the file was built and are not
+#' configurable here.
+#' @param binaryFile the name of the cluster binary file.
+#' @param metafile the name of the cluster metadata file.
+#' @param clusters the set of cluster labels to aggregate. If \code{NULL} all
+#' clusters stored in the file are used.
+#' @param variants the set of variants in format "chr#:# REF ALT".
+#' @param regions the set of regions [startPos, endPos] in format
+#' "chr# startPos endPos". Regions must be non-overlapping.
+#' @param minMAF numeric minimum minor allele frequency.
+#' @param maxMAF numeric maximum minor allele frequency.
+#' @param minMAC integer minimum minor allele count.
+#' @param maxMAC integer maximum minor allele count.
+#' @param reportSingletons logical if TRUE singletons will be reported.
+#' @param minCallRate numeric minimum call rate.
+#' @return matrix with columns \code{hom_ref}, \code{het}, \code{hom_alt},
+#' \code{n_variants} and \code{call_rate}; one row per reported variant or
+#' region.
+#' @seealso \code{\link{buildClusterBinaryFromBinary}}, \code{\link{scanBinaryFile}}
+#' @export
+scanClusterBinaryFile <- function(binaryFile, metafile, clusters = NULL,
+                                  variants = NULL, regions = NULL,
+                                  minMAF = 0.0, maxMAF = 1.0,
+                                  minMAC = 1L, maxMAC = .Machine$integer.max,
+                                  reportSingletons = TRUE, minCallRate = 0.9) {
+  binaryFile <- normalizePath(binaryFile)
+  metafile <- normalizePath(metafile)
+  stopifnot(file.exists(binaryFile))
+  stopifnot(file.exists(metafile))
+  minMAC <- as.integer(minMAC)
+  maxMAC <- as.integer(maxMAC)
+  clusters <- if (is.null(clusters)) character(0) else as.character(clusters)
+  variants <- if (is.null(variants)) character(0) else variants
+  regions <- if (is.null(regions)) character(0) else regions
+
+  res <- parse_cluster_binary_file(variants, clusters, regions, binaryFile,
+                                   metafile, minMAF, maxMAF, minCallRate,
+                                   minMAC, maxMAC, reportSingletons)
+  names <- res[["names"]]
+  total <- as.integer(res["total"])
+  res[["names"]] <- NULL
+  res[["total"]] <- NULL
+  res <- matrix(do.call(c, res), ncol = 4, dimnames = list(NULL, names(res)))
+  alleles <- res[, "hom_ref"] + res[, "het"] + res[, "hom_alt"]
+  res <- cbind(res, call_rate = alleles / (res[, "n_variants"] * total))
+  rownames(res) <- names
+
+  res
+}
