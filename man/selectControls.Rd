@@ -47,9 +47,10 @@ principal directions of the data in case dataset.}
 
 \item{caseCounts}{matrix with summary genotype counts from cases.}
 
-\item{controlsClustering}{cluster names for controls. Each cluster must
-contain at most 255 samples because per-cluster allele counts are stored
-in one byte during matching.}
+\item{controlsClustering}{cluster names for controls, one per matrix column.
+Each cluster must contain at most 255 samples because per-cluster allele
+counts are stored in one byte during matching. This argument is required
+when \code{genotypeMatrix} has no column names.}
 
 \item{minLambda}{minimum possible lambda.}
 
@@ -84,7 +85,8 @@ size.}
 \code{controls} element. When \code{FALSE} (default) it contains sample
 names. When \code{TRUE} it contains the
 cluster identifiers instead -- the original labels supplied via
-\code{controlsClustering}, or sample names when no clusters were provided.}
+\code{controlsClustering}, or sample names when no clusters were provided.
+Cluster identifiers are also returned when the controls have no column names.}
 }
 \value{
 a list with the matching diagnostics (\code{lambda},

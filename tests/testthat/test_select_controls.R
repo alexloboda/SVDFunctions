@@ -52,6 +52,27 @@ test_that("internal clustering helpers handle NULL clustering", {
                c("ctrl3", "ctrl1"))
 })
 
+test_that("controls without names require an explicit clustering", {
+  prepareControlsClustering <- getFromNamespace("prepareControlsClustering",
+                                                "SVDFunctions")
+  resolveSelectedControls <- getFromNamespace("resolveSelectedControls",
+                                              "SVDFunctions")
+
+  expect_error(prepareControlsClustering(NULL, NULL, 2L),
+               "must have column names")
+
+  clusteringInfo <- prepareControlsClustering(c("cluster-b", "cluster-a"),
+                                              NULL, 2L)
+  expect_equal(clusteringInfo$sampleClusterIds, c(1L, 0L))
+  expect_equal(resolveSelectedControls(c(2L, 1L),
+                                       clusteringInfo$sampleClusterIds,
+                                       clusteringInfo$clusterLabels,
+                                       NULL),
+               c("cluster-b", "cluster-a"))
+  expect_error(prepareControlsClustering("cluster-a", NULL, 2L),
+               "one entry per control")
+})
+
 # Build a self-consistent toy problem where cases and controls are drawn from
 # the same per-variant allele frequencies. In that situation a subset of the
 # controls matches the cases well, so the matching should return a non-empty
@@ -128,4 +149,3 @@ test_that("selectControls returns a non-empty set with low lambda", {
   # stability across platforms and RNG streams.
   expect_lt(lambda, 1.3)
 })
-

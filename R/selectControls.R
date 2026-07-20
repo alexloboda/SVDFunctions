@@ -26,10 +26,18 @@ checkAlleleCounts <- function(countsMatrix, maf = 0.05, mac = 10,
   quality_control_impl(countsMatrix, maf, mac, chisq_threshold)
 }
 
-prepareControlsClustering <- function(controlsClustering, controlNames) {
+prepareControlsClustering <- function(controlsClustering, controlNames,
+                                      nControls = length(controlNames)) {
   if (is.null(controlsClustering)) {
-    return(list(sampleClusterIds = seq_along(controlNames) - 1L,
+    if (is.null(controlNames)) {
+      stop(paste("genotypeMatrix must have column names when",
+                 "controlsClustering is NULL"))
+    }
+    return(list(sampleClusterIds = seq_len(nControls) - 1L,
                 clusterLabels = controlNames))
+  }
+  if (length(controlsClustering) != nControls) {
+    stop("controlsClustering must have one entry per control sample")
   }
 
   factoredClustering <- as.factor(controlsClustering)
@@ -43,7 +51,7 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
     return(clusterLabels[clusterIds])
   }
   if (is.null(controlNames)) {
-    return(controlNames)
+    return(clusterLabels[clusterIds])
   }
 
   samplesByCluster <- split(controlNames, sampleClusterIds)
@@ -70,9 +78,10 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' @param SVDReference reference basis of the left singular vectors.
 #' @param controlsMean mean value of the reference genotypes.
 #' @param caseCounts matrix with summary genotype counts from cases.
-#' @param controlsClustering cluster names for controls. Each cluster must
-#' contain at most 255 samples because per-cluster allele counts are stored
-#' in one byte during matching.
+#' @param controlsClustering cluster names for controls, one per matrix column.
+#' Each cluster must contain at most 255 samples because per-cluster allele
+#' counts are stored in one byte during matching. This argument is required
+#' when \code{genotypeMatrix} has no column names.
 #' @param minLambda minimum possible lambda.
 #' @param softMinLambda desirable minimum for lambda.
 #' @param softMaxLambda desirable maximum for lambda.
@@ -95,6 +104,7 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' names. When \code{TRUE} it contains the
 #' cluster identifiers instead -- the original labels supplied via
 #' \code{controlsClustering}, or sample names when no clusters were provided.
+#' Cluster identifiers are also returned when the controls have no column names.
 #' @return a list with the matching diagnostics (\code{lambda},
 #' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
 #' \code{controls} element holding either the selected sample names or, when
@@ -130,7 +140,8 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
     stop("Check dimensions of the matrices")
   }
   clusteringInfo <- prepareControlsClustering(controlsClustering,
-                                              colnames(genotypeMatrix))
+                                              colnames(genotypeMatrix),
+                                              ncol(genotypeMatrix))
   cl <- clusteringInfo$sampleClusterIds
   clusterLabels <- clusteringInfo$clusterLabels
   stopifnot(all(!is.na(cl)))

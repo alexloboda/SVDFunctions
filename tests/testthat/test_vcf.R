@@ -398,6 +398,15 @@ test_that("per-cluster binary aggregation matches sample-level scan", {
                                minCallRate = mcr)
     expect_equal(actual, expected)
   }
+
+  # Repeating a cluster label must not count that cluster twice.
+  withDuplicates <- scanClusterBinaryFile(clBin, clMeta,
+                                          clusters = c("cl1", "cl3", "cl1"),
+                                          regions = regions, minCallRate = 0)
+  withoutDuplicates <- scanClusterBinaryFile(clBin, clMeta,
+                                             clusters = c("cl1", "cl3"),
+                                             regions = regions, minCallRate = 0)
+  expect_equal(withDuplicates, withoutDuplicates)
 })
 
 test_that("per-cluster scan reproduces variant-level counts and MAF filters", {
@@ -616,4 +625,3 @@ test_that("indels are matched as-is while SNVs may be flipped (binary + cluster)
   expect_equal(clFlip[, c("hom_ref", "het", "hom_alt")],
                flip[, c("hom_ref", "het", "hom_alt")])
 })
-

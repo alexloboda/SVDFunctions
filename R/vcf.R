@@ -416,7 +416,7 @@ scanClusterBinaryFile <- function(binaryFile, metafile, clusters = NULL,
   stopifnot(file.exists(metafile))
   minMAC <- as.integer(minMAC)
   maxMAC <- as.integer(maxMAC)
-  clusters <- if (is.null(clusters)) character(0) else as.character(clusters)
+  clusters <- if (is.null(clusters)) character(0) else unique(as.character(clusters))
   variants <- if (is.null(variants)) character(0) else variants
   regions <- if (is.null(regions)) character(0) else regions
 

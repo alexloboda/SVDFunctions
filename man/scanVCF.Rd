@@ -58,7 +58,15 @@ metadata file prefix_meta. If not NULL corresponding files will be generated.}
 }
 \value{
 list containing genotype matrix and/or call rate matrix if 
-requested.
+requested. If
+\code{predictMissing = TRUE}, the \code{genotype} element is a list with:
+\itemize{
+  \item \code{genotype}: numeric matrix with missing values replaced by predictions
+  \item \code{predicted}: logical matrix indicating which entries were originally missing
+  \item \code{loo}: data.frame with per-variant imputation QC based on out-of-bag
+    (leave-one-out-like) predictions on observed genotypes (columns: \code{variant},
+    \code{n_observed}, \code{n_missing}, \code{oob_mae}, \code{oob_rmse}, \code{rounded_acc})
+}
 }
 \description{
 Scan .vcf or .vcf.gz files in matrix and return genotype matrix, call rate
