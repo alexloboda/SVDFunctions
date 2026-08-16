@@ -149,3 +149,85 @@ test_that("selectControls returns a non-empty set with low lambda", {
   # stability across platforms and RNG streams.
   expect_lt(lambda, 1.3)
 })
+
+# The control genotype matrix may legitimately carry more variants than the
+# cases, in an arbitrary order. selectControls must match the shared variants
+# through an index view instead of slicing the (potentially huge) control
+# matrices into copies.
+test_that("selectControls handles a superset control matrix via an index view", {
+  skip_on_cran()
+  set.seed(321)
+
+  p <- 200L            # case variants
+  extra <- 60L         # control-only variants
+  n_controls <- 120L
+  n_cases <- 50L
+  components <- 6L
+
+  af <- runif(p + extra, 0.15, 0.45)
+  drawGenotypes <- function(n, nv) {
+    m <- vapply(seq_len(nv), function(i) rbinom(n, 2, af[i]), integer(n))
+    t(m) # variants x samples
+  }
+
+  # Controls carry every variant, but in a shuffled row order.
+  controls <- drawGenotypes(n_controls, p + extra)
+  storage.mode(controls) <- "integer"
+  rownames(controls) <- paste0("v", seq_len(p + extra))
+  colnames(controls) <- paste0("ctrl", seq_len(n_controls))
+  controls <- controls[sample(p + extra), ]
+
+  # Cases only involve the first p variants, drawn from the same frequencies.
+  caseVars <- paste0("v", seq_len(p))
+  cases <- drawGenotypes(n_cases, p)
+  rownames(cases) <- caseVars
+  colnames(cases) <- paste0("case", seq_len(n_cases))
+
+  controlsMean <- rowMeans(controls)
+  svdRef <- RSpectra::svds(controls - controlsMean, k = components)$u
+  rownames(svdRef) <- rownames(controls)
+
+  pinv <- getFromNamespace("pinv", "SVDFunctions")
+  transition <- pinv(svdRef[caseVars, , drop = FALSE])
+  reducedCases <- transition %*% (cases - controlsMean[caseVars])
+  casesMean <- rowMeans(reducedCases)
+  centeredCases <- reducedCases - casesMean
+  caseSvd <- svd(centeredCases)
+  casesPDs <- (caseSvd$u %*% diag(caseSvd$d)) / sqrt(n_cases)
+
+  caseCounts <- genotypesToCounts(cases)
+
+  genotypeMatrix <- controls
+  storage.mode(genotypeMatrix) <- "double"
+
+  # The memory-saving core: a transition widened with zero columns for the
+  # control-only variants projects the full control matrix to the exact same
+  # reduced coordinates as first slicing it down to the shared variants.
+  controlVars <- rownames(controls)
+  variantRows <- match(caseVars, controlVars)
+  widened <- matrix(0, nrow(transition), length(controlVars))
+  widened[, variantRows] <- transition
+  indexViewProjection <- widened %*% genotypeMatrix
+  slicedProjection <- transition %*% genotypeMatrix[caseVars, ]
+  expect_equal(indexViewProjection, slicedProjection)
+
+  # End to end, the superset path (matched by name, no slicing) must still find
+  # a valid control set. Mis-mapping the variants would break the per-variant
+  # counts and inflate lambda well past the bound below.
+  result <- selectControls(
+    genotypeMatrix = genotypeMatrix, originalGenotypeMatrix = controls,
+    casesPDs = casesPDs, casesMean = casesMean,
+    SVDReference = svdRef, controlsMean = controlsMean,
+    caseCounts = caseCounts, caseVariants = caseVars,
+    minLambda = 0.5, softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3,
+    min = 60L, max = 100L, step = 10L, iterations = 5000L, minCallRate = 0.9
+  )
+
+  expect_true(length(result$controls) > 0)
+  expect_true(all(result$controls %in% colnames(controls)))
+  lambda <- as.numeric(result$optimal_lambda)[1]
+  expect_false(is.na(lambda))
+  expect_lt(lambda, 1.3)
+})
+
+

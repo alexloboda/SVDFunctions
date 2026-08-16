@@ -69,15 +69,24 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' is \code{min} samples for privacy preservation reasons.
 #' @param genotypeMatrix numeric matrix where rows are variants and columns are
 #' samples. The missing values should be imputed prior calling this function.
+#' Rows are identified by their variant names (\code{rownames}) and may contain
+#' a superset of \code{caseVariants}.
 #' @param originalGenotypeMatrix integer genotype matrix with missing values.
 #' The matrix must already use integer storage mode; \code{selectControls}
-#' throws an error instead of coercing it to avoid an additional full copy.
-#' @param casesPDs numeric matrix where rows are variants and columns are 
-#' principal directions of the data in case dataset.
-#' @param casesMean numeric vector representing mean per-variant genotype value.
+#' throws an error instead of coercing it to avoid an additional full copy. Its
+#' rows must correspond to those of \code{genotypeMatrix}.
+#' @param casesPDs numeric matrix of case principal directions in the PCA-like
+#' space (rows are reduced components, columns are principal directions).
+#' @param casesMean numeric vector of case means in the PCA-like space, one
+#' value per reduced component.
 #' @param SVDReference reference basis of the left singular vectors.
 #' @param controlsMean mean value of the reference genotypes.
-#' @param caseCounts matrix with summary genotype counts from cases.
+#' @param caseCounts matrix with summary genotype counts from cases, one row per
+#' case variant in the order given by \code{caseVariants}.
+#' @param caseVariants optional character vector naming the case variants in the
+#' row order of \code{caseCounts}. Every entry must occur in the row names of
+#' \code{genotypeMatrix} and \code{SVDReference}. Defaults to the control variant
+#' names, i.e. cases and controls share the same variants.
 #' @param controlsClustering cluster names for controls, one per matrix column.
 #' Each cluster must contain at most 255 samples because per-cluster allele
 #' counts are stored in one byte during matching. This argument is required
@@ -112,6 +121,7 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' @export
 selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs, 
                             casesMean, SVDReference, controlsMean, caseCounts, 
+                            caseVariants = NULL,
                             controlsClustering = NULL, minLambda = 0.75, 
                             softMinLambda = 0.9, softMaxLambda = 1.05, maxLambda = 1.3, 
                             min = 500, max = 1000, step = 50, iterations = 100000, 
@@ -136,8 +146,23 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
   }
   stopifnot(all(!is.na(genotypeMatrix)))
-  if (nrow(genotypeMatrix) != nrow(caseCounts)) {
-    stop("Check dimensions of the matrices")
+  controlVariants <- rownames(genotypeMatrix)
+  if (is.null(controlVariants)) {
+    stop("genotypeMatrix must have variant row names")
+  }
+  if (is.null(caseVariants)) {
+    caseVariants <- controlVariants
+  }
+  caseVariants <- as.character(caseVariants)
+  if (anyDuplicated(caseVariants)) {
+    stop("caseVariants must not contain duplicates")
+  }
+  if (nrow(caseCounts) != length(caseVariants)) {
+    stop("caseCounts must have one row per case variant")
+  }
+  variantRows <- match(caseVariants, controlVariants)
+  if (anyNA(variantRows)) {
+    stop("caseVariants must be a subset of the control genotype matrix rows")
   }
   clusteringInfo <- prepareControlsClustering(controlsClustering,
                                               colnames(genotypeMatrix),
@@ -150,12 +175,24 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   }
   
   names(controlsMean) <- rownames(SVDReference)
-  controlsMean <- controlsMean[rownames(genotypeMatrix)]
-  SVDReference <- SVDReference[rownames(genotypeMatrix), ]
-  transition <- pinv(SVDReference)
+  if (!all(caseVariants %in% rownames(SVDReference))) {
+    stop("Every case variant must occur in SVDReference")
+  }
+  transition <- pinv(SVDReference[caseVariants, , drop = FALSE])
+  meanOffset <- as.vector(transition %*% controlsMean[caseVariants])
   rm(SVDReference)
   
-  meanOffset <- as.vector(transition %*% controlsMean)
+  # Project the controls into the case PCA-like space through an index view over
+  # the control variants instead of slicing genotypeMatrix into a large copy:
+  # the transition is widened to every control variant with zero columns for
+  # those absent from the cases, so multiplying the full matrix yields the same
+  # reduced result as projecting only the shared variants.
+  if (length(variantRows) != length(controlVariants) ||
+      any(variantRows != seq_along(controlVariants))) {
+    widened <- matrix(0, nrow(transition), length(controlVariants))
+    widened[, variantRows] <- transition
+    transition <- widened
+  }
   genotypeMatrix <- transition %*% genotypeMatrix
   genotypeMatrix <- genotypeMatrix - meanOffset
   
@@ -167,6 +204,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 casesMean, 
                                 casesPDs, 
                                 caseCounts, 
+                                variantRows - 1L, 
                                 cl, 
                                 stats::qchisq(stats::ppoints(1e+07), df = 1), 
                                 minLambda, 

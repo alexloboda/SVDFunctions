@@ -18,12 +18,13 @@ matchControlsCluster <- function(cases, gmatrix, original, SVD, mean, ...) {
   
   checkCaseInfo(cases)
   
-  if (nrow(cases$counts) != nrow(gmatrix)){
+  if (nrow(cases$counts) != length(cases$variants)){
     userError("Something is wrong with SNP selection")
   }
   
   results <- selectControls(gmatrix, original, cases$US, cases$mean, 
-                            SVD, mean, cases$counts, ...)
+                            SVD, mean, cases$counts, caseVariants = cases$variants,
+                            ...)
   df <- data.frame(sample = results$controls, 
                    cluster = if (length(results$controls) == 0) c() else cases$id,
                    stringsAsFactors = FALSE, row.names = NULL)
@@ -142,11 +143,12 @@ filter_variants <- function(population, ids) {
 
 #' Select a set of controls that populationally matches a set of cases.
 #' @param controlGMatrix numeric matrix(0 - ref, 1 - het, 2 - both alt).
-#' Intermediate values are allowed, NAs are not. Rows must already be filtered
-#' to \code{cases$variants} and be in the same order.
+#' Intermediate values are allowed, NAs are not. Rows are named by variant and
+#' must include every entry of \code{cases$variants}; extra control variants are
+#' allowed and are matched by name through an index view rather than by slicing.
 #' @param originalControlGMatrix integer matrix(0 - ref, 1 - het, 2 - both alt)
-#' with missing values allowed. Rows must already match \code{controlGMatrix}
-#' and therefore \code{cases$variants}.
+#' with missing values allowed. Its rows must correspond to those of
+#' \code{controlGMatrix}.
 #' @param cases result of calling function readInstanceFromYml.
 #' @param clusterMergeCoef numeric coefficient of preference of merging clusters.
 #' @param ... parameters to be passed to selectControls function.
@@ -159,14 +161,12 @@ selectControlsHier <- function(controlGMatrix, originalControlGMatrix,
                                ...) {
   stopifnot(all(!is.na(controlGMatrix)))
   stopifnot(all(rownames(controlGMatrix) == rownames(originalControlGMatrix)))
-  if (!identical(rownames(controlGMatrix), cases$variants)) {
-    stop(paste(
-      "controlGMatrix and originalControlGMatrix must already be filtered to cases$variants",
-      "and use the same row order"
-    ))
+
+  if (!all(cases$variants %in% rownames(controlGMatrix))) {
+    userError("cases$variants must be a subset of the control genotype matrix rows")
   }
   
-  ret <- recSelect(controlGMatrix, originalControlGMatrix,  
+  ret <- recSelect(controlGMatrix, originalControlGMatrix,
                    cases, SVDReference, controlsMean, cases$hierarchy, 
                    clusterMergeCoef, softMinLambda = softMinLambda,
                    softMaxLambda = softMaxLambda, ...)

@@ -18,12 +18,13 @@ selectControlsHier(
 }
 \arguments{
 \item{controlGMatrix}{numeric matrix(0 - ref, 1 - het, 2 - both alt).
-Intermediate values are allowed, NAs are not. Rows must already be filtered
-to \code{cases$variants} and be in the same order.}
+Intermediate values are allowed, NAs are not. Rows are named by variant and
+must include every entry of \code{cases$variants}; extra control variants are
+allowed and are matched by name through an index view rather than by slicing.}
 
 \item{originalControlGMatrix}{integer matrix(0 - ref, 1 - het, 2 - both alt)
-with missing values allowed. Rows must already match \code{controlGMatrix}
-and therefore \code{cases$variants}.}
+with missing values allowed. Its rows must correspond to those of
+\code{controlGMatrix}.}
 
 \item{cases}{result of calling function readInstanceFromYml.}
 

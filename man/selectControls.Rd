@@ -12,6 +12,7 @@ selectControls(
   SVDReference,
   controlsMean,
   caseCounts,
+  caseVariants = NULL,
   controlsClustering = NULL,
   minLambda = 0.75,
   softMinLambda = 0.9,
@@ -30,22 +31,33 @@ selectControls(
 }
 \arguments{
 \item{genotypeMatrix}{numeric matrix where rows are variants and columns are
-samples. The missing values should be imputed prior calling this function.}
+samples. The missing values should be imputed prior calling this function.
+Rows are identified by their variant names (\code{rownames}) and may contain
+a superset of \code{caseVariants}; the matrix is never sliced down to the
+shared variants, an index view is used instead.}
 
 \item{originalGenotypeMatrix}{integer genotype matrix with missing values.
 The matrix must already use integer storage mode; \code{selectControls}
-throws an error instead of coercing it to avoid an additional full copy.}
+throws an error instead of coercing it to avoid an additional full copy. Its
+rows must correspond to those of \code{genotypeMatrix}.}
 
-\item{casesPDs}{numeric matrix where rows are variants and columns are 
-principal directions of the data in case dataset.}
+\item{casesPDs}{numeric matrix of case principal directions in the PCA-like
+space (rows are reduced components, columns are principal directions).}
 
-\item{casesMean}{numeric vector representing mean per-variant genotype value.}
+\item{casesMean}{numeric vector of case means in the PCA-like space, one
+value per reduced component.}
 
 \item{SVDReference}{reference basis of the left singular vectors.}
 
 \item{controlsMean}{mean value of the reference genotypes.}
 
-\item{caseCounts}{matrix with summary genotype counts from cases.}
+\item{caseCounts}{matrix with summary genotype counts from cases, one row per
+case variant in the order given by \code{caseVariants}.}
+
+\item{caseVariants}{optional character vector naming the case variants in the
+row order of \code{caseCounts}. Every entry must occur in the row names of
+\code{genotypeMatrix} and \code{SVDReference}. Defaults to the control variant
+names, i.e. cases and controls share the same variants.}
 
 \item{controlsClustering}{cluster names for controls, one per matrix column.
 Each cluster must contain at most 255 samples because per-cluster allele

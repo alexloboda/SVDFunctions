@@ -90,19 +90,29 @@ mvn::Vector r_to_cpp(const NumericVector& vector) {
 }
 
 
+// `variant_rows` maps every case variant (row of the case count matrix) to the
+// row of `matrix` that holds the matching control genotypes, or -1 when the
+// case variant is absent from the controls. This lets the caller pass the full
+// control genotype matrix without slicing it down to the case variants.
 std::vector<std::vector<matching::ClusterCounts>> build_cluster_counts(const IntegerMatrix& matrix,
                                                                        const std::vector<int>& clustering,
-                                                                       size_t n_clusters) {
-    int n_variants = matrix.nrow();
+                                                                       size_t n_clusters,
+                                                                       const std::vector<int>& variant_rows) {
+    int n_case_variants = static_cast<int>(variant_rows.size());
+    int n_control_variants = matrix.nrow();
     int n_samples = matrix.ncol();
     std::vector<std::vector<matching::ClusterCounts>> counts(n_clusters,
-                                                             std::vector<matching::ClusterCounts>(n_variants));
+                                                             std::vector<matching::ClusterCounts>(n_case_variants));
     for (int j = 0; j < n_samples; j++) {
         int cluster = clustering[j];
-        for (int i = 0; i < n_variants; i++) {
+        for (int cv = 0; cv < n_case_variants; cv++) {
+            int i = variant_rows[cv];
+            if (i < 0 || i >= n_control_variants) {
+                continue;
+            }
             int value = matrix(i, j);
             if (!(value == Rcpp::NA)) {
-                counts[cluster][i][value] += 1;
+                counts[cluster][cv][value] += 1;
             }
         }
     }
@@ -129,7 +139,8 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
 List select_controls_cpp(IntegerMatrix& gmatrix,
                      NumericMatrix& gmatrix_rs,
                      NumericVector& mean, NumericMatrix& directions,
-                     IntegerMatrix& cc, IntegerVector& clustering,
+                     IntegerMatrix& cc, IntegerVector& variant_rows,
+                     IntegerVector& clustering,
                      NumericVector& chi2fn,
                      double min_lambda, double lb_lambda,
                      double max_lambda, double ub_lambda,
@@ -146,6 +157,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     auto gm_rs = r_to_cpp(gmatrix_rs);
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
+    vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
 
     int min_controls = min;
     int max_controls = max;
@@ -159,7 +171,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     mvn::Clustering cl(clust_vec);
     validate_cluster_sizes(cl);
 
-    auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size());
+    auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size(), variant_rows_vec);
     matching::matching matcher(std::move(cluster_counts), std::move(gm_rs), cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
