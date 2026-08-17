@@ -154,7 +154,6 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   if (mode(genotypeMatrix) != "numeric") {
     stop("genotypeMatrix must already be stored as a numeric matrix")
   }
-  mode(genotypeMatrix) <- "numeric"
   if (!is.integer(originalGenotypeMatrix)) {
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
   }
