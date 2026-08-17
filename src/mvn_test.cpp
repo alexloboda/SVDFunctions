@@ -172,10 +172,10 @@ void precompute_cluster_range(std::vector<double>& mahalanobis_centered,
 }
 
 mvn_test::mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
-           const PrecomputeConfig& config)
+           const PrecomputeConfig& config, std::mt19937::result_type seed)
         :distances{std::make_shared<mahalanobis_distances>(X, S, mean)},
          clustering(std::make_shared<Clustering>(clst)),
-         wheel(std::random_device()()) {
+         wheel(seed) {
     if (X->cols() == 0 || X->rows() == 0) {
         throw std::invalid_argument("Matrix is empty");
     }
@@ -370,8 +370,13 @@ mvn_test::mvn_test(const mvn_test& other)
      n(other.n),
      effect_size(other.effect_size),
      latest_subset_point(other.latest_subset_point),
-     wheel{other.wheel()},
+     wheel{other.wheel},
      subset(other.subset) {}
+
+void mvn_test::reseed(std::mt19937::result_type seed) {
+    wheel.seed(seed);
+    sampler.reseed(wheel());
+}
 
 Clustering::Clustering(const std::vector<int>& clustering) {
     if (clustering.empty()) {
@@ -405,6 +410,9 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
          transformed(S.rows(), this->X->cols()),
          quadratic_form(this->X->cols()),
          centered_distance(this->X->cols()) {
+    if (S.rows() != S.cols() || S.rows() != this->X->rows() || mean.size() != this->X->rows()) {
+        throw std::invalid_argument("Covariance and mean dimensions must match the number of components (rows) of X.");
+    }
     Eigen::LDLT<Matrix> solver(S);
     if (solver.info() != Eigen::Success) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");
@@ -467,22 +475,10 @@ void mvn_test::add(unsigned int point) {
     }
 }
 
-std::unique_ptr<mvn_test> mvn_test::clone() {
-    return std::make_unique<mvn_test>(*this);
-}
-
-std::vector<double> mvn_test::loglikelihood(const std::vector<int>& ids) const {
-    std::vector<double> ret;
-    for (int id: ids) {
-        double dist = std::sqrt(distances->distance(id));
-        if (dist > 1) {
-            dist = 1.0 / (dist * dist);
-        } else {
-            dist = 1;
-        }
-        ret.push_back(std::log(dist));
-    }
-    return ret;
+std::unique_ptr<mvn_test> mvn_test::clone(std::mt19937::result_type seed) const {
+    auto copy = std::make_unique<mvn_test>(*this);
+    copy->reseed(seed);
+    return copy;
 }
 
 RandomSampler::RandomSampler(const std::vector<double>& logscale, long seed) :runif(0.0, 1.0), wheel(seed), original(logscale),
@@ -630,9 +626,13 @@ void RandomSampler::update(size_t node) {
 
 RandomSampler::RandomSampler() :runif(0.0, 1.0), wheel(0), size(0) {}
 
-RandomSampler::RandomSampler(const RandomSampler& other) :runif(0.0, 1.0), wheel(other.wheel()),
+RandomSampler::RandomSampler(const RandomSampler& other) :runif(other.runif), wheel(other.wheel),
                                                           original(other.original), segment_tree(other.segment_tree),
                                                           active_tree(other.active_tree), size(other.size) {}
+
+void RandomSampler::reseed(std::mt19937::result_type seed) {
+    wheel.seed(seed);
+}
 
 RandomSampler& RandomSampler::operator=(RandomSampler&& other) {
     runif = other.runif;

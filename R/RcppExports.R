@@ -5,12 +5,12 @@ quality_control_impl <- function(case_counts, maf, mac, chi2boundary) {
     .Call(`_SVDFunctions_quality_control_impl`, case_counts, maf, mac, chi2boundary)
 }
 
-subsample_mvn <- function(matrix, size, mean, cov) {
-    .Call(`_SVDFunctions_subsample_mvn`, matrix, size, mean, cov)
+subsample_mvn <- function(matrix, size, mean, cov, seed) {
+    .Call(`_SVDFunctions_subsample_mvn`, matrix, size, mean, cov, seed)
 }
 
-select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, sa_threads = 0L, exact_precompute_threads = 0L, exact_cluster_tile_size = 32L) {
-    .Call(`_SVDFunctions_select_controls_cpp`, gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, sa_threads, exact_precompute_threads, exact_cluster_tile_size)
+select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, seed, sa_threads = 0L, exact_precompute_threads = 0L, exact_cluster_tile_size = 32L) {
+    .Call(`_SVDFunctions_select_controls_cpp`, gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, seed, sa_threads, exact_precompute_threads, exact_cluster_tile_size)
 }
 
 parse_binary_file <- function(variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, requiredDP, requiredGQ) {

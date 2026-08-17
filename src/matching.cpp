@@ -163,6 +163,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 
 void matching::process_mvn(const Matrix& directions, Vector mean,
                            int sa_threads, int start, int ub, int step, int iterations,
+                           std::mt19937::result_type seed,
                            int exact_precompute_threads, int exact_cluster_tile_size) {
     const double EPS = 1e-18;
     Rcpp::Rcerr << "Starting processing controls space." << std::endl;
@@ -178,7 +179,7 @@ void matching::process_mvn(const Matrix& directions, Vector mean,
 
     {
         Matrix rs_cov = directions * directions.transpose();
-        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, config);
+        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, config, seed);
     }
     controls_space.reset();
     Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;

@@ -21,7 +21,7 @@ struct PrecomputeConfig {
 
 class RandomSampler {
     std::uniform_real_distribution<double> runif;
-    mutable std::mt19937 wheel;
+    std::mt19937 wheel;
     std::vector<double> original;
     std::vector<double> segment_tree;
     std::vector<size_t> active_tree;
@@ -38,6 +38,7 @@ public:
     void enable(size_t n);
     size_t sample();
     size_t n_active() const;
+    void reseed(std::mt19937::result_type seed);
 private:
     std::pair<size_t, size_t> children(size_t node) const;
     static bool is_root(size_t node);
@@ -111,13 +112,13 @@ protected:
     size_t effect_size;
     int latest_subset_point;
 
-    mutable std::mt19937 wheel;
+    std::mt19937 wheel;
 
     std::vector<size_t> subset;
 
 public:
     mvn_test(std::shared_ptr<const Matrix> X, const Clustering& clst, const Matrix& S, const Vector& mean,
-             const PrecomputeConfig& config = {});
+             const PrecomputeConfig& config, std::mt19937::result_type seed);
     mvn_test(const mvn_test&);
 
     size_t dimensions() const;
@@ -132,8 +133,12 @@ public:
     double get_normality_statistic();
 
     friend bool operator<(mvn_test& lhs, mvn_test& rhs);
-    std::vector<double> loglikelihood(const std::vector<int>& ids) const;
-    std::unique_ptr<mvn_test> clone();
+
+    // Copying leaves the source untouched, so every clone would inherit an identical
+    // random stream: callers must hand each clone its own seed. Cloning is const and
+    // thus safe to call concurrently on a shared instance.
+    std::unique_ptr<mvn_test> clone(std::mt19937::result_type seed) const;
+    void reseed(std::mt19937::result_type seed);
 
 protected:
     void remove(unsigned i);

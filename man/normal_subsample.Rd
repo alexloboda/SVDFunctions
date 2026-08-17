@@ -4,13 +4,18 @@
 \alias{normal_subsample}
 \title{Find a subset of points forming multivariate normal distribution.}
 \usage{
-normal_subsample(matrix, size)
+normal_subsample(matrix, size, seed = NULL)
 }
 \arguments{
 \item{matrix}{n by m R matrix where columns are samples and rows are
 corresponding components of vectors.}
 
 \item{size}{the number of points to be subsetted.}
+
+\item{seed}{optional integer seed for the simulated annealing. When
+\code{NULL} (default) the seed is drawn from R's generator, so
+\code{set.seed} makes the result reproducible. Reproducibility holds for a
+given build of the package on a given machine; see \code{\link{selectControls}}.}
 }
 \description{
 The method takes a set of n-dimensional points of size m and tries 

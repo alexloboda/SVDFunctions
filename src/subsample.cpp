@@ -11,20 +11,10 @@ namespace mvn {
 
 subsample::subsample(std::shared_ptr<const mvn::Matrix> X, const Clustering& clst, const mvn::Vector& mean,
                                          const mvn::Matrix& cov,
-                                         const PrecomputeConfig& config)
-                : test{std::make_shared<mvn_test>(mvn_test(X, clst, cov, mean, config))},
-          clst(clst),
-          wheel(std::random_device()()) {
-}
-
-namespace {
-
-template <class T>
-constexpr std::add_const_t<T>& const_ref(T& t) noexcept
-{
-    return t;
-}
-
+                                         const PrecomputeConfig& config,
+                                         std::mt19937::result_type seed)
+                : wheel(seed) {
+    test = std::make_shared<mvn_test>(X, clst, cov, mean, config, wheel());
 }
 
 void subsample::run(size_t iterations, size_t restarts, double t_start, double c, size_t pool_size, size_t start, size_t size_ub,
@@ -41,12 +31,18 @@ void subsample::run(size_t iterations, size_t restarts, double t_start, double c
     while (curr_size <= size_ub) {
         Rcpp::checkUserInterrupt();
         std::vector<std::future<std::shared_ptr<mvn_test>>> thread_solutions;
+        // Workers share one immutable mvn_test: every random stream they use has to be
+        // seeded here, on this thread, since drawing from a shared engine would race.
+        std::shared_ptr<const mvn_test> shared_test = test;
         for (size_t t = 0; t < restarts; t++) {
-            thread_solutions.push_back(pool.push([test = const_ref(test), iterations, t_start, curr_size, c,
-                                                         seed = wheel()]() -> std::shared_ptr<mvn_test> {
+            auto annealing_seed = wheel();
+            auto clone_seed = wheel();
+            thread_solutions.push_back(pool.push([test = shared_test, iterations, t_start, curr_size, c,
+                                                         seed = annealing_seed,
+                                                         clone_seed]() -> std::shared_ptr<mvn_test> {
                 double t = t_start;
                 std::mt19937 mersenne_wheel(seed);
-                std::shared_ptr<mvn_test> local_test = test->clone();
+                std::shared_ptr<mvn_test> local_test = test->clone(clone_seed);
                 while (local_test->subsample_size() < curr_size) {
                     local_test->add_one();
                 }

@@ -26,15 +26,15 @@ selectControls(
   saThreads = NULL,
   exactPrecomputeThreads = NULL,
   exactClusterTileSize = 32L,
-  returnClusters = FALSE
+  returnClusters = FALSE,
+  seed = NULL
 )
 }
 \arguments{
 \item{genotypeMatrix}{numeric matrix where rows are variants and columns are
 samples. The missing values should be imputed prior calling this function.
 Rows are identified by their variant names (\code{rownames}) and may contain
-a superset of \code{caseVariants}; the matrix is never sliced down to the
-shared variants, an index view is used instead.}
+a superset of \code{caseVariants}.}
 
 \item{originalGenotypeMatrix}{integer genotype matrix with missing values.
 The matrix must already use integer storage mode; \code{selectControls}
@@ -99,6 +99,16 @@ names. When \code{TRUE} it contains the
 cluster identifiers instead -- the original labels supplied via
 \code{controlsClustering}, or sample names when no clusters were provided.
 Cluster identifiers are also returned when the controls have no column names.}
+
+\item{seed}{optional integer seed for the simulated annealing. When
+\code{NULL} (default) it is drawn from R's generator, so \code{set.seed}
+fixes the selection. The same seed reproduces the same controls exactly for a
+given build of the package on a given machine, and does so independently of
+\code{saThreads} and \code{exactPrecomputeThreads}. It is not a
+cross-platform guarantee: rebuilding with different compiler flags or a
+different standard library changes the result, and because the annealing is a
+discrete search, any such difference yields an entirely different subset
+rather than a slightly different one.}
 }
 \value{
 a list with the matching diagnostics (\code{lambda},

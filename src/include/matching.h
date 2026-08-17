@@ -107,6 +107,7 @@ public:
     matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
     void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
                      int sa_threads, int start, int size_ub, int step, int iterations,
+                     std::mt19937::result_type seed,
                      int exact_precompute_threads = 0, int exact_cluster_tile_size = 32);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);

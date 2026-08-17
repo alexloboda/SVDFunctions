@@ -120,11 +120,13 @@ std::vector<std::vector<matching::ClusterCounts>> build_cluster_counts(const Int
 }
 
 // [[Rcpp::export]]
-List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mean, NumericMatrix& cov) {
+List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mean, NumericMatrix& cov,
+                   int seed) {
     std::vector<int> clusters(matrix.ncol());
     std::iota(clusters.begin(), clusters.end(), 0);
     mvn::Clustering clustering(clusters);
-    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), *r_to_cpp(cov));
+    mvn::subsample annealing(r_to_cpp(matrix), clustering, r_to_cpp(mean), *r_to_cpp(cov),
+                             mvn::PrecomputeConfig{}, static_cast<std::mt19937::result_type>(seed));
     annealing.run(1'000'000, 4, 1.0, 0.99995, std::thread::hardware_concurrency(), size[0], size[0], 1);
 
     List ret;
@@ -146,6 +148,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
                      double max_lambda, double ub_lambda,
                      int min, int max, int step,
                      int sa_iterations, double min_call_rate,
+                     int seed,
                      int sa_threads = 0,
                      int exact_precompute_threads = 0,
                      int exact_cluster_tile_size = 32) {
@@ -178,6 +181,7 @@ List select_controls_cpp(IntegerMatrix& gmatrix,
     matcher.set_hard_threshold({min_lambda, max_lambda});
     matcher.process_mvn(*principal_directions, r_to_cpp(mean), sa_pool_size,
                         min_controls, max_controls, step_clusters, iterations,
+                        static_cast<std::mt19937::result_type>(seed),
                         exact_precompute_threads, exact_cluster_tile_size);
     principal_directions.reset();
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });

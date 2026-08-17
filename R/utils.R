@@ -14,6 +14,18 @@ pinv <- function(m, tol = NULL) {
     ((1 / s$d[positive]) * t(s$u[, positive, drop = FALSE]))
 }
 
+# Seeds for the C++ side. Drawing the default from R's own generator is what
+# makes set.seed() reach the simulated annealing: the C++ code has no access to
+# R's RNG state, so the seed has to be handed over explicitly.
+resolveSeed <- function(seed) {
+  if (is.null(seed)) {
+    seed <- stats::runif(1, 1, .Machine$integer.max)
+  }
+  seed <- as.integer(seed)
+  stopifnot(length(seed) == 1, !is.na(seed), seed > 0)
+  seed
+}
+
 # Column names used inside ggplot2::aes() in the plotting helpers. Declaring
 # them keeps R CMD check from reporting "no visible binding" notes.
 utils::globalVariables(c(

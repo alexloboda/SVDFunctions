@@ -8,7 +8,12 @@
 #' @param matrix n by m R matrix where columns are samples and rows are
 #' corresponding components of vectors.
 #' @param size the number of points to be subsetted.
+#' @param seed optional integer seed for the simulated annealing. When
+#' \code{NULL} (default) the seed is drawn from R's generator, so
+#' \code{set.seed} makes the result reproducible. Reproducibility holds for a
+#' given build of the package on a given machine; see \code{\link{selectControls}}.
 #' @export
-normal_subsample <- function(matrix, size) {
-  subsample_mvn(matrix, size, colMeans(matrix), stats::cov(t(matrix)))
+normal_subsample <- function(matrix, size, seed = NULL) {
+  subsample_mvn(matrix, size, rowMeans(matrix), stats::cov(t(matrix)),
+                resolveSeed(seed))
 }

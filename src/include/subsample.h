@@ -10,13 +10,15 @@ class subsample {
 
     std::vector<std::vector<size_t>> best;
     std::vector<double> best_stat;
-    Clustering clst;
 
+    // Sole source of randomness for the whole search: every worker's stream is seeded
+    // from here, on the dispatching thread. Same seed, same build, same machine ->
+    // same answer; see the note on clone() in mvn_test.h.
     std::mt19937 wheel;
 public:
     subsample();
     subsample(std::shared_ptr<const Matrix> X, const Clustering& clst, const Vector& mean, const Matrix& cov,
-              const PrecomputeConfig& config = {});
+              const PrecomputeConfig& config, std::mt19937::result_type seed);
     subsample(subsample&&) = default;
     subsample& operator=(subsample&& other) = default;
 

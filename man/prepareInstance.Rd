@@ -53,8 +53,11 @@ from the package.}
 
 \item{keptSamplesFile}{Optional. File to save the names of kept samples.}
 
-\item{seed}{integer random seed for reproducibility. In case of 
-normalize_drop != 0 the seed doesn't garantee reproducibility.}
+\item{seed}{integer random seed for reproducibility. It is seeded into R's
+generator, from which the simulated annealing in \code{normal_subsample}
+draws its own seed, so the whole pipeline is reproducible for a given build
+of the package on a given machine. It is not a cross-platform guarantee: see
+\code{\link{selectControls}} for what does and does not carry over.}
 }
 \description{
 Prepare instance and write yaml file from QC-ed gmatrix.

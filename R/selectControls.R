@@ -108,10 +108,19 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' @param exactClusterTileSize optional integer tile size used for exact
 #' blocked aggregation across samples inside each cluster pair.
 #' size.
+#' @param seed optional integer seed for the simulated annealing. When
+#' \code{NULL} (default) it is drawn from R's generator, so \code{set.seed}
+#' fixes the selection. The same seed reproduces the same controls exactly for a
+#' given build of the package on a given machine, and does so independently of
+#' \code{saThreads} and \code{exactPrecomputeThreads}. It is not a
+#' cross-platform guarantee: rebuilding with different compiler flags or a
+#' different standard library changes the result, and because the annealing is a
+#' discrete search, any such difference yields an entirely different subset
+#' rather than a slightly different one.
 #' @param returnClusters logical; controls the form of the returned
 #' \code{controls} element. When \code{FALSE} (default) it contains sample
 #' names. When \code{TRUE} it contains the
-#' cluster identifiers instead -- the original labels supplied via
+#' cluster identifiers instead -- the origin.al labels supplied via
 #' \code{controlsClustering}, or sample names when no clusters were provided.
 #' Cluster identifiers are also returned when the controls have no column names.
 #' @return a list with the matching diagnostics (\code{lambda},
@@ -128,7 +137,8 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             minCallRate = 0.98, saThreads = NULL,
                             exactPrecomputeThreads = NULL,
                             exactClusterTileSize = 32L,
-                            returnClusters = FALSE) {
+                            returnClusters = FALSE, seed = NULL) {
+  seed <- resolveSeed(seed)
   iterations <- as.integer(iterations)
   stopifnot(iterations > 0)
   returnClusters <- isTRUE(returnClusters)
@@ -141,6 +151,9 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
+  if (mode(genotypeMatrix) != "numeric") {
+    stop("genotypeMatrix must already be stored as a numeric matrix")
+  }
   mode(genotypeMatrix) <- "numeric"
   if (!is.integer(originalGenotypeMatrix)) {
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
@@ -210,6 +223,7 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                                 minLambda, 
                                 softMinLambda, maxLambda, softMaxLambda, min, 
                                 max, step, iterations, minCallRate,
+                                seed,
                                 saThreads, exactPrecomputeThreads,
                                 exactClusterTileSize)
   if (length(result$controls) > 0) {
