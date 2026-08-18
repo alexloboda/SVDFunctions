@@ -28,11 +28,6 @@ contiguously, which is what lets \code{\link{prepareControlsSpace}} and
 \code{\link{matchControlCandidates}} stream the matrix one variant at a time
 instead of holding it in memory.
 }
-\details{
-The matrix is written straight from R's memory without an intermediate copy,
-but it does have to exist to be written: the point of the format is that
-every later run reads it without ever materialising it again.
-}
 \seealso{
 \code{\link{readControlsMatrixInfo}},
 \code{\link{collapseControlsMatrix}}, \code{\link{selectControlsFromFiles}}

@@ -209,6 +209,33 @@ prepareControlsSpace.character <- function(genotypeMatrix, SVDReference, control
                      controlsClustering, project)
 }
 
+#' Point a prepared control space at a different set of cases.
+#'
+#' \code{\link{prepareControlsSpace}} splits into a part that depends only on
+#' the controls -- the reduced coordinates, which are the expensive bit -- and a
+#' part that describes the cases, namely the mean and covariance the subsample
+#' should match. Only the latter changes when the same controls are matched
+#' against one case cluster after another, as
+#' \code{\link{selectControlsHier}} does, so the coordinates can be computed
+#' once and re-aimed.
+#' @param space a list as returned by \code{\link{prepareControlsSpace}}.
+#' @inheritParams selectControls
+#' @return \code{space} with its \code{mean} and \code{cov} replaced.
+#' @seealso \code{\link{prepareControlsSpace}}
+#' @export
+retargetControlsSpace <- function(space, casesMean, casesPDs) {
+  if (!is.list(space) || is.null(space$points)) {
+    stop("space must be a list as returned by prepareControlsSpace")
+  }
+  space$mean <- casesMean
+  space$cov <- tcrossprod(as.matrix(casesPDs))
+  if (length(space$mean) != nrow(space$points) ||
+      nrow(space$cov) != nrow(space$points)) {
+    stop("casesMean and casesPDs must match the components of space$points")
+  }
+  space
+}
+
 #' Select multivariate normal subsamples of a set of points.
 #'
 #' Second stage of \code{\link{selectControls}}, and a self-contained
@@ -293,11 +320,6 @@ mvnSubsampleClusters <- function(points, mean, cov, clusterIds = NULL,
                              threads, precomputeThreads, clusterTileSize)
 }
 
-# The chi-squared quantile table the lambda_GC estimate is read off.
-matchingChisqTable <- function() {
-  stats::qchisq(stats::ppoints(1e+07), df = 1)
-}
-
 validateCandidates <- function(candidates) {
   if (!is.list(candidates) || is.null(candidates$clusters) ||
       is.null(candidates$statistics)) {
@@ -317,91 +339,79 @@ validateClusterIds <- function(clusterIds, nSamples) {
   clusterIds
 }
 
-#' Pick the genetically best matching subset among control candidates.
+#' Precompute the control side of the matching stage.
 #'
-#' Third stage of \code{\link{selectControls}}, and the only one that looks at
-#' genotypes. For every candidate subset produced by
-#' \code{\link{mvnSubsampleClusters}} it recomputes the per-variant control
-#' counts, applies call rate and allele count quality control, derives per-variant
-#' association p-values against the case counts and from those the genomic
-#' inflation factor \eqn{\lambda_GC}. It then keeps the candidates within
-#' \eqn{[minLambda; maxLambda]} and prefers the ones inside
-#' \eqn{[softMinLambda; softMaxLambda]}, falling back to the one closest to that
-#' range.
+#' Collapses the control genotypes into the per-cluster allele counts
+#' \code{\link{matchControlCandidates}} scores candidates against, and with them
+#' the chi-squared quantile table the genomic inflation factor is read off.
+#' Neither depends on the cases, so when the same controls are matched against
+#' one case cluster after another -- as \code{\link{selectControlsHier}} does --
+#' this work is done once instead of once per cluster.
 #'
-#' The controls can be given as a matrix, as the path of a raw genotype matrix
-#' written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, or as
-#' the path of a per-cluster counts file written by
-#' \code{\link{collapseControlsMatrix}}. The collapsed file is the cheapest of
-#' the three: it already holds exactly the counts this stage needs, so nothing is
-#' recomputed and no individual genotype is read. It also carries its own
-#' clustering, so \code{clusterIds} defaults to the one it was built with.
-#' @param originalGenotypeMatrix either the integer control genotype matrix
-#' described in \code{\link{selectControls}}, or the path of a control matrix
-#' file holding raw genotypes or collapsed per-cluster counts.
-#' @param candidates list as returned by \code{\link{mvnSubsampleClusters}}, with
-#' a \code{clusters} element holding one-based cluster ids per candidate and a
-#' matching \code{statistics} element.
+#' The controls may be a matrix, a raw genotype file written by
+#' \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, or a per-cluster
+#' counts file from \code{\link{collapseControlsMatrix}}. The result holds a
+#' pointer to native memory: it is valid for the session that created it and does
+#' not survive being saved and reloaded.
+#' @param originalGenotypeMatrix the control genotypes, as a matrix or a path.
 #' @param clusterIds one-based cluster id per control sample, as returned by
 #' \code{\link{prepareControlsSpace}}. For a collapsed counts file it defaults to
 #' the clustering stored in the file.
 #' @param variantRows optional one-based rows of \code{originalGenotypeMatrix}
-#' holding the case variants, in the row order of \code{caseCounts}. Defaults to
-#' every row, i.e. cases and controls share the same variants in the same order.
-#' @param caseVariants optional names of the case variants, in the row order of
-#' \code{caseCounts}. Only for the file backed method, where it is resolved
-#' against the variant names stored in the file instead of \code{variantRows}.
+#' holding the case variants, in the row order the case counts will use. Defaults
+#' to every row.
+#' @param caseVariants optional names of the case variants instead of
+#' \code{variantRows}. Only for the file backed method, where they are resolved
+#' against the variant names stored in the file.
 #' @param ... passed to the method.
-#' @inheritParams selectControls
-#' @return a list with the matching diagnostics (\code{lambda},
-#' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
-#' \code{controls} element holding the one-based cluster ids of the selected
-#' candidate, empty when no candidate satisfied the hard lambda bounds.
-#' @seealso \code{\link{collapseControlsMatrix}}
+#' @return an object of class \code{clusterCounts}.
+#' @seealso \code{\link{matchControlCandidates}}
 #' @export
-matchControlCandidates <- function(originalGenotypeMatrix, ...) {
-  UseMethod("matchControlCandidates")
+prepareClusterCounts <- function(originalGenotypeMatrix, ...) {
+  UseMethod("prepareClusterCounts")
 }
 
-#' @rdname matchControlCandidates
+newClusterCounts <- function(ptr, nClusters, nSamples) {
+  structure(list(ptr = ptr,
+                 nVariants = prepared_cluster_counts_variants_cpp(ptr),
+                 nClusters = nClusters,
+                 nSamples = nSamples,
+                 # Depends on nothing, costs seconds and tens of megabytes to
+                 # build, and is needed once per matching run: carried here so a
+                 # hierarchy of case clusters pays for it once.
+                 chisq = stats::qchisq(stats::ppoints(1e+07), df = 1)),
+            class = "clusterCounts")
+}
+
 #' @export
-matchControlCandidates.matrix <- function(originalGenotypeMatrix, caseCounts,
-                                          candidates, clusterIds,
-                                          variantRows = NULL, minLambda = 0.75,
-                                          softMinLambda = 0.9, softMaxLambda = 1.05,
-                                          maxLambda = 1.3, min = 500,
-                                          minCallRate = 0.98, ...) {
+print.clusterCounts <- function(x, ...) {
+  cat(sprintf("<clusterCounts: %d variants x %d clusters over %d samples>\n",
+              x$nVariants, x$nClusters, x$nSamples))
+  invisible(x)
+}
+
+#' @rdname prepareClusterCounts
+#' @export
+prepareClusterCounts.matrix <- function(originalGenotypeMatrix, clusterIds,
+                                        variantRows = NULL, ...) {
   if (!is.integer(originalGenotypeMatrix)) {
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
   }
-  validateCandidates(candidates)
   clusterIds <- validateClusterIds(clusterIds, ncol(originalGenotypeMatrix))
-  caseCounts <- as.matrix(caseCounts)
   if (is.null(variantRows)) {
     variantRows <- seq_len(nrow(originalGenotypeMatrix))
   }
-  variantRows <- as.integer(variantRows)
-  if (nrow(caseCounts) != length(variantRows)) {
-    stop("caseCounts must have one row per case variant")
-  }
-
-  match_controls_cpp(originalGenotypeMatrix, caseCounts, variantRows - 1L,
-                     clusterIds - 1L,
-                     lapply(candidates$clusters, as.integer),
-                     as.numeric(candidates$statistics),
-                     matchingChisqTable(),
-                     minLambda, softMinLambda, maxLambda, softMaxLambda,
-                     min, minCallRate)
+  ptr <- prepare_cluster_counts_cpp(originalGenotypeMatrix,
+                                    as.integer(variantRows) - 1L,
+                                    clusterIds - 1L)
+  newClusterCounts(ptr, max(clusterIds), length(clusterIds))
 }
 
-#' @rdname matchControlCandidates
+#' @rdname prepareClusterCounts
 #' @export
-matchControlCandidates.character <- function(originalGenotypeMatrix, caseCounts,
-                                             candidates, clusterIds = NULL,
-                                             variantRows = NULL, caseVariants = NULL,
-                                             minLambda = 0.75, softMinLambda = 0.9,
-                                             softMaxLambda = 1.05, maxLambda = 1.3,
-                                             min = 500, minCallRate = 0.98, ...) {
+prepareClusterCounts.character <- function(originalGenotypeMatrix, clusterIds = NULL,
+                                           variantRows = NULL, caseVariants = NULL,
+                                           ...) {
   path <- path.expand(originalGenotypeMatrix)
   info <- readControlsMatrixInfo(path)
   collapsed <- info$dtype == "clusterCounts"
@@ -409,8 +419,6 @@ matchControlCandidates.character <- function(originalGenotypeMatrix, caseCounts,
     stop(paste("matching needs a matrix written with dtype \"u8\" or collapsed",
                "cluster counts"))
   }
-  validateCandidates(candidates)
-
   if (is.null(clusterIds)) {
     if (collapsed) {
       if (any(info$colweights < 1L)) {
@@ -424,22 +432,92 @@ matchControlCandidates.character <- function(originalGenotypeMatrix, caseCounts,
     }
   }
   clusterIds <- validateClusterIds(clusterIds, sum(info$colweights))
-
-  caseCounts <- as.matrix(caseCounts)
   if (is.null(variantRows)) {
     variantRows <- controlsMatrixVariantRows(info, caseVariants)
   }
-  variantRows <- as.integer(variantRows)
-  if (nrow(caseCounts) != length(variantRows)) {
+  ptr <- prepare_cluster_counts_file_cpp(path, as.integer(variantRows) - 1L,
+                                         clusterIds - 1L)
+  newClusterCounts(ptr, max(clusterIds), length(clusterIds))
+}
+
+#' Pick the genetically best matching subset among control candidates.
+#'
+#' Third stage of \code{\link{selectControls}}, and the only one that looks at
+#' genotypes. For every candidate subset produced by
+#' \code{\link{mvnSubsampleClusters}} it recomputes the per-variant control
+#' counts, applies call rate and allele count quality control, derives per-variant
+#' association p-values against the case counts and from those the genomic
+#' inflation factor \eqn{\lambda_GC}. It then keeps the candidates within
+#' \eqn{[minLambda; maxLambda]} and prefers the ones inside
+#' \eqn{[softMinLambda; softMaxLambda]}, falling back to the one closest to that
+#' range.
+#'
+#' The controls can be given as a matrix, as the path of a raw genotype matrix
+#' written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, as the
+#' path of a per-cluster counts file written by
+#' \code{\link{collapseControlsMatrix}}, or as the object
+#' \code{\link{prepareClusterCounts}} returns. The first three all collapse the
+#' controls first and then score, so they are shorthand for the last one; pass
+#' the prepared object directly when several sets of cases are matched against
+#' the same controls.
+#' @param originalGenotypeMatrix the controls: an integer matrix as described in
+#' \code{\link{selectControls}}, the path of a control matrix file, or prepared
+#' cluster counts.
+#' @param candidates list as returned by \code{\link{mvnSubsampleClusters}}, with
+#' a \code{clusters} element holding one-based cluster ids per candidate and a
+#' matching \code{statistics} element.
+#' @inheritParams prepareClusterCounts
+#' @inheritParams selectControls
+#' @return a list with the matching diagnostics (\code{lambda},
+#' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
+#' \code{controls} element holding the one-based cluster ids of the selected
+#' candidate, empty when no candidate satisfied the hard lambda bounds.
+#' @seealso \code{\link{prepareClusterCounts}}, \code{\link{collapseControlsMatrix}}
+#' @export
+matchControlCandidates <- function(originalGenotypeMatrix, ...) {
+  UseMethod("matchControlCandidates")
+}
+
+#' @rdname matchControlCandidates
+#' @export
+matchControlCandidates.clusterCounts <- function(originalGenotypeMatrix, caseCounts,
+                                                 candidates, minLambda = 0.75,
+                                                 softMinLambda = 0.9,
+                                                 softMaxLambda = 1.05,
+                                                 maxLambda = 1.3, min = 500,
+                                                 minCallRate = 0.98, ...) {
+  counts <- originalGenotypeMatrix
+  validateCandidates(candidates)
+  caseCounts <- as.matrix(caseCounts)
+  if (nrow(caseCounts) != counts$nVariants) {
     stop("caseCounts must have one row per case variant")
   }
 
-  match_controls_file_cpp(path, caseCounts, variantRows - 1L, clusterIds - 1L,
-                          lapply(candidates$clusters, as.integer),
-                          as.numeric(candidates$statistics),
-                          matchingChisqTable(),
-                          minLambda, softMinLambda, maxLambda, softMaxLambda,
-                          min, minCallRate)
+  match_prepared_cpp(counts$ptr, caseCounts,
+                     lapply(candidates$clusters, as.integer),
+                     as.numeric(candidates$statistics), counts$chisq,
+                     minLambda, softMinLambda, maxLambda, softMaxLambda,
+                     min, minCallRate)
+}
+
+#' @rdname matchControlCandidates
+#' @export
+matchControlCandidates.matrix <- function(originalGenotypeMatrix, caseCounts,
+                                          candidates, clusterIds,
+                                          variantRows = NULL, ...) {
+  counts <- prepareClusterCounts(originalGenotypeMatrix, clusterIds, variantRows)
+  matchControlCandidates(counts, caseCounts, candidates, ...)
+}
+
+#' @rdname matchControlCandidates
+#' @export
+matchControlCandidates.character <- function(originalGenotypeMatrix, caseCounts,
+                                             candidates, clusterIds = NULL,
+                                             variantRows = NULL, caseVariants = NULL,
+                                             ...) {
+  counts <- prepareClusterCounts(originalGenotypeMatrix, clusterIds, variantRows,
+                                 caseVariants)
+  matchControlCandidates(counts, caseCounts, candidates, ...)
 }
 
 # Stages two and three plus the resolution of the selected clusters back to
@@ -467,6 +545,58 @@ runControlSelection <- function(space, match, sampleNames, returnClusters, min, 
     result$controls <- c()
   }
   result
+}
+
+# Runs the pipeline against an already prepared space and counts, re-aiming the
+# space at this particular set of cases. The trailing ... swallows the stage one
+# arguments the caller may still be carrying, which were consumed when the space
+# was built.
+selectWithPrepared <- function(space, counts, sampleNames, casesMean, casesPDs,
+                               caseCounts, minLambda = 0.75, softMinLambda = 0.9,
+                               softMaxLambda = 1.05, maxLambda = 1.3, min = 500,
+                               max = 1000, step = 50, iterations = 100000,
+                               minCallRate = 0.98, saThreads = NULL,
+                               exactPrecomputeThreads = NULL,
+                               exactClusterTileSize = 32L, returnClusters = FALSE,
+                               seed = NULL, ...) {
+  seed <- resolveSeed(seed)
+  space <- retargetControlsSpace(space, casesMean, casesPDs)
+  if (nrow(as.matrix(caseCounts)) != counts$nVariants) {
+    stop("caseCounts must have one row per case variant")
+  }
+
+  match <- function(candidates) {
+    matchControlCandidates(counts, caseCounts, candidates, minLambda = minLambda,
+                           softMinLambda = softMinLambda,
+                           softMaxLambda = softMaxLambda, maxLambda = maxLambda,
+                           min = min, minCallRate = minCallRate)
+  }
+
+  runControlSelection(space, match, sampleNames, isTRUE(returnClusters), min, max,
+                      step, iterations, seed, saThreads, exactPrecomputeThreads,
+                      exactClusterTileSize)
+}
+
+# Checks that a control matrix file describes the same controls the space was
+# built from, and reports the sample names to label the selection with. A
+# collapsed file keeps no samples, so it reports none and the selection comes
+# back as cluster identifiers.
+controlsFileSampleNames <- function(originalFile, space) {
+  info <- readControlsMatrixInfo(originalFile)
+  if (info$dtype == "clusterCounts") {
+    if (!identical(info$colnames, space$clusterLabels) ||
+        !identical(as.integer(info$colweights),
+                   as.integer(tabulate(space$clusterIds, length(info$colnames))))) {
+      stop(paste("the cluster counts file was collapsed over a different",
+                 "clustering than the one prepareControlsSpace resolved"))
+    }
+    return(NULL)
+  }
+  if (!identical(info$colnames, space$sampleNames)) {
+    stop(paste("genotypeFile and originalFile must hold the same samples in",
+               "the same order"))
+  }
+  info$colnames
 }
 
 #' Select a set of controls that matches to a set of cases.
@@ -646,24 +776,9 @@ selectControlsFromFiles <- function(genotypeFile, originalFile, casesPDs,
     stop("caseCounts must have one row per case variant")
   }
 
-  info <- readControlsMatrixInfo(originalFile)
-  if (info$dtype == "clusterCounts") {
-    if (!identical(info$colnames, space$clusterLabels) ||
-        !identical(as.integer(info$colweights),
-                   as.integer(tabulate(space$clusterIds, length(info$colnames))))) {
-      stop(paste("the cluster counts file was collapsed over a different",
-                 "clustering than the one prepareControlsSpace resolved"))
-    }
-    # No samples survive in a collapsed file, so the selection can only be
-    # reported as cluster identifiers.
-    sampleNames <- NULL
-  } else {
-    if (!identical(info$colnames, space$sampleNames)) {
-      stop(paste("genotypeFile and originalFile must hold the same samples in",
-                 "the same order"))
-    }
-    sampleNames <- info$colnames
-  }
+  # No samples survive in a collapsed file, so the selection can only be
+  # reported as cluster identifiers.
+  sampleNames <- controlsFileSampleNames(originalFile, space)
 
   match <- function(candidates) {
     matchControlCandidates(originalFile, caseCounts, candidates,

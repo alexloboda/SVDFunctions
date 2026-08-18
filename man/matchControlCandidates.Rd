@@ -2,11 +2,25 @@
 % Please edit documentation in R/selectControls.R
 \name{matchControlCandidates}
 \alias{matchControlCandidates}
+\alias{matchControlCandidates.clusterCounts}
 \alias{matchControlCandidates.matrix}
 \alias{matchControlCandidates.character}
 \title{Pick the genetically best matching subset among control candidates.}
 \usage{
 matchControlCandidates(originalGenotypeMatrix, ...)
+
+\method{matchControlCandidates}{clusterCounts}(
+  originalGenotypeMatrix,
+  caseCounts,
+  candidates,
+  minLambda = 0.75,
+  softMinLambda = 0.9,
+  softMaxLambda = 1.05,
+  maxLambda = 1.3,
+  min = 500,
+  minCallRate = 0.98,
+  ...
+)
 
 \method{matchControlCandidates}{matrix}(
   originalGenotypeMatrix,
@@ -14,12 +28,6 @@ matchControlCandidates(originalGenotypeMatrix, ...)
   candidates,
   clusterIds,
   variantRows = NULL,
-  minLambda = 0.75,
-  softMinLambda = 0.9,
-  softMaxLambda = 1.05,
-  maxLambda = 1.3,
-  min = 500,
-  minCallRate = 0.98,
   ...
 )
 
@@ -30,19 +38,13 @@ matchControlCandidates(originalGenotypeMatrix, ...)
   clusterIds = NULL,
   variantRows = NULL,
   caseVariants = NULL,
-  minLambda = 0.75,
-  softMinLambda = 0.9,
-  softMaxLambda = 1.05,
-  maxLambda = 1.3,
-  min = 500,
-  minCallRate = 0.98,
   ...
 )
 }
 \arguments{
-\item{originalGenotypeMatrix}{either the integer control genotype matrix
-described in \code{\link{selectControls}}, or the path of a control matrix
-file holding raw genotypes or collapsed per-cluster counts.}
+\item{originalGenotypeMatrix}{the controls: an integer matrix as described in
+\code{\link{selectControls}}, the path of a control matrix file, or prepared
+cluster counts.}
 
 \item{...}{passed to the method.}
 
@@ -52,14 +54,6 @@ case variant in the order given by \code{caseVariants}.}
 \item{candidates}{list as returned by \code{\link{mvnSubsampleClusters}}, with
 a \code{clusters} element holding one-based cluster ids per candidate and a
 matching \code{statistics} element.}
-
-\item{clusterIds}{one-based cluster id per control sample, as returned by
-\code{\link{prepareControlsSpace}}. For a collapsed counts file it defaults to
-the clustering stored in the file.}
-
-\item{variantRows}{optional one-based rows of \code{originalGenotypeMatrix}
-holding the case variants, in the row order of \code{caseCounts}. Defaults to
-every row, i.e. cases and controls share the same variants in the same order.}
 
 \item{minLambda}{minimum possible lambda.}
 
@@ -73,9 +67,17 @@ every row, i.e. cases and controls share the same variants in the same order.}
 
 \item{minCallRate}{numeric minimal call rate for SNP to be considered.}
 
-\item{caseVariants}{optional names of the case variants, in the row order of
-\code{caseCounts}. Only for the file backed method, where it is resolved
-against the variant names stored in the file instead of \code{variantRows}.}
+\item{clusterIds}{one-based cluster id per control sample, as returned by
+\code{\link{prepareControlsSpace}}. For a collapsed counts file it defaults to
+the clustering stored in the file.}
+
+\item{variantRows}{optional one-based rows of \code{originalGenotypeMatrix}
+holding the case variants, in the row order the case counts will use. Defaults
+to every row.}
+
+\item{caseVariants}{optional names of the case variants instead of
+\code{variantRows}. Only for the file backed method, where they are resolved
+against the variant names stored in the file.}
 }
 \value{
 a list with the matching diagnostics (\code{lambda},
@@ -96,13 +98,14 @@ range.
 }
 \details{
 The controls can be given as a matrix, as the path of a raw genotype matrix
-written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, or as
-the path of a per-cluster counts file written by
-\code{\link{collapseControlsMatrix}}. The collapsed file is the cheapest of
-the three: it already holds exactly the counts this stage needs, so nothing is
-recomputed and no individual genotype is read. It also carries its own
-clustering, so \code{clusterIds} defaults to the one it was built with.
+written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, as the
+path of a per-cluster counts file written by
+\code{\link{collapseControlsMatrix}}, or as the object
+\code{\link{prepareClusterCounts}} returns. The first three all collapse the
+controls first and then score, so they are shorthand for the last one; pass
+the prepared object directly when several sets of cases are matched against
+the same controls.
 }
 \seealso{
-\code{\link{collapseControlsMatrix}}
+\code{\link{prepareClusterCounts}}, \code{\link{collapseControlsMatrix}}
 }

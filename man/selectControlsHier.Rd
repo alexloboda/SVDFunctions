@@ -41,5 +41,13 @@ with missing values allowed. Its rows must correspond to those of
 \item{...}{parameters to be passed to selectControls function.}
 }
 \description{
-Select a set of controls that populationally matches a set of cases.
+Walks the case hierarchy and matches every node against the same controls.
+The control side of the work -- projecting the controls into the case
+PCA-like space and collapsing them into per-cluster allele counts -- does not
+depend on which case cluster is being matched, so it is done once and reused
+for every node; only the multivariate normality search and the lambda scoring
+run per node.
+}
+\seealso{
+\code{\link{selectControlsHierFromFiles}}
 }

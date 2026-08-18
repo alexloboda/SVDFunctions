@@ -32,7 +32,7 @@ void read_binary(const char* filename, Matrix& matrix){
 
 namespace matching {
 
-matching::matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts,
+matching::matching(std::shared_ptr<const ClusterCountsTable> cluster_counts,
                    mvn::Clustering clustering) : cluster_counts(std::move(cluster_counts)),
                                             clustering(std::move(clustering)) {}
 
@@ -170,7 +170,7 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 Counts matching::count_controls(const std::vector<size_t>& groups, size_t variant) {
     Counts counts;
     for (size_t group: groups) {
-        const ClusterCounts& cluster = cluster_counts[group][variant];
+        const ClusterCounts& cluster = (*cluster_counts)[group][variant];
         counts[0] += cluster[0];
         counts[1] += cluster[1];
         counts[2] += cluster[2];

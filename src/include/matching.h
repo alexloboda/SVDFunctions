@@ -65,6 +65,11 @@ private:
     }
 };
 
+// Per-cluster allele counts for every case variant, indexed [cluster][variant].
+// Shared rather than owned: they depend only on the controls, so one table can
+// be scored against many different sets of cases.
+using ClusterCountsTable = std::vector<std::vector<ClusterCounts>>;
+
 class lambda_range {
     double lb;
     double ub;
@@ -96,7 +101,7 @@ struct matching_results {
 class matching {
     static constexpr double EPS = 1e-6;
 
-    std::vector<std::vector<ClusterCounts>> cluster_counts;
+    std::shared_ptr<const ClusterCountsTable> cluster_counts;
 
     mvn::Clustering clustering;
 
@@ -111,7 +116,7 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts, mvn::Clustering clustering);
+    matching(std::shared_ptr<const ClusterCountsTable> cluster_counts, mvn::Clustering clustering);
     void set_candidates(std::vector<std::vector<size_t>>&& candidates, std::vector<double>&& statistics);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);
