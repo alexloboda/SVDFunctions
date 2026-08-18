@@ -58,6 +58,233 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
   unlist(samplesByCluster[as.character(clusterIds - 1L)], use.names = FALSE)
 }
 
+#' Project control genotypes into the case PCA-like space.
+#'
+#' First stage of \code{\link{selectControls}}. It reduces the control genotypes
+#' to the PCA-like coordinates the cases were reduced to, and collects the target
+#' mean and covariance that describe the case distribution in that space. The
+#' returned list carries everything \code{\link{mvnSubsampleClusters}} needs, so
+#' the annealing can be run directly on it.
+#' @inheritParams selectControls
+#' @return a list with the reduced control coordinates (\code{points}, one column
+#' per control sample), the target \code{mean} and \code{cov} of the case
+#' distribution, the one-based per-sample \code{clusterIds} together with their
+#' \code{clusterLabels}, the control \code{sampleNames}, the resolved
+#' \code{caseVariants} and the \code{variantRows} they occupy in
+#' \code{genotypeMatrix}.
+#' @export
+prepareControlsSpace <- function(genotypeMatrix, SVDReference, controlsMean,
+                                 casesMean, casesPDs, caseVariants = NULL,
+                                 controlsClustering = NULL) {
+  stopifnot(is.matrix(genotypeMatrix))
+  if (mode(genotypeMatrix) != "numeric") {
+    stop("genotypeMatrix must already be stored as a numeric matrix")
+  }
+  stopifnot(all(!is.na(genotypeMatrix)))
+  controlVariants <- rownames(genotypeMatrix)
+  if (is.null(controlVariants)) {
+    stop("genotypeMatrix must have variant row names")
+  }
+  if (is.null(caseVariants)) {
+    caseVariants <- controlVariants
+  }
+  caseVariants <- as.character(caseVariants)
+  if (anyDuplicated(caseVariants)) {
+    stop("caseVariants must not contain duplicates")
+  }
+  variantRows <- match(caseVariants, controlVariants)
+  if (anyNA(variantRows)) {
+    stop("caseVariants must be a subset of the control genotype matrix rows")
+  }
+  clusteringInfo <- prepareControlsClustering(controlsClustering,
+                                              colnames(genotypeMatrix),
+                                              ncol(genotypeMatrix))
+  cl <- clusteringInfo$sampleClusterIds
+  stopifnot(all(!is.na(cl)))
+  if (any(tabulate(cl + 1L) > 255L)) {
+    stop("Each control cluster must contain at most 255 samples")
+  }
+
+  names(controlsMean) <- rownames(SVDReference)
+  if (!all(caseVariants %in% rownames(SVDReference))) {
+    stop("Every case variant must occur in SVDReference")
+  }
+  transition <- pinv(SVDReference[caseVariants, , drop = FALSE])
+  meanOffset <- as.vector(transition %*% controlsMean[caseVariants])
+  rm(SVDReference)
+
+  # Project the controls into the case PCA-like space through an index view over
+  # the control variants instead of slicing genotypeMatrix into a large copy:
+  # the transition is widened to every control variant with zero columns for
+  # those absent from the cases, so multiplying the full matrix yields the same
+  # reduced result as projecting only the shared variants.
+  if (length(variantRows) != length(controlVariants) ||
+      any(variantRows != seq_along(controlVariants))) {
+    widened <- matrix(0, nrow(transition), length(controlVariants))
+    widened[, variantRows] <- transition
+    transition <- widened
+  }
+  points <- transition %*% genotypeMatrix
+  points <- points - meanOffset
+
+  list(points = points,
+       mean = casesMean,
+       cov = tcrossprod(as.matrix(casesPDs)),
+       clusterIds = cl + 1L,
+       clusterLabels = clusteringInfo$clusterLabels,
+       sampleNames = colnames(genotypeMatrix),
+       caseVariants = caseVariants,
+       variantRows = variantRows)
+}
+
+#' Select multivariate normal subsamples of a set of points.
+#'
+#' Second stage of \code{\link{selectControls}}, and a self-contained
+#' multivariate normality search: it only sees points in some reduced space, the
+#' clusters they are swapped in as units, and the normal distribution to match.
+#' Nothing about genotypes enters here. Simulated annealing minimizes a BHEP-type
+#' normality statistic for every target subset size in turn, so the result is one
+#' candidate subset per size rather than a single answer.
+#' @param points numeric matrix where columns are points and rows are their
+#' components, e.g. the \code{points} element of \code{\link{prepareControlsSpace}}.
+#' @param mean numeric vector, one value per component, giving the mean of the
+#' distribution the subsample should follow.
+#' @param cov numeric covariance matrix of that distribution, with one row and
+#' column per component.
+#' @param clusterIds optional one-based cluster id per column of \code{points}.
+#' Points sharing a cluster are added and removed as a unit. Defaults to one
+#' cluster per point.
+#' @param min minimal number of clusters to select.
+#' @param max maximum number of clusters to select.
+#' @param step increment between consecutive target sizes.
+#' @param iterations number of simulated annealing iterations per target size.
+#' @param seed optional integer seed for the simulated annealing. When
+#' \code{NULL} (default) it is drawn from R's generator, so \code{set.seed}
+#' fixes the search; see \code{\link{selectControls}} for the exact guarantee.
+#' @param threads optional integer number of threads for the annealing restarts.
+#' By default uses all available hardware threads.
+#' @param precomputeThreads optional integer number of threads used to precompute
+#' the exact cluster-level Mahalanobis aggregates. By default uses all available
+#' hardware threads.
+#' @param clusterTileSize optional integer tile size used for exact blocked
+#' aggregation across points inside each cluster pair.
+#' @return a list with \code{clusters}, a list holding the one-based cluster ids
+#' of the best subset found for each target size, and \code{statistics}, the
+#' normality statistic each of those subsets reached.
+#' @export
+mvnSubsampleClusters <- function(points, mean, cov, clusterIds = NULL,
+                                 min = 500, max = 1000, step = 50,
+                                 iterations = 100000, seed = NULL,
+                                 threads = NULL, precomputeThreads = NULL,
+                                 clusterTileSize = 32L) {
+  stopifnot(is.matrix(points))
+  if (mode(points) != "numeric") {
+    stop("points must already be stored as a numeric matrix")
+  }
+  cov <- as.matrix(cov)
+  mean <- as.numeric(mean)
+  if (nrow(cov) != nrow(points) || ncol(cov) != nrow(points)) {
+    stop("cov must be square with one row per component of points")
+  }
+  if (length(mean) != nrow(points)) {
+    stop("mean must have one value per component of points")
+  }
+
+  if (is.null(clusterIds)) {
+    clusterIds <- seq_len(ncol(points))
+  }
+  clusterIds <- as.integer(clusterIds)
+  if (length(clusterIds) != ncol(points)) {
+    stop("clusterIds must have one entry per column of points")
+  }
+  if (anyNA(clusterIds) || any(clusterIds < 1L)) {
+    stop("clusterIds must be one-based cluster indices")
+  }
+
+  seed <- resolveSeed(seed)
+  iterations <- as.integer(iterations)
+  min <- as.integer(min)
+  max <- as.integer(max)
+  step <- as.integer(step)
+  threads <- if (is.null(threads)) 0L else as.integer(threads)
+  precomputeThreads <- if (is.null(precomputeThreads)) 0L else as.integer(precomputeThreads)
+  clusterTileSize <- as.integer(clusterTileSize)
+  stopifnot(iterations > 0)
+  # A non-positive step would never advance the target size in the C++ loop.
+  stopifnot(min >= 0L, max >= 0L, step > 0L)
+  stopifnot(threads >= 0L)
+  stopifnot(precomputeThreads >= 0L)
+  stopifnot(clusterTileSize > 0L)
+
+  mvn_subsample_clusters_cpp(points, clusterIds - 1L, mean, cov,
+                             min, max, step, iterations, seed,
+                             threads, precomputeThreads, clusterTileSize)
+}
+
+#' Pick the genetically best matching subset among control candidates.
+#'
+#' Third stage of \code{\link{selectControls}}, and the only one that looks at
+#' genotypes. For every candidate subset produced by
+#' \code{\link{mvnSubsampleClusters}} it recomputes the per-variant control
+#' counts, applies call rate and allele count quality control, derives per-variant
+#' association p-values against the case counts and from those the genomic
+#' inflation factor \eqn{\lambda_GC}. It then keeps the candidates within
+#' \eqn{[minLambda; maxLambda]} and prefers the ones inside
+#' \eqn{[softMinLambda; softMaxLambda]}, falling back to the one closest to that
+#' range.
+#' @param candidates list as returned by \code{\link{mvnSubsampleClusters}}, with
+#' a \code{clusters} element holding one-based cluster ids per candidate and a
+#' matching \code{statistics} element.
+#' @param clusterIds one-based cluster id per column of
+#' \code{originalGenotypeMatrix}, as returned by
+#' \code{\link{prepareControlsSpace}}.
+#' @param variantRows optional one-based rows of \code{originalGenotypeMatrix}
+#' holding the case variants, in the row order of \code{caseCounts}. Defaults to
+#' every row, i.e. cases and controls share the same variants in the same order.
+#' @inheritParams selectControls
+#' @return a list with the matching diagnostics (\code{lambda},
+#' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
+#' \code{controls} element holding the one-based cluster ids of the selected
+#' candidate, empty when no candidate satisfied the hard lambda bounds.
+#' @export
+matchControlCandidates <- function(originalGenotypeMatrix, caseCounts, candidates,
+                                   clusterIds, variantRows = NULL,
+                                   minLambda = 0.75, softMinLambda = 0.9,
+                                   softMaxLambda = 1.05, maxLambda = 1.3,
+                                   min = 500, minCallRate = 0.98) {
+  stopifnot(is.matrix(originalGenotypeMatrix))
+  if (!is.integer(originalGenotypeMatrix)) {
+    stop("originalGenotypeMatrix must already be stored as an integer matrix")
+  }
+  if (!is.list(candidates) || is.null(candidates$clusters) ||
+      is.null(candidates$statistics)) {
+    stop("candidates must be a list with clusters and statistics elements")
+  }
+  clusterIds <- as.integer(clusterIds)
+  if (length(clusterIds) != ncol(originalGenotypeMatrix)) {
+    stop("clusterIds must have one entry per control sample")
+  }
+  if (anyNA(clusterIds) || any(clusterIds < 1L)) {
+    stop("clusterIds must be one-based cluster indices")
+  }
+  caseCounts <- as.matrix(caseCounts)
+  if (is.null(variantRows)) {
+    variantRows <- seq_len(nrow(originalGenotypeMatrix))
+  }
+  variantRows <- as.integer(variantRows)
+  if (nrow(caseCounts) != length(variantRows)) {
+    stop("caseCounts must have one row per case variant")
+  }
+
+  match_controls_cpp(originalGenotypeMatrix, caseCounts, variantRows - 1L,
+                     clusterIds - 1L,
+                     lapply(candidates$clusters, as.integer),
+                     as.numeric(candidates$statistics),
+                     stats::qchisq(stats::ppoints(1e+07), df = 1),
+                     minLambda, softMinLambda, maxLambda, softMaxLambda,
+                     min, minCallRate)
+}
+
 #' Select a set of controls that matches to a set of cases.
 #' 
 #' Finds an optimal set of controls satisfying 
@@ -120,7 +347,7 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
 #' @param returnClusters logical; controls the form of the returned
 #' \code{controls} element. When \code{FALSE} (default) it contains sample
 #' names. When \code{TRUE} it contains the
-#' cluster identifiers instead -- the origin.al labels supplied via
+#' cluster identifiers instead -- the original labels supplied via
 #' \code{controlsClustering}, or sample names when no clusters were provided.
 #' Cluster identifiers are also returned when the controls have no column names.
 #' @return a list with the matching diagnostics (\code{lambda},
@@ -139,95 +366,47 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
                             exactClusterTileSize = 32L,
                             returnClusters = FALSE, seed = NULL) {
   seed <- resolveSeed(seed)
-  iterations <- as.integer(iterations)
-  stopifnot(iterations > 0)
   returnClusters <- isTRUE(returnClusters)
-  saThreads <- if (is.null(saThreads)) 0L else as.integer(saThreads)
-  exactPrecomputeThreads <- if (is.null(exactPrecomputeThreads)) 0L else as.integer(exactPrecomputeThreads)
-  exactClusterTileSize <- as.integer(exactClusterTileSize)
-  stopifnot(saThreads >= 0L)
-  stopifnot(exactPrecomputeThreads >= 0L)
-  stopifnot(exactClusterTileSize > 0L)
   stopifnot(is.matrix(genotypeMatrix))
   stopifnot(is.matrix(originalGenotypeMatrix))
   stopifnot(dim(genotypeMatrix) == dim(originalGenotypeMatrix))
-  if (mode(genotypeMatrix) != "numeric") {
-    stop("genotypeMatrix must already be stored as a numeric matrix")
-  }
+  # Checked here rather than left to matchControlCandidates so that a wrongly
+  # typed matrix is rejected before the annealing, not hours into it.
   if (!is.integer(originalGenotypeMatrix)) {
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
   }
-  stopifnot(all(!is.na(genotypeMatrix)))
-  controlVariants <- rownames(genotypeMatrix)
-  if (is.null(controlVariants)) {
-    stop("genotypeMatrix must have variant row names")
-  }
-  if (is.null(caseVariants)) {
-    caseVariants <- controlVariants
-  }
-  caseVariants <- as.character(caseVariants)
-  if (anyDuplicated(caseVariants)) {
-    stop("caseVariants must not contain duplicates")
-  }
-  if (nrow(caseCounts) != length(caseVariants)) {
+
+  space <- prepareControlsSpace(genotypeMatrix, SVDReference, controlsMean,
+                                casesMean, casesPDs, caseVariants,
+                                controlsClustering)
+  # caseVariants and caseCounts are consumed by different stages, so their
+  # agreement is this function's to check -- again, before the annealing runs.
+  if (nrow(as.matrix(caseCounts)) != length(space$variantRows)) {
     stop("caseCounts must have one row per case variant")
   }
-  variantRows <- match(caseVariants, controlVariants)
-  if (anyNA(variantRows)) {
-    stop("caseVariants must be a subset of the control genotype matrix rows")
-  }
-  clusteringInfo <- prepareControlsClustering(controlsClustering,
-                                              colnames(genotypeMatrix),
-                                              ncol(genotypeMatrix))
-  cl <- clusteringInfo$sampleClusterIds
-  clusterLabels <- clusteringInfo$clusterLabels
-  stopifnot(all(!is.na(cl)))
-  if (any(tabulate(cl + 1L) > 255L)) {
-    stop("Each control cluster must contain at most 255 samples")
-  }
-  
-  names(controlsMean) <- rownames(SVDReference)
-  if (!all(caseVariants %in% rownames(SVDReference))) {
-    stop("Every case variant must occur in SVDReference")
-  }
-  transition <- pinv(SVDReference[caseVariants, , drop = FALSE])
-  meanOffset <- as.vector(transition %*% controlsMean[caseVariants])
-  rm(SVDReference)
-  
-  # Project the controls into the case PCA-like space through an index view over
-  # the control variants instead of slicing genotypeMatrix into a large copy:
-  # the transition is widened to every control variant with zero columns for
-  # those absent from the cases, so multiplying the full matrix yields the same
-  # reduced result as projecting only the shared variants.
-  if (length(variantRows) != length(controlVariants) ||
-      any(variantRows != seq_along(controlVariants))) {
-    widened <- matrix(0, nrow(transition), length(controlVariants))
-    widened[, variantRows] <- transition
-    transition <- widened
-  }
-  genotypeMatrix <- transition %*% genotypeMatrix
-  genotypeMatrix <- genotypeMatrix - meanOffset
-  
-  caseCounts <- as.matrix(caseCounts)
-  gmatrix <- originalGenotypeMatrix
-  
-  result <- select_controls_cpp(gmatrix, 
-                                genotypeMatrix, 
-                                casesMean, 
-                                casesPDs, 
-                                caseCounts, 
-                                variantRows - 1L, 
-                                cl, 
-                                stats::qchisq(stats::ppoints(1e+07), df = 1), 
-                                minLambda, 
-                                softMinLambda, maxLambda, softMaxLambda, min, 
-                                max, step, iterations, minCallRate,
-                                seed,
-                                saThreads, exactPrecomputeThreads,
-                                exactClusterTileSize)
+
+  candidates <- mvnSubsampleClusters(space$points, space$mean, space$cov,
+                                     space$clusterIds, min = min, max = max,
+                                     step = step, iterations = iterations,
+                                     seed = seed, threads = saThreads,
+                                     precomputeThreads = exactPrecomputeThreads,
+                                     clusterTileSize = exactClusterTileSize)
+
+  result <- matchControlCandidates(originalGenotypeMatrix, caseCounts, candidates,
+                                   space$clusterIds, space$variantRows,
+                                   minLambda = minLambda,
+                                   softMinLambda = softMinLambda,
+                                   softMaxLambda = softMaxLambda,
+                                   maxLambda = maxLambda, min = min,
+                                   minCallRate = minCallRate)
+
   if (length(result$controls) > 0) {
-    result$controls <- resolveSelectedControls(result$controls, cl,
-                                               clusterLabels, colnames(gmatrix),
+    # resolveSelectedControls expects zero-based per-sample cluster ids, and the
+    # sample names come from the matrix the counts were taken from.
+    result$controls <- resolveSelectedControls(result$controls,
+                                               space$clusterIds - 1L,
+                                               space$clusterLabels,
+                                               colnames(originalGenotypeMatrix),
                                                returnClusters)
   }
   else {

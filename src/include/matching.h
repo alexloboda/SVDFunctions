@@ -10,7 +10,7 @@
 #include <functional>
 #include <stdexcept>
 
-#include "subsample.h"
+#include "mvn_test.h"
 #include "lm.h"
 
 
@@ -89,14 +89,21 @@ struct matching_results {
                      double oprimal_lambda);
 };
 
+// Scores candidate control subsets genetically: per-variant counts, call rate,
+// association p-values and the resulting lambda_GC. The candidates themselves come
+// from the multivariate normality search, which knows nothing about genetics and
+// runs separately (see mvn::subsample).
 class matching {
     static constexpr double EPS = 1e-6;
 
     std::vector<std::vector<ClusterCounts>> cluster_counts;
-    std::shared_ptr<Eigen::MatrixXd> controls_space;
 
     mvn::Clustering clustering;
-    mvn::subsample subsampling;
+
+    // One candidate subset of clusters per target size, each with the normality
+    // statistic the search reached for it.
+    std::vector<std::vector<size_t>> candidates;
+    std::vector<double> candidate_statistics;
 
     std::function<void()> interrupts_checker;
     std::function<double(double)> qchisq;
@@ -104,11 +111,8 @@ class matching {
     lambda_range hard_threshold;
     lambda_range soft_threshold;
 public:
-    matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts, std::shared_ptr<Eigen::MatrixXd> space, mvn::Clustering clustering);
-    void process_mvn(const Eigen::MatrixXd& directions, Eigen::VectorXd mean,
-                     int sa_threads, int start, int size_ub, int step, int iterations,
-                     std::mt19937::result_type seed,
-                     int exact_precompute_threads = 0, int exact_cluster_tile_size = 32);
+    matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts, mvn::Clustering clustering);
+    void set_candidates(std::vector<std::vector<size_t>>&& candidates, std::vector<double>&& statistics);
     void set_qchi_sq_function(const std::function<double(double)>& f);
     matching_results match(const std::vector<Counts>& case_counts, unsigned min_controls = 1, double min_call_rate = 0.95);
 

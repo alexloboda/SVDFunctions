@@ -9,8 +9,12 @@ subsample_mvn <- function(matrix, size, mean, cov, seed) {
     .Call(`_SVDFunctions_subsample_mvn`, matrix, size, mean, cov, seed)
 }
 
-select_controls_cpp <- function(gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, seed, sa_threads = 0L, exact_precompute_threads = 0L, exact_cluster_tile_size = 32L) {
-    .Call(`_SVDFunctions_select_controls_cpp`, gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, seed, sa_threads, exact_precompute_threads, exact_cluster_tile_size)
+mvn_subsample_clusters_cpp <- function(points, clustering, mean, cov, min, max, step, iterations, seed, sa_threads = 0L, exact_precompute_threads = 0L, exact_cluster_tile_size = 32L) {
+    .Call(`_SVDFunctions_mvn_subsample_clusters_cpp`, points, clustering, mean, cov, min, max, step, iterations, seed, sa_threads, exact_precompute_threads, exact_cluster_tile_size)
+}
+
+match_controls_cpp <- function(gmatrix, cc, variant_rows, clustering, candidates, statistics, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate) {
+    .Call(`_SVDFunctions_match_controls_cpp`, gmatrix, cc, variant_rows, clustering, candidates, statistics, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate)
 }
 
 parse_binary_file <- function(variants, samples, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, requiredDP, requiredGQ) {

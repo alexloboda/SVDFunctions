@@ -9,6 +9,7 @@
 
 #include "include/qchisq.h"
 #include "include/matching.h"
+#include "include/subsample.h"
 #include "include/hw.h"
 
 using namespace Rcpp;
@@ -137,58 +138,126 @@ List subsample_mvn(NumericMatrix& matrix, IntegerVector size, NumericVector& mea
     return ret;
 }
 
+// Second stage of the control selection: the multivariate normality search on its
+// own. It knows nothing about genotypes -- it only sees points in some reduced
+// space, the clusters they are swapped in as units, and the target normal
+// distribution -- and it returns one candidate subset of clusters per target size
+// rather than a single answer. Choosing between those candidates is the caller's
+// job (see match_controls_cpp).
 // [[Rcpp::export]]
-List select_controls_cpp(IntegerMatrix& gmatrix,
-                     NumericMatrix& gmatrix_rs,
-                     NumericVector& mean, NumericMatrix& directions,
-                     IntegerMatrix& cc, IntegerVector& variant_rows,
-                     IntegerVector& clustering,
-                     NumericVector& chi2fn,
-                     double min_lambda, double lb_lambda,
-                     double max_lambda, double ub_lambda,
-                     int min, int max, int step,
-                     int sa_iterations, double min_call_rate,
-                     int seed,
-                     int sa_threads = 0,
-                     int exact_precompute_threads = 0,
-                     int exact_cluster_tile_size = 32) {
-    vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
-    qchi2 q(precomputed_chi);
-
-    auto case_counts = r_to_cpp(cc);
-    auto principal_directions = r_to_cpp(directions);
-    auto gm_rs = r_to_cpp(gmatrix_rs);
+List mvn_subsample_clusters_cpp(NumericMatrix& points,
+                                IntegerVector& clustering,
+                                NumericVector& mean,
+                                NumericMatrix& cov,
+                                int min, int max, int step,
+                                int iterations, int seed,
+                                int sa_threads = 0,
+                                int exact_precompute_threads = 0,
+                                int exact_cluster_tile_size = 32) {
+    // The temperature decays geometrically from t0 = 1 down to this floor over the
+    // whole iteration budget.
+    const double TEMPERATURE_FLOOR = 1e-18;
 
     vector<int> clust_vec(clustering.begin(), clustering.end());
-    vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
+    mvn::Clustering cl(clust_vec);
 
-    int min_controls = min;
-    int max_controls = max;
-    int step_clusters = step;
-    int iterations = sa_iterations;
-    double mcr = min_call_rate;
+    mvn::PrecomputeConfig config;
+    if (exact_precompute_threads > 0) {
+        config.threads = static_cast<size_t>(exact_precompute_threads);
+    }
+    if (exact_cluster_tile_size > 0) {
+        config.cluster_tile_size = static_cast<size_t>(exact_cluster_tile_size);
+    }
+
     int sa_pool_size = sa_threads > 0 ? sa_threads : static_cast<int>(std::thread::hardware_concurrency());
     if (sa_pool_size <= 0) {
         sa_pool_size = 1;
     }
+
+    auto space = r_to_cpp(points);
+    Rcpp::Rcerr << "Starting processing controls space." << std::endl;
+    Rcpp::Rcerr << "The size of controls space is " << space->rows() << " by " << space->cols() << std::endl;
+
+    mvn::subsample annealing(space, cl, r_to_cpp(mean), *r_to_cpp(cov), config,
+                             static_cast<std::mt19937::result_type>(seed));
+    space.reset();
+    Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
+
+    double c = std::pow(TEMPERATURE_FLOOR, 1.0 / (double)iterations);
+    annealing.run(iterations, 4, 1.0, c, sa_pool_size, min, max, step);
+
+    int n_solutions = static_cast<int>(annealing.solutions());
+    List clusters(n_solutions);
+    NumericVector statistics(n_solutions);
+    for (int k = 0; k < n_solutions; k++) {
+        auto solution = annealing.get_solution(k);
+        IntegerVector ids(solution.begin(), solution.end());
+        clusters[k] = ids + 1;
+        statistics[k] = annealing.statistic(k);
+    }
+
+    List ret;
+    ret["clusters"] = clusters;
+    ret["statistics"] = statistics;
+    return ret;
+}
+
+// Third stage: pick the candidate subset whose lambda_GC matches the cases best.
+// `candidates` holds one-based cluster ids as produced by mvn_subsample_clusters_cpp,
+// and `variant_rows` maps case variants onto rows of `gmatrix` (see build_cluster_counts).
+// [[Rcpp::export]]
+List match_controls_cpp(IntegerMatrix& gmatrix,
+                        IntegerMatrix& cc,
+                        IntegerVector& variant_rows,
+                        IntegerVector& clustering,
+                        List& candidates,
+                        NumericVector& statistics,
+                        NumericVector& chi2fn,
+                        double min_lambda, double lb_lambda,
+                        double max_lambda, double ub_lambda,
+                        int min_controls, double min_call_rate) {
+    vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
+    qchi2 q(precomputed_chi);
+
+    auto case_counts = r_to_cpp(cc);
+
+    vector<int> clust_vec(clustering.begin(), clustering.end());
+    vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
+
     mvn::Clustering cl(clust_vec);
     validate_cluster_sizes(cl);
 
+    if (candidates.size() != statistics.size()) {
+        Rcpp::stop("Every candidate subset must come with its normality statistic");
+    }
+
+    std::vector<std::vector<size_t>> candidate_subsets;
+    candidate_subsets.reserve(candidates.size());
+    for (R_xlen_t k = 0; k < candidates.size(); k++) {
+        IntegerVector ids = candidates[k];
+        std::vector<size_t> subset;
+        subset.reserve(ids.size());
+        for (int id: ids) {
+            if (id < 1 || static_cast<size_t>(id) > cl.size()) {
+                Rcpp::stop("Candidate subsets must reference existing clusters");
+            }
+            subset.push_back(static_cast<size_t>(id - 1));
+        }
+        candidate_subsets.push_back(std::move(subset));
+    }
+
     auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size(), variant_rows_vec);
-    matching::matching matcher(std::move(cluster_counts), std::move(gm_rs), cl);
+    matching::matching matcher(std::move(cluster_counts), cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
     matcher.set_hard_threshold({min_lambda, max_lambda});
-    matcher.process_mvn(*principal_directions, r_to_cpp(mean), sa_pool_size,
-                        min_controls, max_controls, step_clusters, iterations,
-                        static_cast<std::mt19937::result_type>(seed),
-                        exact_precompute_threads, exact_cluster_tile_size);
-    principal_directions.reset();
+    matcher.set_candidates(std::move(candidate_subsets),
+                           std::vector<double>(statistics.begin(), statistics.end()));
     matcher.set_interrupts_checker([]() { Rcpp::checkUserInterrupt(); });
 
     auto counts = matrix_to_counts(*case_counts);
     case_counts.reset();
-    auto result = matcher.match(counts, min_controls, mcr);
+    auto result = matcher.match(counts, min_controls, min_call_rate);
 
     List ret;
     NumericVector lambda(result.lambdas.begin(), result.lambdas.end());

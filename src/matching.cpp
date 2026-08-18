@@ -30,20 +30,26 @@ void read_binary(const char* filename, Matrix& matrix){
 }
 } // Eigen::
 
-namespace {
-
-using Matrix = Eigen::MatrixXd;
-using Vector = Eigen::VectorXd;
-
-}
-
 namespace matching {
 
 matching::matching(std::vector<std::vector<ClusterCounts>>&& cluster_counts,
-                   std::shared_ptr<Eigen::MatrixXd> controls_space,
                    mvn::Clustering clustering) : cluster_counts(std::move(cluster_counts)),
-                                            controls_space(std::move(controls_space)),
                                             clustering(std::move(clustering)) {}
+
+void matching::set_candidates(std::vector<std::vector<size_t>>&& subsets, std::vector<double>&& statistics) {
+    if (subsets.size() != statistics.size()) {
+        throw std::invalid_argument("Every candidate subset must come with its normality statistic");
+    }
+    for (const auto& subset: subsets) {
+        for (size_t group: subset) {
+            if (group >= clustering.size()) {
+                throw std::invalid_argument("Candidate subsets must reference existing clusters");
+            }
+        }
+    }
+    candidates = std::move(subsets);
+    candidate_statistics = std::move(statistics);
+}
 
 void matching::set_soft_threshold(lambda_range range) {
     soft_threshold = range;
@@ -91,16 +97,16 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
     std::vector<int> pvals_num;
     std::vector<double> optimal_pvals;
 
-    for (size_t k = 0, step = 0; k < subsampling.solutions(); k++, step++) {
+    for (size_t k = 0, step = 0; k < candidates.size(); k++, step++) {
         if (step % 100 == 0) {
             interrupts_checker();
         }
 
-        stats.push_back(subsampling.statistic(k));
+        stats.push_back(candidate_statistics[k]);
 
         std::vector<double> pvals;
 
-        auto control_groups = subsampling.get_solution(k);
+        const auto& control_groups = candidates[k];
         if (control_groups.size() < min_controls) {
             continue;
         }
@@ -159,32 +165,6 @@ matching_results matching::match(const std::vector<Counts>& case_counts, unsigne
 
     return {std::move(optimal_clusters), std::move(optimal_pvals), std::move(lambdas),
             std::move(stats), std::move(lambda_i), std::move(pvals_num), lambda};
-}
-
-void matching::process_mvn(const Matrix& directions, Vector mean,
-                           int sa_threads, int start, int ub, int step, int iterations,
-                           std::mt19937::result_type seed,
-                           int exact_precompute_threads, int exact_cluster_tile_size) {
-    const double EPS = 1e-18;
-    Rcpp::Rcerr << "Starting processing controls space." << std::endl;
-    Rcpp::Rcerr << "The size of controls space is " << controls_space->rows() << " by " << controls_space->cols() << std::endl;
-
-    mvn::PrecomputeConfig config;
-    if (exact_precompute_threads > 0) {
-        config.threads = static_cast<size_t>(exact_precompute_threads);
-    }
-    if (exact_cluster_tile_size > 0) {
-        config.cluster_tile_size = static_cast<size_t>(exact_cluster_tile_size);
-    }
-
-    {
-        Matrix rs_cov = directions * directions.transpose();
-        subsampling = mvn::subsample(controls_space, clustering, mean, rs_cov, config, seed);
-    }
-    controls_space.reset();
-    Rcpp::Rcerr << "Mahalanobis distances have been successfully calculated." << std::endl;
-    double c = std::pow(EPS, 1.0 / (double)iterations);
-    subsampling.run(iterations, 4, 1.0 , c, sa_threads, start, ub, step);
 }
 
 Counts matching::count_controls(const std::vector<size_t>& groups, size_t variant) {

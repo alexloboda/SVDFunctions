@@ -40,34 +40,48 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// select_controls_cpp
-List select_controls_cpp(IntegerMatrix& gmatrix, NumericMatrix& gmatrix_rs, NumericVector& mean, NumericMatrix& directions, IntegerMatrix& cc, IntegerVector& variant_rows, IntegerVector& clustering, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min, int max, int step, int sa_iterations, double min_call_rate, int seed, int sa_threads, int exact_precompute_threads, int exact_cluster_tile_size);
-RcppExport SEXP _SVDFunctions_select_controls_cpp(SEXP gmatrixSEXP, SEXP gmatrix_rsSEXP, SEXP meanSEXP, SEXP directionsSEXP, SEXP ccSEXP, SEXP variant_rowsSEXP, SEXP clusteringSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP sa_iterationsSEXP, SEXP min_call_rateSEXP, SEXP seedSEXP, SEXP sa_threadsSEXP, SEXP exact_precompute_threadsSEXP, SEXP exact_cluster_tile_sizeSEXP) {
+// mvn_subsample_clusters_cpp
+List mvn_subsample_clusters_cpp(NumericMatrix& points, IntegerVector& clustering, NumericVector& mean, NumericMatrix& cov, int min, int max, int step, int iterations, int seed, int sa_threads, int exact_precompute_threads, int exact_cluster_tile_size);
+RcppExport SEXP _SVDFunctions_mvn_subsample_clusters_cpp(SEXP pointsSEXP, SEXP clusteringSEXP, SEXP meanSEXP, SEXP covSEXP, SEXP minSEXP, SEXP maxSEXP, SEXP stepSEXP, SEXP iterationsSEXP, SEXP seedSEXP, SEXP sa_threadsSEXP, SEXP exact_precompute_threadsSEXP, SEXP exact_cluster_tile_sizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix& >::type points(pointsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type clustering(clusteringSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type mean(meanSEXP);
+    Rcpp::traits::input_parameter< NumericMatrix& >::type cov(covSEXP);
+    Rcpp::traits::input_parameter< int >::type min(minSEXP);
+    Rcpp::traits::input_parameter< int >::type max(maxSEXP);
+    Rcpp::traits::input_parameter< int >::type step(stepSEXP);
+    Rcpp::traits::input_parameter< int >::type iterations(iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
+    Rcpp::traits::input_parameter< int >::type sa_threads(sa_threadsSEXP);
+    Rcpp::traits::input_parameter< int >::type exact_precompute_threads(exact_precompute_threadsSEXP);
+    Rcpp::traits::input_parameter< int >::type exact_cluster_tile_size(exact_cluster_tile_sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(mvn_subsample_clusters_cpp(points, clustering, mean, cov, min, max, step, iterations, seed, sa_threads, exact_precompute_threads, exact_cluster_tile_size));
+    return rcpp_result_gen;
+END_RCPP
+}
+// match_controls_cpp
+List match_controls_cpp(IntegerMatrix& gmatrix, IntegerMatrix& cc, IntegerVector& variant_rows, IntegerVector& clustering, List& candidates, NumericVector& statistics, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min_controls, double min_call_rate);
+RcppExport SEXP _SVDFunctions_match_controls_cpp(SEXP gmatrixSEXP, SEXP ccSEXP, SEXP variant_rowsSEXP, SEXP clusteringSEXP, SEXP candidatesSEXP, SEXP statisticsSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP min_controlsSEXP, SEXP min_call_rateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerMatrix& >::type gmatrix(gmatrixSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix& >::type gmatrix_rs(gmatrix_rsSEXP);
-    Rcpp::traits::input_parameter< NumericVector& >::type mean(meanSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix& >::type directions(directionsSEXP);
     Rcpp::traits::input_parameter< IntegerMatrix& >::type cc(ccSEXP);
     Rcpp::traits::input_parameter< IntegerVector& >::type variant_rows(variant_rowsSEXP);
     Rcpp::traits::input_parameter< IntegerVector& >::type clustering(clusteringSEXP);
+    Rcpp::traits::input_parameter< List& >::type candidates(candidatesSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type statistics(statisticsSEXP);
     Rcpp::traits::input_parameter< NumericVector& >::type chi2fn(chi2fnSEXP);
     Rcpp::traits::input_parameter< double >::type min_lambda(min_lambdaSEXP);
     Rcpp::traits::input_parameter< double >::type lb_lambda(lb_lambdaSEXP);
     Rcpp::traits::input_parameter< double >::type max_lambda(max_lambdaSEXP);
     Rcpp::traits::input_parameter< double >::type ub_lambda(ub_lambdaSEXP);
-    Rcpp::traits::input_parameter< int >::type min(minSEXP);
-    Rcpp::traits::input_parameter< int >::type max(maxSEXP);
-    Rcpp::traits::input_parameter< int >::type step(stepSEXP);
-    Rcpp::traits::input_parameter< int >::type sa_iterations(sa_iterationsSEXP);
+    Rcpp::traits::input_parameter< int >::type min_controls(min_controlsSEXP);
     Rcpp::traits::input_parameter< double >::type min_call_rate(min_call_rateSEXP);
-    Rcpp::traits::input_parameter< int >::type seed(seedSEXP);
-    Rcpp::traits::input_parameter< int >::type sa_threads(sa_threadsSEXP);
-    Rcpp::traits::input_parameter< int >::type exact_precompute_threads(exact_precompute_threadsSEXP);
-    Rcpp::traits::input_parameter< int >::type exact_cluster_tile_size(exact_cluster_tile_sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(select_controls_cpp(gmatrix, gmatrix_rs, mean, directions, cc, variant_rows, clustering, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min, max, step, sa_iterations, min_call_rate, seed, sa_threads, exact_precompute_threads, exact_cluster_tile_size));
+    rcpp_result_gen = Rcpp::wrap(match_controls_cpp(gmatrix, cc, variant_rows, clustering, candidates, statistics, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -160,7 +174,8 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 5},
-    {"_SVDFunctions_select_controls_cpp", (DL_FUNC) &_SVDFunctions_select_controls_cpp, 21},
+    {"_SVDFunctions_mvn_subsample_clusters_cpp", (DL_FUNC) &_SVDFunctions_mvn_subsample_clusters_cpp, 12},
+    {"_SVDFunctions_match_controls_cpp", (DL_FUNC) &_SVDFunctions_match_controls_cpp, 13},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {"_SVDFunctions_convert_to_cluster_binary", (DL_FUNC) &_SVDFunctions_convert_to_cluster_binary, 9},
     {"_SVDFunctions_parse_cluster_binary_file", (DL_FUNC) &_SVDFunctions_parse_cluster_binary_file, 11},
