@@ -2,23 +2,40 @@
 % Please edit documentation in R/selectControls.R
 \name{prepareControlsSpace}
 \alias{prepareControlsSpace}
+\alias{prepareControlsSpace.matrix}
+\alias{prepareControlsSpace.character}
 \title{Project control genotypes into the case PCA-like space.}
 \usage{
-prepareControlsSpace(
+prepareControlsSpace(genotypeMatrix, ...)
+
+\method{prepareControlsSpace}{matrix}(
   genotypeMatrix,
   SVDReference,
   controlsMean,
   casesMean,
   casesPDs,
   caseVariants = NULL,
-  controlsClustering = NULL
+  controlsClustering = NULL,
+  ...
+)
+
+\method{prepareControlsSpace}{character}(
+  genotypeMatrix,
+  SVDReference,
+  controlsMean,
+  casesMean,
+  casesPDs,
+  caseVariants = NULL,
+  controlsClustering = NULL,
+  threads = NULL,
+  ...
 )
 }
 \arguments{
-\item{genotypeMatrix}{numeric matrix where rows are variants and columns are
-samples. The missing values should be imputed prior calling this function.
-Rows are identified by their variant names (\code{rownames}) and may contain
-a superset of \code{caseVariants}.}
+\item{genotypeMatrix}{either the numeric control genotype matrix described in
+\code{\link{selectControls}}, or the path of a control matrix file holding it.}
+
+\item{...}{passed to the method.}
 
 \item{SVDReference}{reference basis of the left singular vectors.}
 
@@ -39,6 +56,10 @@ names, i.e. cases and controls share the same variants.}
 Each cluster must contain at most 255 samples because per-cluster allele
 counts are stored in one byte during matching. This argument is required
 when \code{genotypeMatrix} has no column names.}
+
+\item{threads}{optional integer number of threads for the file backed
+projection. By default uses all available hardware threads. Ignored for the
+in-memory method.}
 }
 \value{
 a list with the reduced control coordinates (\code{points}, one column
@@ -54,4 +75,21 @@ to the PCA-like coordinates the cases were reduced to, and collects the target
 mean and covariance that describe the case distribution in that space. The
 returned list carries everything \code{\link{mvnSubsampleClusters}} needs, so
 the annealing can be run directly on it.
+}
+\details{
+The controls can be given either as a matrix or as the path of a file written
+by \code{\link{writeControlsMatrix}}. The file backed method streams the
+matrix one variant at a time and never materialises it: the projection
+decomposes into one contribution per variant, so its peak memory is the
+reduced result plus a handful of variant rows, whatever the size of the
+matrix on disk.
+
+The two methods sum the same products in a different order, so the reduced
+coordinates agree to rounding rather than bit for bit. The search that
+consumes them is discrete, so the two can settle on different -- equally
+valid -- subsets of controls. Within either method the result is exact and
+does not depend on \code{threads}.
+}
+\seealso{
+\code{\link{writeControlsMatrix}}
 }

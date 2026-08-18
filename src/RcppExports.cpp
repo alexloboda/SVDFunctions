@@ -11,6 +11,60 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// write_controls_matrix_cpp
+void write_controls_matrix_cpp(SEXP matrix, const std::string& path, const std::string& dtype, const CharacterVector& rownames, const CharacterVector& colnames);
+RcppExport SEXP _SVDFunctions_write_controls_matrix_cpp(SEXP matrixSEXP, SEXP pathSEXP, SEXP dtypeSEXP, SEXP rownamesSEXP, SEXP colnamesSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type matrix(matrixSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type path(pathSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type dtype(dtypeSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type rownames(rownamesSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type colnames(colnamesSEXP);
+    write_controls_matrix_cpp(matrix, path, dtype, rownames, colnames);
+    return R_NilValue;
+END_RCPP
+}
+// controls_matrix_info_cpp
+List controls_matrix_info_cpp(const std::string& path);
+RcppExport SEXP _SVDFunctions_controls_matrix_info_cpp(SEXP pathSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::string& >::type path(pathSEXP);
+    rcpp_result_gen = Rcpp::wrap(controls_matrix_info_cpp(path));
+    return rcpp_result_gen;
+END_RCPP
+}
+// project_controls_file_cpp
+NumericMatrix project_controls_file_cpp(const std::string& path, const IntegerVector& variant_rows, const NumericMatrix& transition, const NumericVector& controls_mean, int threads);
+RcppExport SEXP _SVDFunctions_project_controls_file_cpp(SEXP pathSEXP, SEXP variant_rowsSEXP, SEXP transitionSEXP, SEXP controls_meanSEXP, SEXP threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::string& >::type path(pathSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type variant_rows(variant_rowsSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type transition(transitionSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type controls_mean(controls_meanSEXP);
+    Rcpp::traits::input_parameter< int >::type threads(threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(project_controls_file_cpp(path, variant_rows, transition, controls_mean, threads));
+    return rcpp_result_gen;
+END_RCPP
+}
+// collapse_controls_matrix_cpp
+List collapse_controls_matrix_cpp(const std::string& path, const IntegerVector& cluster_ids, const CharacterVector& cluster_labels, const std::string& out_path);
+RcppExport SEXP _SVDFunctions_collapse_controls_matrix_cpp(SEXP pathSEXP, SEXP cluster_idsSEXP, SEXP cluster_labelsSEXP, SEXP out_pathSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::string& >::type path(pathSEXP);
+    Rcpp::traits::input_parameter< const IntegerVector& >::type cluster_ids(cluster_idsSEXP);
+    Rcpp::traits::input_parameter< const CharacterVector& >::type cluster_labels(cluster_labelsSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type out_path(out_pathSEXP);
+    rcpp_result_gen = Rcpp::wrap(collapse_controls_matrix_cpp(path, cluster_ids, cluster_labels, out_path));
+    return rcpp_result_gen;
+END_RCPP
+}
 // quality_control_impl
 LogicalVector quality_control_impl(const IntegerMatrix& case_counts, const NumericVector& maf, const IntegerVector& mac, const NumericVector& chi2boundary);
 RcppExport SEXP _SVDFunctions_quality_control_impl(SEXP case_countsSEXP, SEXP mafSEXP, SEXP macSEXP, SEXP chi2boundarySEXP) {
@@ -82,6 +136,29 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type min_controls(min_controlsSEXP);
     Rcpp::traits::input_parameter< double >::type min_call_rate(min_call_rateSEXP);
     rcpp_result_gen = Rcpp::wrap(match_controls_cpp(gmatrix, cc, variant_rows, clustering, candidates, statistics, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate));
+    return rcpp_result_gen;
+END_RCPP
+}
+// match_controls_file_cpp
+List match_controls_file_cpp(const std::string& path, IntegerMatrix& cc, IntegerVector& variant_rows, IntegerVector& clustering, List& candidates, NumericVector& statistics, NumericVector& chi2fn, double min_lambda, double lb_lambda, double max_lambda, double ub_lambda, int min_controls, double min_call_rate);
+RcppExport SEXP _SVDFunctions_match_controls_file_cpp(SEXP pathSEXP, SEXP ccSEXP, SEXP variant_rowsSEXP, SEXP clusteringSEXP, SEXP candidatesSEXP, SEXP statisticsSEXP, SEXP chi2fnSEXP, SEXP min_lambdaSEXP, SEXP lb_lambdaSEXP, SEXP max_lambdaSEXP, SEXP ub_lambdaSEXP, SEXP min_controlsSEXP, SEXP min_call_rateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::string& >::type path(pathSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix& >::type cc(ccSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type variant_rows(variant_rowsSEXP);
+    Rcpp::traits::input_parameter< IntegerVector& >::type clustering(clusteringSEXP);
+    Rcpp::traits::input_parameter< List& >::type candidates(candidatesSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type statistics(statisticsSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type chi2fn(chi2fnSEXP);
+    Rcpp::traits::input_parameter< double >::type min_lambda(min_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type lb_lambda(lb_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type max_lambda(max_lambdaSEXP);
+    Rcpp::traits::input_parameter< double >::type ub_lambda(ub_lambdaSEXP);
+    Rcpp::traits::input_parameter< int >::type min_controls(min_controlsSEXP);
+    Rcpp::traits::input_parameter< double >::type min_call_rate(min_call_rateSEXP);
+    rcpp_result_gen = Rcpp::wrap(match_controls_file_cpp(path, cc, variant_rows, clustering, candidates, statistics, chi2fn, min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -172,10 +249,15 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_SVDFunctions_write_controls_matrix_cpp", (DL_FUNC) &_SVDFunctions_write_controls_matrix_cpp, 5},
+    {"_SVDFunctions_controls_matrix_info_cpp", (DL_FUNC) &_SVDFunctions_controls_matrix_info_cpp, 1},
+    {"_SVDFunctions_project_controls_file_cpp", (DL_FUNC) &_SVDFunctions_project_controls_file_cpp, 5},
+    {"_SVDFunctions_collapse_controls_matrix_cpp", (DL_FUNC) &_SVDFunctions_collapse_controls_matrix_cpp, 4},
     {"_SVDFunctions_quality_control_impl", (DL_FUNC) &_SVDFunctions_quality_control_impl, 4},
     {"_SVDFunctions_subsample_mvn", (DL_FUNC) &_SVDFunctions_subsample_mvn, 5},
     {"_SVDFunctions_mvn_subsample_clusters_cpp", (DL_FUNC) &_SVDFunctions_mvn_subsample_clusters_cpp, 12},
     {"_SVDFunctions_match_controls_cpp", (DL_FUNC) &_SVDFunctions_match_controls_cpp, 13},
+    {"_SVDFunctions_match_controls_file_cpp", (DL_FUNC) &_SVDFunctions_match_controls_file_cpp, 13},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {"_SVDFunctions_convert_to_cluster_binary", (DL_FUNC) &_SVDFunctions_convert_to_cluster_binary, 9},
     {"_SVDFunctions_parse_cluster_binary_file", (DL_FUNC) &_SVDFunctions_parse_cluster_binary_file, 11},

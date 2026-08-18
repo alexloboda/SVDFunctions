@@ -2,9 +2,13 @@
 % Please edit documentation in R/selectControls.R
 \name{matchControlCandidates}
 \alias{matchControlCandidates}
+\alias{matchControlCandidates.matrix}
+\alias{matchControlCandidates.character}
 \title{Pick the genetically best matching subset among control candidates.}
 \usage{
-matchControlCandidates(
+matchControlCandidates(originalGenotypeMatrix, ...)
+
+\method{matchControlCandidates}{matrix}(
   originalGenotypeMatrix,
   caseCounts,
   candidates,
@@ -15,14 +19,32 @@ matchControlCandidates(
   softMaxLambda = 1.05,
   maxLambda = 1.3,
   min = 500,
-  minCallRate = 0.98
+  minCallRate = 0.98,
+  ...
+)
+
+\method{matchControlCandidates}{character}(
+  originalGenotypeMatrix,
+  caseCounts,
+  candidates,
+  clusterIds = NULL,
+  variantRows = NULL,
+  caseVariants = NULL,
+  minLambda = 0.75,
+  softMinLambda = 0.9,
+  softMaxLambda = 1.05,
+  maxLambda = 1.3,
+  min = 500,
+  minCallRate = 0.98,
+  ...
 )
 }
 \arguments{
-\item{originalGenotypeMatrix}{integer genotype matrix with missing values.
-The matrix must already use integer storage mode; \code{selectControls}
-throws an error instead of coercing it to avoid an additional full copy. Its
-rows must correspond to those of \code{genotypeMatrix}.}
+\item{originalGenotypeMatrix}{either the integer control genotype matrix
+described in \code{\link{selectControls}}, or the path of a control matrix
+file holding raw genotypes or collapsed per-cluster counts.}
+
+\item{...}{passed to the method.}
 
 \item{caseCounts}{matrix with summary genotype counts from cases, one row per
 case variant in the order given by \code{caseVariants}.}
@@ -31,9 +53,9 @@ case variant in the order given by \code{caseVariants}.}
 a \code{clusters} element holding one-based cluster ids per candidate and a
 matching \code{statistics} element.}
 
-\item{clusterIds}{one-based cluster id per column of
-\code{originalGenotypeMatrix}, as returned by
-\code{\link{prepareControlsSpace}}.}
+\item{clusterIds}{one-based cluster id per control sample, as returned by
+\code{\link{prepareControlsSpace}}. For a collapsed counts file it defaults to
+the clustering stored in the file.}
 
 \item{variantRows}{optional one-based rows of \code{originalGenotypeMatrix}
 holding the case variants, in the row order of \code{caseCounts}. Defaults to
@@ -50,6 +72,10 @@ every row, i.e. cases and controls share the same variants in the same order.}
 \item{min}{minimal number of clusters from control dataset to be returned.}
 
 \item{minCallRate}{numeric minimal call rate for SNP to be considered.}
+
+\item{caseVariants}{optional names of the case variants, in the row order of
+\code{caseCounts}. Only for the file backed method, where it is resolved
+against the variant names stored in the file instead of \code{variantRows}.}
 }
 \value{
 a list with the matching diagnostics (\code{lambda},
@@ -67,4 +93,16 @@ inflation factor \eqn{\lambda_GC}. It then keeps the candidates within
 \eqn{[minLambda; maxLambda]} and prefers the ones inside
 \eqn{[softMinLambda; softMaxLambda]}, falling back to the one closest to that
 range.
+}
+\details{
+The controls can be given as a matrix, as the path of a raw genotype matrix
+written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, or as
+the path of a per-cluster counts file written by
+\code{\link{collapseControlsMatrix}}. The collapsed file is the cheapest of
+the three: it already holds exactly the counts this stage needs, so nothing is
+recomputed and no individual genotype is read. It also carries its own
+clustering, so \code{clusterIds} defaults to the one it was built with.
+}
+\seealso{
+\code{\link{collapseControlsMatrix}}
 }

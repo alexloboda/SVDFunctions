@@ -58,30 +58,14 @@ resolveSelectedControls <- function(clusterIds, sampleClusterIds, clusterLabels,
   unlist(samplesByCluster[as.character(clusterIds - 1L)], use.names = FALSE)
 }
 
-#' Project control genotypes into the case PCA-like space.
-#'
-#' First stage of \code{\link{selectControls}}. It reduces the control genotypes
-#' to the PCA-like coordinates the cases were reduced to, and collects the target
-#' mean and covariance that describe the case distribution in that space. The
-#' returned list carries everything \code{\link{mvnSubsampleClusters}} needs, so
-#' the annealing can be run directly on it.
-#' @inheritParams selectControls
-#' @return a list with the reduced control coordinates (\code{points}, one column
-#' per control sample), the target \code{mean} and \code{cov} of the case
-#' distribution, the one-based per-sample \code{clusterIds} together with their
-#' \code{clusterLabels}, the control \code{sampleNames}, the resolved
-#' \code{caseVariants} and the \code{variantRows} they occupy in
-#' \code{genotypeMatrix}.
-#' @export
-prepareControlsSpace <- function(genotypeMatrix, SVDReference, controlsMean,
-                                 casesMean, casesPDs, caseVariants = NULL,
-                                 controlsClustering = NULL) {
-  stopifnot(is.matrix(genotypeMatrix))
-  if (mode(genotypeMatrix) != "numeric") {
-    stop("genotypeMatrix must already be stored as a numeric matrix")
-  }
-  stopifnot(all(!is.na(genotypeMatrix)))
-  controlVariants <- rownames(genotypeMatrix)
+# Shared core of the prepareControlsSpace methods. Everything except the
+# projection itself is identical between the in-memory and the file backed path,
+# so the difference is confined to `project`, which receives the k x
+# n_case_variants transition, the rows the case variants occupy in the controls
+# and the control means of those variants, and returns the reduced coordinates.
+buildControlsSpace <- function(controlVariants, sampleNames, nSamples,
+                               SVDReference, controlsMean, casesMean, casesPDs,
+                               caseVariants, controlsClustering, project) {
   if (is.null(controlVariants)) {
     stop("genotypeMatrix must have variant row names")
   }
@@ -96,9 +80,8 @@ prepareControlsSpace <- function(genotypeMatrix, SVDReference, controlsMean,
   if (anyNA(variantRows)) {
     stop("caseVariants must be a subset of the control genotype matrix rows")
   }
-  clusteringInfo <- prepareControlsClustering(controlsClustering,
-                                              colnames(genotypeMatrix),
-                                              ncol(genotypeMatrix))
+  clusteringInfo <- prepareControlsClustering(controlsClustering, sampleNames,
+                                              nSamples)
   cl <- clusteringInfo$sampleClusterIds
   stopifnot(all(!is.na(cl)))
   if (any(tabulate(cl + 1L) > 255L)) {
@@ -110,31 +93,120 @@ prepareControlsSpace <- function(genotypeMatrix, SVDReference, controlsMean,
     stop("Every case variant must occur in SVDReference")
   }
   transition <- pinv(SVDReference[caseVariants, , drop = FALSE])
-  meanOffset <- as.vector(transition %*% controlsMean[caseVariants])
+  variantMean <- as.vector(controlsMean[caseVariants])
   rm(SVDReference)
 
-  # Project the controls into the case PCA-like space through an index view over
-  # the control variants instead of slicing genotypeMatrix into a large copy:
-  # the transition is widened to every control variant with zero columns for
-  # those absent from the cases, so multiplying the full matrix yields the same
-  # reduced result as projecting only the shared variants.
-  if (length(variantRows) != length(controlVariants) ||
-      any(variantRows != seq_along(controlVariants))) {
-    widened <- matrix(0, nrow(transition), length(controlVariants))
-    widened[, variantRows] <- transition
-    transition <- widened
-  }
-  points <- transition %*% genotypeMatrix
-  points <- points - meanOffset
+  points <- project(transition, variantRows, variantMean)
+  # The in-memory projection inherits these from the multiplication; set them
+  # explicitly so both paths label the columns of `points` the same way.
+  colnames(points) <- sampleNames
 
   list(points = points,
        mean = casesMean,
        cov = tcrossprod(as.matrix(casesPDs)),
        clusterIds = cl + 1L,
        clusterLabels = clusteringInfo$clusterLabels,
-       sampleNames = colnames(genotypeMatrix),
+       sampleNames = sampleNames,
        caseVariants = caseVariants,
        variantRows = variantRows)
+}
+
+#' Project control genotypes into the case PCA-like space.
+#'
+#' First stage of \code{\link{selectControls}}. It reduces the control genotypes
+#' to the PCA-like coordinates the cases were reduced to, and collects the target
+#' mean and covariance that describe the case distribution in that space. The
+#' returned list carries everything \code{\link{mvnSubsampleClusters}} needs, so
+#' the annealing can be run directly on it.
+#'
+#' The controls can be given either as a matrix or as the path of a file written
+#' by \code{\link{writeControlsMatrix}}. The file backed method streams the
+#' matrix one variant at a time and never materialises it: the projection
+#' decomposes into one contribution per variant, so its peak memory is the
+#' reduced result plus a handful of variant rows, whatever the size of the
+#' matrix on disk.
+#'
+#' The two methods sum the same products in a different order, so the reduced
+#' coordinates agree to rounding rather than bit for bit. The search that
+#' consumes them is discrete, so the two can settle on different -- equally
+#' valid -- subsets of controls. Within either method the result is exact and
+#' does not depend on \code{threads}.
+#' @param genotypeMatrix either the numeric control genotype matrix described in
+#' \code{\link{selectControls}}, or the path of a control matrix file holding it.
+#' @param threads optional integer number of threads for the file backed
+#' projection. By default uses all available hardware threads. Ignored for the
+#' in-memory method.
+#' @param ... passed to the method.
+#' @inheritParams selectControls
+#' @return a list with the reduced control coordinates (\code{points}, one column
+#' per control sample), the target \code{mean} and \code{cov} of the case
+#' distribution, the one-based per-sample \code{clusterIds} together with their
+#' \code{clusterLabels}, the control \code{sampleNames}, the resolved
+#' \code{caseVariants} and the \code{variantRows} they occupy in
+#' \code{genotypeMatrix}.
+#' @seealso \code{\link{writeControlsMatrix}}
+#' @export
+prepareControlsSpace <- function(genotypeMatrix, ...) {
+  UseMethod("prepareControlsSpace")
+}
+
+#' @rdname prepareControlsSpace
+#' @export
+prepareControlsSpace.matrix <- function(genotypeMatrix, SVDReference, controlsMean,
+                                        casesMean, casesPDs, caseVariants = NULL,
+                                        controlsClustering = NULL, ...) {
+  if (mode(genotypeMatrix) != "numeric") {
+    stop("genotypeMatrix must already be stored as a numeric matrix")
+  }
+  stopifnot(all(!is.na(genotypeMatrix)))
+  controlVariants <- rownames(genotypeMatrix)
+
+  project <- function(transition, variantRows, variantMean) {
+    meanOffset <- as.vector(transition %*% variantMean)
+    # Project the controls into the case PCA-like space through an index view
+    # over the control variants instead of slicing genotypeMatrix into a large
+    # copy: the transition is widened to every control variant with zero columns
+    # for those absent from the cases, so multiplying the full matrix yields the
+    # same reduced result as projecting only the shared variants.
+    if (length(variantRows) != length(controlVariants) ||
+        any(variantRows != seq_along(controlVariants))) {
+      widened <- matrix(0, nrow(transition), length(controlVariants))
+      widened[, variantRows] <- transition
+      transition <- widened
+    }
+    points <- transition %*% genotypeMatrix
+    points - meanOffset
+  }
+
+  buildControlsSpace(controlVariants, colnames(genotypeMatrix),
+                     ncol(genotypeMatrix), SVDReference, controlsMean, casesMean,
+                     casesPDs, caseVariants, controlsClustering, project)
+}
+
+#' @rdname prepareControlsSpace
+#' @export
+prepareControlsSpace.character <- function(genotypeMatrix, SVDReference, controlsMean,
+                                           casesMean, casesPDs, caseVariants = NULL,
+                                           controlsClustering = NULL, threads = NULL,
+                                           ...) {
+  path <- path.expand(genotypeMatrix)
+  info <- readControlsMatrixInfo(path)
+  if (info$dtype == "clusterCounts") {
+    stop("the projection needs a genotype matrix, not collapsed cluster counts")
+  }
+  threads <- if (is.null(threads)) 0L else as.integer(threads)
+  stopifnot(threads >= 0L)
+
+  # The C++ side centers each variant as it streams it, which is exactly the
+  # meanOffset subtraction the in-memory path performs after the fact.
+  project <- function(transition, variantRows, variantMean) {
+    project_controls_file_cpp(path, variantRows - 1L, transition, variantMean,
+                              threads)
+  }
+
+  buildControlsSpace(info$rownames, info$colnames, info$ncol, SVDReference,
+                     controlsMean, casesMean, casesPDs, caseVariants,
+                     controlsClustering, project)
 }
 
 #' Select multivariate normal subsamples of a set of points.
@@ -221,6 +293,30 @@ mvnSubsampleClusters <- function(points, mean, cov, clusterIds = NULL,
                              threads, precomputeThreads, clusterTileSize)
 }
 
+# The chi-squared quantile table the lambda_GC estimate is read off.
+matchingChisqTable <- function() {
+  stats::qchisq(stats::ppoints(1e+07), df = 1)
+}
+
+validateCandidates <- function(candidates) {
+  if (!is.list(candidates) || is.null(candidates$clusters) ||
+      is.null(candidates$statistics)) {
+    stop("candidates must be a list with clusters and statistics elements")
+  }
+  candidates
+}
+
+validateClusterIds <- function(clusterIds, nSamples) {
+  clusterIds <- as.integer(clusterIds)
+  if (length(clusterIds) != nSamples) {
+    stop("clusterIds must have one entry per control sample")
+  }
+  if (anyNA(clusterIds) || any(clusterIds < 1L)) {
+    stop("clusterIds must be one-based cluster indices")
+  }
+  clusterIds
+}
+
 #' Pick the genetically best matching subset among control candidates.
 #'
 #' Third stage of \code{\link{selectControls}}, and the only one that looks at
@@ -232,41 +328,54 @@ mvnSubsampleClusters <- function(points, mean, cov, clusterIds = NULL,
 #' \eqn{[minLambda; maxLambda]} and prefers the ones inside
 #' \eqn{[softMinLambda; softMaxLambda]}, falling back to the one closest to that
 #' range.
+#'
+#' The controls can be given as a matrix, as the path of a raw genotype matrix
+#' written by \code{\link{writeControlsMatrix}} with \code{dtype = "u8"}, or as
+#' the path of a per-cluster counts file written by
+#' \code{\link{collapseControlsMatrix}}. The collapsed file is the cheapest of
+#' the three: it already holds exactly the counts this stage needs, so nothing is
+#' recomputed and no individual genotype is read. It also carries its own
+#' clustering, so \code{clusterIds} defaults to the one it was built with.
+#' @param originalGenotypeMatrix either the integer control genotype matrix
+#' described in \code{\link{selectControls}}, or the path of a control matrix
+#' file holding raw genotypes or collapsed per-cluster counts.
 #' @param candidates list as returned by \code{\link{mvnSubsampleClusters}}, with
 #' a \code{clusters} element holding one-based cluster ids per candidate and a
 #' matching \code{statistics} element.
-#' @param clusterIds one-based cluster id per column of
-#' \code{originalGenotypeMatrix}, as returned by
-#' \code{\link{prepareControlsSpace}}.
+#' @param clusterIds one-based cluster id per control sample, as returned by
+#' \code{\link{prepareControlsSpace}}. For a collapsed counts file it defaults to
+#' the clustering stored in the file.
 #' @param variantRows optional one-based rows of \code{originalGenotypeMatrix}
 #' holding the case variants, in the row order of \code{caseCounts}. Defaults to
 #' every row, i.e. cases and controls share the same variants in the same order.
+#' @param caseVariants optional names of the case variants, in the row order of
+#' \code{caseCounts}. Only for the file backed method, where it is resolved
+#' against the variant names stored in the file instead of \code{variantRows}.
+#' @param ... passed to the method.
 #' @inheritParams selectControls
 #' @return a list with the matching diagnostics (\code{lambda},
 #' \code{optimal_lambda}, \code{statistics}, \code{pvals}, \code{snps}) and a
 #' \code{controls} element holding the one-based cluster ids of the selected
 #' candidate, empty when no candidate satisfied the hard lambda bounds.
+#' @seealso \code{\link{collapseControlsMatrix}}
 #' @export
-matchControlCandidates <- function(originalGenotypeMatrix, caseCounts, candidates,
-                                   clusterIds, variantRows = NULL,
-                                   minLambda = 0.75, softMinLambda = 0.9,
-                                   softMaxLambda = 1.05, maxLambda = 1.3,
-                                   min = 500, minCallRate = 0.98) {
-  stopifnot(is.matrix(originalGenotypeMatrix))
+matchControlCandidates <- function(originalGenotypeMatrix, ...) {
+  UseMethod("matchControlCandidates")
+}
+
+#' @rdname matchControlCandidates
+#' @export
+matchControlCandidates.matrix <- function(originalGenotypeMatrix, caseCounts,
+                                          candidates, clusterIds,
+                                          variantRows = NULL, minLambda = 0.75,
+                                          softMinLambda = 0.9, softMaxLambda = 1.05,
+                                          maxLambda = 1.3, min = 500,
+                                          minCallRate = 0.98, ...) {
   if (!is.integer(originalGenotypeMatrix)) {
     stop("originalGenotypeMatrix must already be stored as an integer matrix")
   }
-  if (!is.list(candidates) || is.null(candidates$clusters) ||
-      is.null(candidates$statistics)) {
-    stop("candidates must be a list with clusters and statistics elements")
-  }
-  clusterIds <- as.integer(clusterIds)
-  if (length(clusterIds) != ncol(originalGenotypeMatrix)) {
-    stop("clusterIds must have one entry per control sample")
-  }
-  if (anyNA(clusterIds) || any(clusterIds < 1L)) {
-    stop("clusterIds must be one-based cluster indices")
-  }
+  validateCandidates(candidates)
+  clusterIds <- validateClusterIds(clusterIds, ncol(originalGenotypeMatrix))
   caseCounts <- as.matrix(caseCounts)
   if (is.null(variantRows)) {
     variantRows <- seq_len(nrow(originalGenotypeMatrix))
@@ -280,9 +389,84 @@ matchControlCandidates <- function(originalGenotypeMatrix, caseCounts, candidate
                      clusterIds - 1L,
                      lapply(candidates$clusters, as.integer),
                      as.numeric(candidates$statistics),
-                     stats::qchisq(stats::ppoints(1e+07), df = 1),
+                     matchingChisqTable(),
                      minLambda, softMinLambda, maxLambda, softMaxLambda,
                      min, minCallRate)
+}
+
+#' @rdname matchControlCandidates
+#' @export
+matchControlCandidates.character <- function(originalGenotypeMatrix, caseCounts,
+                                             candidates, clusterIds = NULL,
+                                             variantRows = NULL, caseVariants = NULL,
+                                             minLambda = 0.75, softMinLambda = 0.9,
+                                             softMaxLambda = 1.05, maxLambda = 1.3,
+                                             min = 500, minCallRate = 0.98, ...) {
+  path <- path.expand(originalGenotypeMatrix)
+  info <- readControlsMatrixInfo(path)
+  collapsed <- info$dtype == "clusterCounts"
+  if (!collapsed && info$dtype != "u8") {
+    stop(paste("matching needs a matrix written with dtype \"u8\" or collapsed",
+               "cluster counts"))
+  }
+  validateCandidates(candidates)
+
+  if (is.null(clusterIds)) {
+    if (collapsed) {
+      if (any(info$colweights < 1L)) {
+        stop("the cluster counts file holds an empty cluster")
+      }
+      # A collapsed file has no samples left to count, so the clustering is
+      # rebuilt from the sample sizes it stores alongside the counts.
+      clusterIds <- rep(seq_len(info$ncol), info$colweights)
+    } else {
+      clusterIds <- seq_len(info$ncol)
+    }
+  }
+  clusterIds <- validateClusterIds(clusterIds, sum(info$colweights))
+
+  caseCounts <- as.matrix(caseCounts)
+  if (is.null(variantRows)) {
+    variantRows <- controlsMatrixVariantRows(info, caseVariants)
+  }
+  variantRows <- as.integer(variantRows)
+  if (nrow(caseCounts) != length(variantRows)) {
+    stop("caseCounts must have one row per case variant")
+  }
+
+  match_controls_file_cpp(path, caseCounts, variantRows - 1L, clusterIds - 1L,
+                          lapply(candidates$clusters, as.integer),
+                          as.numeric(candidates$statistics),
+                          matchingChisqTable(),
+                          minLambda, softMinLambda, maxLambda, softMaxLambda,
+                          min, minCallRate)
+}
+
+# Stages two and three plus the resolution of the selected clusters back to
+# names. `match` runs the third stage over the candidates the search produced;
+# it is the only part that differs between the in-memory and file backed entry
+# points.
+runControlSelection <- function(space, match, sampleNames, returnClusters, min, max,
+                                step, iterations, seed, saThreads,
+                                exactPrecomputeThreads, exactClusterTileSize) {
+  candidates <- mvnSubsampleClusters(space$points, space$mean, space$cov,
+                                     space$clusterIds, min = min, max = max,
+                                     step = step, iterations = iterations,
+                                     seed = seed, threads = saThreads,
+                                     precomputeThreads = exactPrecomputeThreads,
+                                     clusterTileSize = exactClusterTileSize)
+  result <- match(candidates)
+  if (length(result$controls) > 0) {
+    # resolveSelectedControls expects zero-based per-sample cluster ids.
+    result$controls <- resolveSelectedControls(result$controls,
+                                               space$clusterIds - 1L,
+                                               space$clusterLabels,
+                                               sampleNames, returnClusters)
+  }
+  else {
+    result$controls <- c()
+  }
+  result
 }
 
 #' Select a set of controls that matches to a set of cases.
@@ -385,32 +569,114 @@ selectControls <- function (genotypeMatrix, originalGenotypeMatrix, casesPDs,
     stop("caseCounts must have one row per case variant")
   }
 
-  candidates <- mvnSubsampleClusters(space$points, space$mean, space$cov,
-                                     space$clusterIds, min = min, max = max,
-                                     step = step, iterations = iterations,
-                                     seed = seed, threads = saThreads,
-                                     precomputeThreads = exactPrecomputeThreads,
-                                     clusterTileSize = exactClusterTileSize)
-
-  result <- matchControlCandidates(originalGenotypeMatrix, caseCounts, candidates,
-                                   space$clusterIds, space$variantRows,
-                                   minLambda = minLambda,
-                                   softMinLambda = softMinLambda,
-                                   softMaxLambda = softMaxLambda,
-                                   maxLambda = maxLambda, min = min,
-                                   minCallRate = minCallRate)
-
-  if (length(result$controls) > 0) {
-    # resolveSelectedControls expects zero-based per-sample cluster ids, and the
-    # sample names come from the matrix the counts were taken from.
-    result$controls <- resolveSelectedControls(result$controls,
-                                               space$clusterIds - 1L,
-                                               space$clusterLabels,
-                                               colnames(originalGenotypeMatrix),
-                                               returnClusters)
+  match <- function(candidates) {
+    matchControlCandidates(originalGenotypeMatrix, caseCounts, candidates,
+                           space$clusterIds, space$variantRows,
+                           minLambda = minLambda,
+                           softMinLambda = softMinLambda,
+                           softMaxLambda = softMaxLambda,
+                           maxLambda = maxLambda, min = min,
+                           minCallRate = minCallRate)
   }
-  else {
-    result$controls <- c()
+
+  # The sample names come from the matrix the counts were taken from.
+  runControlSelection(space, match, colnames(originalGenotypeMatrix),
+                      returnClusters, min, max, step, iterations, seed,
+                      saThreads, exactPrecomputeThreads, exactClusterTileSize)
+}
+
+#' Select a set of controls without holding the control genotypes in memory.
+#'
+#' Does exactly what \code{\link{selectControls}} does, but reads the control
+#' genotypes from files written by \code{\link{writeControlsMatrix}} instead of
+#' taking them as matrices. The projection streams the reduced genotypes one
+#' variant at a time and the matching streams the raw ones, so at no point does
+#' a control genotype matrix exist in R. What is held is the reduced
+#' \code{points} (one small vector per sample) and the per-cluster allele counts,
+#' both of which are orders of magnitude smaller than the genotypes they come
+#' from.
+#'
+#' \code{originalFile} may be a raw genotype matrix written with
+#' \code{dtype = "u8"}, or the per-cluster counts produced by
+#' \code{\link{collapseControlsMatrix}}. The collapsed form is both faster and
+#' free of individual genotypes; because it has no samples left in it, the
+#' selected controls come back as cluster identifiers.
+#'
+#' The two files are matched by name, not by position: the case variants are
+#' resolved against the variant names of each file separately, so the files may
+#' order their variants differently. The samples, however, must line up, and
+#' with a collapsed file the clustering stored in it must be the one
+#' \code{controlsClustering} describes. That last check compares the cluster
+#' labels and the per-cluster sample counts, which is all a collapsed file
+#' retains: a clustering that permutes samples between equally sized clusters of
+#' the same name cannot be told apart from the one the file was built with.
+#' @param genotypeFile path of the control matrix file holding the imputed
+#' genotypes, written with \code{dtype} \code{"f64"} or \code{"f32"} (or
+#' \code{"u8"} when the genotypes are integral).
+#' @param originalFile path of the control matrix file holding the raw genotypes
+#' (\code{dtype = "u8"}) or the collapsed per-cluster counts.
+#' @param projectionThreads optional integer number of threads for the streaming
+#' projection. By default uses all available hardware threads.
+#' @inheritParams selectControls
+#' @return the same list \code{\link{selectControls}} returns.
+#' @seealso \code{\link{writeControlsMatrix}},
+#' \code{\link{collapseControlsMatrix}}, \code{\link{selectControls}}
+#' @export
+selectControlsFromFiles <- function(genotypeFile, originalFile, casesPDs,
+                                    casesMean, SVDReference, controlsMean,
+                                    caseCounts, caseVariants = NULL,
+                                    controlsClustering = NULL, minLambda = 0.75,
+                                    softMinLambda = 0.9, softMaxLambda = 1.05,
+                                    maxLambda = 1.3, min = 500, max = 1000,
+                                    step = 50, iterations = 100000,
+                                    minCallRate = 0.98, saThreads = NULL,
+                                    exactPrecomputeThreads = NULL,
+                                    exactClusterTileSize = 32L,
+                                    projectionThreads = NULL,
+                                    returnClusters = FALSE, seed = NULL) {
+  seed <- resolveSeed(seed)
+  returnClusters <- isTRUE(returnClusters)
+  genotypeFile <- path.expand(genotypeFile)
+  originalFile <- path.expand(originalFile)
+
+  space <- prepareControlsSpace(genotypeFile, SVDReference, controlsMean,
+                                casesMean, casesPDs, caseVariants,
+                                controlsClustering, threads = projectionThreads)
+  if (nrow(as.matrix(caseCounts)) != length(space$variantRows)) {
+    stop("caseCounts must have one row per case variant")
   }
-  result
+
+  info <- readControlsMatrixInfo(originalFile)
+  if (info$dtype == "clusterCounts") {
+    if (!identical(info$colnames, space$clusterLabels) ||
+        !identical(as.integer(info$colweights),
+                   as.integer(tabulate(space$clusterIds, length(info$colnames))))) {
+      stop(paste("the cluster counts file was collapsed over a different",
+                 "clustering than the one prepareControlsSpace resolved"))
+    }
+    # No samples survive in a collapsed file, so the selection can only be
+    # reported as cluster identifiers.
+    sampleNames <- NULL
+  } else {
+    if (!identical(info$colnames, space$sampleNames)) {
+      stop(paste("genotypeFile and originalFile must hold the same samples in",
+                 "the same order"))
+    }
+    sampleNames <- info$colnames
+  }
+
+  match <- function(candidates) {
+    matchControlCandidates(originalFile, caseCounts, candidates,
+                           clusterIds = space$clusterIds,
+                           caseVariants = space$caseVariants,
+                           minLambda = minLambda,
+                           softMinLambda = softMinLambda,
+                           softMaxLambda = softMaxLambda,
+                           maxLambda = maxLambda, min = min,
+                           minCallRate = minCallRate)
+  }
+
+  runControlSelection(space, match, sampleNames, returnClusters, min, max, step,
+                      iterations, seed, saThreads, exactPrecomputeThreads,
+                      exactClusterTileSize)
 }

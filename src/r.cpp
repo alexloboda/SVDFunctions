@@ -10,6 +10,7 @@
 #include "include/qchisq.h"
 #include "include/matching.h"
 #include "include/subsample.h"
+#include "include/controls_matrix.h"
 #include "include/hw.h"
 
 using namespace Rcpp;
@@ -202,30 +203,24 @@ List mvn_subsample_clusters_cpp(NumericMatrix& points,
     return ret;
 }
 
-// Third stage: pick the candidate subset whose lambda_GC matches the cases best.
-// `candidates` holds one-based cluster ids as produced by mvn_subsample_clusters_cpp,
-// and `variant_rows` maps case variants onto rows of `gmatrix` (see build_cluster_counts).
-// [[Rcpp::export]]
-List match_controls_cpp(IntegerMatrix& gmatrix,
-                        IntegerMatrix& cc,
-                        IntegerVector& variant_rows,
-                        IntegerVector& clustering,
-                        List& candidates,
-                        NumericVector& statistics,
-                        NumericVector& chi2fn,
-                        double min_lambda, double lb_lambda,
-                        double max_lambda, double ub_lambda,
-                        int min_controls, double min_call_rate) {
+// Scores the candidate subsets against the case counts, whatever the per-cluster
+// allele counts were built from. The candidates hold one-based cluster ids as
+// produced by mvn_subsample_clusters_cpp.
+namespace {
+
+List run_matching(std::vector<std::vector<matching::ClusterCounts>>&& cluster_counts,
+                  const mvn::Clustering& cl,
+                  const IntegerMatrix& cc,
+                  const List& candidates,
+                  const NumericVector& statistics,
+                  const NumericVector& chi2fn,
+                  double min_lambda, double lb_lambda,
+                  double max_lambda, double ub_lambda,
+                  int min_controls, double min_call_rate) {
     vector<double> precomputed_chi(chi2fn.begin(), chi2fn.end());
     qchi2 q(precomputed_chi);
 
     auto case_counts = r_to_cpp(cc);
-
-    vector<int> clust_vec(clustering.begin(), clustering.end());
-    vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
-
-    mvn::Clustering cl(clust_vec);
-    validate_cluster_sizes(cl);
 
     if (candidates.size() != statistics.size()) {
         Rcpp::stop("Every candidate subset must come with its normality statistic");
@@ -246,7 +241,6 @@ List match_controls_cpp(IntegerMatrix& gmatrix,
         candidate_subsets.push_back(std::move(subset));
     }
 
-    auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size(), variant_rows_vec);
     matching::matching matcher(std::move(cluster_counts), cl);
     matcher.set_qchi_sq_function(q.function());
     matcher.set_soft_threshold({lb_lambda, ub_lambda});
@@ -278,4 +272,132 @@ List match_controls_cpp(IntegerMatrix& gmatrix,
     ret["pvals"] = pvals;
     ret["snps"] = pvals_num;
     return ret;
+}
+
+// Builds the per-cluster allele counts by streaming a raw genotype matrix from
+// disk one variant row at a time, so the matrix itself is never materialised.
+std::vector<std::vector<matching::ClusterCounts>> stream_cluster_counts(
+        const ctlm::Reader& reader, const std::vector<int>& clustering, size_t n_clusters,
+        const std::vector<int>& variant_rows) {
+    const ctlm::Header& header = reader.header();
+    ctlm::RowReader rows(reader);
+    size_t n_case_variants = variant_rows.size();
+    std::vector<std::vector<matching::ClusterCounts>> counts(
+            n_clusters, std::vector<matching::ClusterCounts>(n_case_variants));
+
+    for (size_t cv = 0; cv < n_case_variants; cv++) {
+        if (cv % 1000 == 0) {
+            Rcpp::checkUserInterrupt();
+        }
+        int r = variant_rows[cv];
+        if (r < 0 || r >= header.nrow) {
+            continue;
+        }
+        const auto* row = reinterpret_cast<const std::uint8_t*>(rows.raw(r));
+        for (std::int64_t j = 0; j < header.ncol; j++) {
+            std::uint8_t value = row[j];
+            if (value <= 2) {
+                counts[clustering[j]][cv][value] += 1;
+            }
+        }
+    }
+    return counts;
+}
+
+// Reads per-cluster allele counts that were collapsed ahead of time. The file
+// already holds exactly what build_cluster_counts would produce, stored variant
+// major, so this only gathers the case variant rows and transposes them.
+std::vector<std::vector<matching::ClusterCounts>> gather_cluster_counts(
+        const ctlm::Reader& reader, size_t n_clusters, const std::vector<int>& variant_rows) {
+    const ctlm::Header& header = reader.header();
+    ctlm::RowReader rows(reader);
+    size_t n_case_variants = variant_rows.size();
+    std::vector<std::vector<matching::ClusterCounts>> counts(
+            n_clusters, std::vector<matching::ClusterCounts>(n_case_variants));
+
+    for (size_t cv = 0; cv < n_case_variants; cv++) {
+        if (cv % 1000 == 0) {
+            Rcpp::checkUserInterrupt();
+        }
+        int r = variant_rows[cv];
+        if (r < 0 || r >= header.nrow) {
+            continue;
+        }
+        const auto* row = reinterpret_cast<const std::uint8_t*>(rows.raw(r));
+        for (size_t cluster = 0; cluster < n_clusters; cluster++) {
+            const std::uint8_t* triple = row + cluster * 3;
+            for (size_t g = 0; g < 3; g++) {
+                counts[cluster][cv][g] = triple[g];
+            }
+        }
+    }
+    return counts;
+}
+
+}
+
+// [[Rcpp::export]]
+List match_controls_cpp(IntegerMatrix& gmatrix,
+                        IntegerMatrix& cc,
+                        IntegerVector& variant_rows,
+                        IntegerVector& clustering,
+                        List& candidates,
+                        NumericVector& statistics,
+                        NumericVector& chi2fn,
+                        double min_lambda, double lb_lambda,
+                        double max_lambda, double ub_lambda,
+                        int min_controls, double min_call_rate) {
+    vector<int> clust_vec(clustering.begin(), clustering.end());
+    vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
+    mvn::Clustering cl(clust_vec);
+    validate_cluster_sizes(cl);
+
+    auto cluster_counts = build_cluster_counts(gmatrix, clust_vec, cl.size(), variant_rows_vec);
+    return run_matching(std::move(cluster_counts), cl, cc, candidates, statistics, chi2fn,
+                        min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate);
+}
+
+// Same as match_controls_cpp, but the counts come from a control matrix file:
+// either a raw genotype matrix that is collapsed on the fly, or one that was
+// collapsed into per-cluster counts beforehand.
+// [[Rcpp::export]]
+List match_controls_file_cpp(const std::string& path,
+                             IntegerMatrix& cc,
+                             IntegerVector& variant_rows,
+                             IntegerVector& clustering,
+                             List& candidates,
+                             NumericVector& statistics,
+                             NumericVector& chi2fn,
+                             double min_lambda, double lb_lambda,
+                             double max_lambda, double ub_lambda,
+                             int min_controls, double min_call_rate) {
+    try {
+        ctlm::Reader reader(path);
+        const ctlm::Header& header = reader.header();
+
+        vector<int> clust_vec(clustering.begin(), clustering.end());
+        vector<int> variant_rows_vec(variant_rows.begin(), variant_rows.end());
+        mvn::Clustering cl(clust_vec);
+        validate_cluster_sizes(cl);
+
+        std::vector<std::vector<matching::ClusterCounts>> cluster_counts;
+        if (header.dtype == ctlm::DType::U8) {
+            if (header.ncol != static_cast<std::int64_t>(clust_vec.size())) {
+                Rcpp::stop("clusterIds must have one entry per column of the control matrix");
+            }
+            cluster_counts = stream_cluster_counts(reader, clust_vec, cl.size(), variant_rows_vec);
+        } else if (header.dtype == ctlm::DType::CLUSTER_COUNTS) {
+            if (header.ncol != static_cast<std::int64_t>(cl.size())) {
+                Rcpp::stop("The cluster counts file must hold one column per cluster");
+            }
+            cluster_counts = gather_cluster_counts(reader, cl.size(), variant_rows_vec);
+        } else {
+            Rcpp::stop("Matching needs a matrix written with dtype \"u8\" or collapsed cluster counts");
+        }
+
+        return run_matching(std::move(cluster_counts), cl, cc, candidates, statistics, chi2fn,
+                            min_lambda, lb_lambda, max_lambda, ub_lambda, min_controls, min_call_rate);
+    } catch (std::exception& e) {
+        Rcpp::stop(e.what());
+    }
 }
