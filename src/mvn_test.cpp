@@ -413,20 +413,13 @@ mahalanobis_distances::mahalanobis_distances(std::shared_ptr<const Matrix> X, co
     if (S.rows() != S.cols() || S.rows() != this->X->rows() || mean.size() != this->X->rows()) {
         throw std::invalid_argument("Covariance and mean dimensions must match the number of components (rows) of X.");
     }
-    Eigen::LDLT<Matrix> solver(S);
-    if (solver.info() != Eigen::Success) {
+    Eigen::FullPivHouseholderQR<Matrix> solver(S);
+    if (!solver.isInvertible()) {
         throw std::logic_error("Non-invertible matrix. Must not happen.");
     }
 
     transformed = solver.solve(*this->X);
-    if (solver.info() != Eigen::Success) {
-        throw std::logic_error("Failed to solve covariance system. Must not happen.");
-    }
-
     Vector transformed_mean = solver.solve(mean);
-    if (solver.info() != Eigen::Success) {
-        throw std::logic_error("Failed to solve centered covariance system. Must not happen.");
-    }
     double mumu = mean.dot(transformed_mean);
 
     for (Eigen::Index i = 0; i < this->X->cols(); i++) {

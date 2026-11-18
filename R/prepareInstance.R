@@ -53,6 +53,7 @@ collapsingToTree <- function(collapsing) {
 #' @param clusters maximum number of clusters.
 #' @param keepSamples names of the samples to keep in results. The feature is
 #' used in order to cluster jointly with another dataset.
+#' @importFrom mclust mclustBIC
 #' @export
 estimateCaseClusters <- function (PCA, plotBIC = FALSE, plotDendrogram = FALSE, 
                                    minClusters = 1, clusters = 20, keepSamples = NULL) {
