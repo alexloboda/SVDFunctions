@@ -625,3 +625,133 @@ test_that("indels are matched as-is while SNVs may be flipped (binary + cluster)
   expect_equal(clFlip[, c("hom_ref", "het", "hom_alt")],
                flip[, c("hom_ref", "het", "hom_alt")])
 })
+
+# Writes a per-cluster binary straight in its on-disk layout, so that a test can
+# make one of any size and knows exactly what is stored in it. `counts` is
+# indexed [genotype, cluster, variant], which is the order of the bytes on disk.
+write_cluster_binary <- function(prefix, labels, sizes, variantLines, counts) {
+  tabbed <- function(x) paste0(paste(x, collapse = "\t"), "\t")
+  files <- list(binaryFile = paste0(prefix, "_bin"),
+                metafile = paste0(prefix, "_meta"))
+  writeLines(c(tabbed(labels), tabbed(sizes), variantLines), files$metafile)
+  writeBin(as.raw(counts), files$binaryFile)
+  files
+}
+
+# A per-cluster binary large enough for both passes of the scanner, over the
+# metadata lines and over the payload rows, to be cut into several tasks.
+synthetic_cluster_binary <- function(prefix, nVariants = 60000L) {
+  labels <- paste0("cl", 1:6)
+  nClusters <- length(labels)
+  sizes <- rep(40L, nClusters)
+
+  # Chromosome X is spelled in a way the scanner does not read on its fast path.
+  chr <- sort(rep_len(1:23, nVariants))
+  pos <- as.integer(ave(seq_len(nVariants), chr, FUN = seq_along)) * 10L
+  variants <- paste0("chr", ifelse(chr == 23L, "X", chr), ":", pos, "\t",
+                     sample(c("A", "C"), nVariants, replace = TRUE), "\t",
+                     sample(c("G", "T"), nVariants, replace = TRUE))
+
+  draw <- function(values) {
+    matrix(sample(values, nClusters * nVariants, replace = TRUE),
+           nrow = nClusters)
+  }
+  het <- draw(0:9)
+  homAlt <- draw(0:4)
+  # Every 50th variant is monomorphic, which the scanner never reports.
+  monomorphic <- seq(50L, nVariants, by = 50L)
+  het[, monomorphic] <- 0L
+  homAlt[, monomorphic] <- 0L
+  counts <- array(0L, dim = c(3L, nClusters, nVariants))
+  counts[1, , ] <- sizes[1] - het - homAlt - draw(0:2)
+  counts[2, , ] <- het
+  counts[3, , ] <- homAlt
+
+  # A blank metadata line does not stand for a payload row.
+  lines <- append(variants, "", after = nVariants %/% 2L)
+  files <- write_cluster_binary(prefix, labels, sizes, lines, counts)
+  c(files, list(labels = labels, sizes = sizes, chr = chr, pos = pos,
+                variants = variants, counts = counts))
+}
+
+test_that("per-cluster scan does not depend on the number of threads", {
+  set.seed(11)
+  data <- synthetic_cluster_binary(paste0(tempdir(), "/cluster_threads"))
+  nVariants <- length(data$variants)
+
+  selected <- c("cl2", "cl3", "cl6")
+  columns <- match(selected, data$labels)
+  total <- sum(data$sizes[columns])
+  # Genotype by variant counts summed over the selected clusters.
+  summed <- colSums(aperm(data$counts[, columns, ], c(2, 1, 3)))
+  homRef <- summed[1, ]
+  het <- summed[2, ]
+  homAlt <- summed[3, ]
+  reported <- (2 * homRef + het > 0) & (2 * homAlt + het > 0)
+  statistics <- c("hom_ref", "het", "hom_alt", "n_variants", "call_rate")
+
+  regions <- c("chr3 5000 20000", "chr7 1 1000000", "chr22 100 110")
+  bounds <- list(c(3, 5000, 20000), c(7, 1, 1000000), c(22, 100, 110))
+  expectedRegions <- t(vapply(bounds, function(b) {
+    keep <- reported & data$chr == b[1] & data$pos >= b[2] & data$pos <= b[3]
+    alleles <- c(sum(homRef[keep]), sum(het[keep]), sum(homAlt[keep]))
+    c(alleles, sum(keep), sum(alleles) / (sum(keep) * total))
+  }, numeric(5)))
+  dimnames(expectedRegions) <- list(regions, statistics)
+
+  requested <- sort(c(sample(which(data$chr != 23L), 300),
+                      head(which(data$chr == 23L), 5)))
+  keep <- requested[reported[requested]]
+  expectedVariants <- cbind(homRef[keep], het[keep], homAlt[keep], 1,
+                            (homRef + het + homAlt)[keep] / total)
+  dimnames(expectedVariants) <- list(data$variants[keep], statistics)
+  # Some of the requested variants are monomorphic and must be left out.
+  expect_lt(length(keep), length(requested))
+
+  scan <- function(threads, ...) {
+    scanClusterBinaryFile(data$binaryFile, data$metafile, clusters = selected,
+                          minCallRate = 0, threads = threads, ...)
+  }
+  byRegion <- scan(1L, regions = regions)
+  byVariant <- scan(1L, variants = data$variants[requested])
+  expect_equal(byRegion, expectedRegions)
+  expect_equal(byVariant, expectedVariants)
+
+  for (threads in list(2L, 3L, 8L, NULL)) {
+    expect_identical(scan(threads, regions = regions), byRegion)
+    expect_identical(scan(threads, variants = data$variants[requested]),
+                     byVariant)
+  }
+})
+
+test_that("per-cluster scan reports broken files when it runs in parallel", {
+  set.seed(12)
+  data <- synthetic_cluster_binary(paste0(tempdir(), "/cluster_broken"))
+
+  # The second half of the payload is gone, so only the first half can be read.
+  truncatedBin <- paste0(tempdir(), "/cluster_broken_truncated_bin")
+  writeBin(readBin(data$binaryFile, "raw",
+                   n = file.size(data$binaryFile) %/% 2), truncatedBin)
+  expect_equal(nrow(scanClusterBinaryFile(truncatedBin, data$metafile,
+                                          regions = "chr1 1 1000000",
+                                          minCallRate = 0, threads = 2L)), 1L)
+  expect_error(
+    scanClusterBinaryFile(truncatedBin, data$metafile,
+                          regions = "chr22 1 1000000", minCallRate = 0,
+                          threads = 2L),
+    "truncated"
+  )
+
+  # A malformed line is rejected wherever it is, not only inside a scanned
+  # region, and the error has to make it out of the thread that met it.
+  brokenMeta <- paste0(tempdir(), "/cluster_broken_meta_malformed")
+  lines <- readLines(data$metafile)
+  lines[40000] <- "chr12:oops\tA\tG"
+  writeLines(lines, brokenMeta)
+  expect_error(
+    scanClusterBinaryFile(data$binaryFile, brokenMeta,
+                          regions = "chr1 1 1000000", minCallRate = 0,
+                          threads = 2L),
+    "Position must be in format"
+  )
+})

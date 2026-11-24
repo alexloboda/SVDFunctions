@@ -400,6 +400,9 @@ buildClusterBinaryFromBinary <- function(binaryFile, metafile, sampleClusters,
 #' @param maxMAC integer maximum minor allele count.
 #' @param reportSingletons logical if TRUE singletons will be reported.
 #' @param minCallRate numeric minimum call rate.
+#' @param threads integer number of threads used to scan the metadata and to
+#' read the binary file. \code{NULL} or \code{0} uses all available hardware
+#' threads. The result does not depend on \code{threads}.
 #' @return matrix with columns \code{hom_ref}, \code{het}, \code{hom_alt},
 #' \code{n_variants} and \code{call_rate}; one row per reported variant or
 #' region.
@@ -409,7 +412,8 @@ scanClusterBinaryFile <- function(binaryFile, metafile, clusters = NULL,
                                   variants = NULL, regions = NULL,
                                   minMAF = 0.0, maxMAF = 1.0,
                                   minMAC = 1L, maxMAC = .Machine$integer.max,
-                                  reportSingletons = TRUE, minCallRate = 0.9) {
+                                  reportSingletons = TRUE, minCallRate = 0.9,
+                                  threads = 4L) {
   binaryFile <- normalizePath(binaryFile)
   metafile <- normalizePath(metafile)
   stopifnot(file.exists(binaryFile))
@@ -419,10 +423,12 @@ scanClusterBinaryFile <- function(binaryFile, metafile, clusters = NULL,
   clusters <- if (is.null(clusters)) character(0) else unique(as.character(clusters))
   variants <- if (is.null(variants)) character(0) else variants
   regions <- if (is.null(regions)) character(0) else regions
+  threads <- if (is.null(threads)) 0L else as.integer(threads)
+  stopifnot(length(threads) == 1, !is.na(threads), threads >= 0L)
 
   res <- parse_cluster_binary_file(variants, clusters, regions, binaryFile,
                                    metafile, minMAF, maxMAF, minCallRate,
-                                   minMAC, maxMAC, reportSingletons)
+                                   minMAC, maxMAC, reportSingletons, threads)
   names <- res[["names"]]
   total <- as.integer(res["total"])
   res[["names"]] <- NULL

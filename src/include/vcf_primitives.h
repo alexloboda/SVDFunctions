@@ -108,7 +108,7 @@ namespace vcf {
         std::unordered_map<int, std::set<Range>> rs;
     public:
         RangeSet() = default;
-        bool includes(const Position& position);
+        bool includes(const Position& position) const;
         void insert(Range r);
         bool empty() const;
     };

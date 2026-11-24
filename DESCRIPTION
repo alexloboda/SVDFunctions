@@ -32,4 +32,5 @@ LinkingTo: Rcpp,
            BH,
            RcppEigen
 Suggests: testthat
+SystemRequirements: C++20
 Config/roxygen2/version: 8.0.0

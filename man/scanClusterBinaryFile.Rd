@@ -15,7 +15,8 @@ scanClusterBinaryFile(
   minMAC = 1L,
   maxMAC = .Machine$integer.max,
   reportSingletons = TRUE,
-  minCallRate = 0.9
+  minCallRate = 0.9,
+  threads = 4L
 )
 }
 \arguments{
@@ -42,6 +43,10 @@ clusters stored in the file are used.}
 \item{reportSingletons}{logical if TRUE singletons will be reported.}
 
 \item{minCallRate}{numeric minimum call rate.}
+
+\item{threads}{integer number of threads used to scan the metadata and to
+read the binary file. \code{NULL} or \code{0} uses all available hardware
+threads. The result does not depend on \code{threads}.}
 }
 \value{
 matrix with columns \code{hom_ref}, \code{het}, \code{hom_alt},

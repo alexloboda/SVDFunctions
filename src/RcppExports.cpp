@@ -263,8 +263,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // parse_cluster_binary_file
-List parse_cluster_binary_file(const CharacterVector& variants, const CharacterVector& clusters, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons);
-RcppExport SEXP _SVDFunctions_parse_cluster_binary_file(SEXP variantsSEXP, SEXP clustersSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP) {
+List parse_cluster_binary_file(const CharacterVector& variants, const CharacterVector& clusters, const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile, const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr, const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons, int threads);
+RcppExport SEXP _SVDFunctions_parse_cluster_binary_file(SEXP variantsSEXP, SEXP clustersSEXP, SEXP regionsSEXP, SEXP binary_fileSEXP, SEXP metafileSEXP, SEXP r_min_mafSEXP, SEXP r_max_mafSEXP, SEXP r_min_crSEXP, SEXP r_min_macSEXP, SEXP r_max_macSEXP, SEXP report_singletonsSEXP, SEXP threadsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -279,7 +279,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const IntegerVector& >::type r_min_mac(r_min_macSEXP);
     Rcpp::traits::input_parameter< const IntegerVector& >::type r_max_mac(r_max_macSEXP);
     Rcpp::traits::input_parameter< const LogicalVector& >::type report_singletons(report_singletonsSEXP);
-    rcpp_result_gen = Rcpp::wrap(parse_cluster_binary_file(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons));
+    Rcpp::traits::input_parameter< int >::type threads(threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(parse_cluster_binary_file(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, threads));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -322,7 +323,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_SVDFunctions_match_controls_file_cpp", (DL_FUNC) &_SVDFunctions_match_controls_file_cpp, 13},
     {"_SVDFunctions_parse_binary_file", (DL_FUNC) &_SVDFunctions_parse_binary_file, 13},
     {"_SVDFunctions_convert_to_cluster_binary", (DL_FUNC) &_SVDFunctions_convert_to_cluster_binary, 9},
-    {"_SVDFunctions_parse_cluster_binary_file", (DL_FUNC) &_SVDFunctions_parse_cluster_binary_file, 11},
+    {"_SVDFunctions_parse_cluster_binary_file", (DL_FUNC) &_SVDFunctions_parse_cluster_binary_file, 12},
     {"_SVDFunctions_parse_vcf", (DL_FUNC) &_SVDFunctions_parse_vcf, 12},
     {NULL, NULL, 0}
 };

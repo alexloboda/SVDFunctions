@@ -61,8 +61,8 @@ convert_to_cluster_binary <- function(binary_file, metafile, samples, sample_clu
     .Call(`_SVDFunctions_convert_to_cluster_binary`, binary_file, metafile, samples, sample_clusters, cluster_labels, out_binary, out_meta, requiredDP, requiredGQ)
 }
 
-parse_cluster_binary_file <- function(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons) {
-    .Call(`_SVDFunctions_parse_cluster_binary_file`, variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons)
+parse_cluster_binary_file <- function(variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, threads) {
+    .Call(`_SVDFunctions_parse_cluster_binary_file`, variants, clusters, regions, binary_file, metafile, r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac, report_singletons, threads)
 }
 
 parse_vcf <- function(filename, samples, bad_positions, variants, DP, GQ, gmatrix, predictMissing, regions, binary_prefix, missingRateThreshold, seed) {

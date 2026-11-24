@@ -2,12 +2,24 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <atomic>
+#include <charconv>
+#include <chrono>
+#include <iterator>
 #include <numeric>
+#include <optional>
+#include <ranges>
+#include <span>
+#include <string_view>
+#include <system_error>
+#include <thread>
 #include <tuple>
+#include <type_traits>
 #include <future>
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "include/vcf_binary.h"
 #include "include/matching.h"
@@ -270,11 +282,13 @@ namespace {
                 continue;
             }
 
-            bool in_range = curr_range < (long)ranges.size();
-            while (in_range && ranges[curr_range] < var.position()) {
+            // The bound is rechecked on every step: a variant past the last
+            // range moves curr_range to the end of the vector.
+            while (curr_range < (long)ranges.size() && ranges[curr_range] < var.position()) {
                 ++curr_range;
                 range_entry = -1;
             }
+            bool in_range = curr_range < (long)ranges.size();
 
             if (requested.find(var) != requested.end()) {
                 bool as_is = requested.at(var);
@@ -481,11 +495,385 @@ List convert_to_cluster_binary(const CharacterVector& binary_file, const Charact
     }
 }
 
+// The per-cluster scanner. Both of its passes, over the metadata lines and over
+// the payload rows, are cut into tasks by the size of the input alone and the
+// task results are put together in file order. The number of threads therefore
+// only decides how many tasks run at once, never what the scan returns.
+//
+// Both files are memory mapped. The mio sources own the mappings and release
+// them when they go out of scope; everything else only looks into them through
+// std::string_view and std::span, which own nothing.
+namespace {
+    constexpr std::size_t METADATA_CHUNK_BYTES = 256u << 10;
+    constexpr std::size_t PAYLOAD_ROWS_PER_TASK = 4096;
+
+    // Maps a whole file read-only; `what` names the file in the error message.
+    // An empty file cannot be mapped, so it is left as an empty source instead
+    // of being an error.
+    template<typename Source>
+    Source map_file(const std::string& path, const std::string& what) {
+        std::ifstream probe(path, std::ios::binary | std::ios::ate);
+        if (!probe) {
+            Rcpp::stop("Cannot open " + what);
+        }
+        Source source;
+        if (probe.tellg() > 0) {
+            std::error_code error;
+            source.map(path, error);
+            if (error) {
+                Rcpp::stop("Cannot map " + what + ": " + error.message());
+            }
+        }
+        return source;
+    }
+
+    // Hands out the lines of a text one after another, the way std::getline does
+    // for a stream, but as views into the text instead of copies. The metadata
+    // is written in text mode, so a file made on Windows ends its lines with
+    // "\r\n" and the carriage return goes along with the line feed.
+    class LineReader {
+        std::string_view rest;
+    public:
+        explicit LineReader(std::string_view text) : rest(text) {}
+
+        // The next line, or nothing once the text is used up.
+        std::optional<std::string_view> next() {
+            if (rest.empty()) {
+                return std::nullopt;
+            }
+            std::string_view line = rest.substr(0, rest.find('\n'));
+            rest.remove_prefix(std::min(line.size() + 1, rest.size()));
+            if (line.ends_with('\r')) {
+                line.remove_suffix(1);
+            }
+            return line;
+        }
+
+        // The text that has not been handed out yet.
+        std::string_view remaining() const { return rest; }
+    };
+
+    // Runs task(0) ... task(n_tasks - 1) on up to `threads` workers and returns
+    // the results in task order. Tasks run off the main thread, so they must not
+    // touch the R API; user interrupts are polled here instead. The pool drains
+    // its queue before it joins, hence the flag that turns whatever is still
+    // queued into no-ops when this function is left early.
+    template<typename Task>
+    auto run_tasks(std::size_t n_tasks, int threads, const Task& task) {
+        using Result = std::invoke_result_t<const Task&, std::size_t>;
+        std::vector<Result> results;
+        results.reserve(n_tasks);
+
+        std::size_t workers = threads > 0 ? static_cast<std::size_t>(threads)
+                                          : std::thread::hardware_concurrency();
+        workers = std::max<std::size_t>(1, std::min(workers, n_tasks));
+        if (workers == 1) {
+            for (std::size_t i = 0; i < n_tasks; i++) {
+                Rcpp::checkUserInterrupt();
+                results.push_back(task(i));
+            }
+            return results;
+        }
+
+        struct RaiseOnExit {
+            std::atomic<bool>& flag;
+            ~RaiseOnExit() { flag = true; }
+        };
+        std::atomic<bool> cancelled{false};
+        cxxpool::thread_pool pool(workers);
+        RaiseOnExit cancel{cancelled};
+
+        std::vector<std::future<Result>> futures;
+        futures.reserve(n_tasks);
+        for (std::size_t i = 0; i < n_tasks; i++) {
+            futures.push_back(pool.push([&task, &cancelled, i]() {
+                return cancelled ? Result() : task(i);
+            }));
+        }
+        for (auto& future: futures) {
+            while (future.wait_for(std::chrono::milliseconds(100)) != std::future_status::ready) {
+                Rcpp::checkUserInterrupt();
+            }
+            results.push_back(future.get());
+        }
+        return results;
+    }
+
+    // What operator>> takes for the gap between two fields of a line.
+    bool is_space(char c) {
+        return c == ' ' || (c >= '\t' && c <= '\r');
+    }
+
+    // The part of a text before its first whitespace.
+    std::string_view first_field(std::string_view text) {
+        return text.substr(0, std::ranges::find_if(text, is_space) - text.begin());
+    }
+
+    std::string_view skip_spaces(std::string_view text) {
+        text.remove_prefix(std::ranges::find_if_not(text, is_space) - text.begin());
+        return text;
+    }
+
+    // Drops a leading "chr", in any letter case, the way Chromosome does.
+    std::string_view without_chr(std::string_view text) {
+        constexpr std::string_view prefix = "chr";
+        auto same_letter = [](char c, char lower) { return c == lower || c == lower - ('a' - 'A'); };
+        if (std::ranges::equal(text.substr(0, prefix.size()), prefix, same_letter)) {
+            text.remove_prefix(prefix.size());
+        }
+        return text;
+    }
+
+    // A number read off the front of a text, and the text that follows it.
+    struct LeadingNumber {
+        int value;
+        std::string_view rest;
+    };
+
+    // Reads the decimal digits a text starts with. Nothing when it does not
+    // start with a digit, or when the number does not fit an int.
+    std::optional<LeadingNumber> leading_number(std::string_view text) {
+        // std::from_chars would also take a minus sign.
+        if (text.empty() || text.front() < '0' || text.front() > '9') {
+            return std::nullopt;
+        }
+        int value = 0;
+        auto [stop, error] = std::from_chars(text.data(), text.data() + text.size(), value);
+        if (error != std::errc()) {
+            return std::nullopt;
+        }
+        return LeadingNumber{value, text.substr(stop - text.data())};
+    }
+
+    // The position a variant line starts with, and the text that follows it.
+    struct LeadingPosition {
+        Position position;
+        std::string_view rest;
+    };
+
+    // Reads the position off the front of a variant line when it is spelled the
+    // plain way: "chr#:#" with an autosome number. Nothing for any other
+    // spelling, which is then left to Variant::parseVariants.
+    std::optional<LeadingPosition> leading_position(std::string_view line) {
+        auto chromosome = leading_number(without_chr(line));
+        if (!chromosome || chromosome->value < 1 || chromosome->value > 22 ||
+                !chromosome->rest.starts_with(':')) {
+            return std::nullopt;
+        }
+        auto coordinate = leading_number(chromosome->rest.substr(1));
+        if (!coordinate || (!coordinate->rest.empty() && !is_space(coordinate->rest.front()))) {
+            return std::nullopt;
+        }
+        return LeadingPosition{Position(Chromosome(chromosome->value), coordinate->value), coordinate->rest};
+    }
+
+    // Parses a whole variant line the way the sequential scanner does, so both
+    // scanners accept and reject exactly the same lines.
+    Variant parse_variant_line(std::string_view line) {
+        std::string text(line);
+        vector<Variant> parsed = Variant::parseVariants(text);
+        if (parsed.empty()) {
+            throw ParserException("Malformed variant in metadata: " + text);
+        }
+        return parsed.front();
+    }
+
+    // One variant line of the metadata, read in place.
+    //
+    // Most lines of a large file are not scan targets, and the position alone
+    // tells. So a plainly spelled position is read on its own, and the rest of
+    // the line is only looked at when the variant is asked for. A line that
+    // spells its position any other way is parsed in full straight away.
+    class VariantLine {
+        std::string_view line;
+        std::optional<LeadingPosition> plain;
+        std::optional<Variant> parsed;
+    public:
+        // Throws ParserException when the line had to be parsed in full and is malformed.
+        explicit VariantLine(std::string_view line) : line(line), plain(leading_position(line)) {
+            if (!plain) {
+                parsed = parse_variant_line(line);
+            }
+        }
+
+        Position position() const {
+            return plain ? plain->position : parsed->position();
+        }
+
+        // Throws ParserException when the alleles of the line are malformed.
+        Variant variant() const {
+            if (parsed) {
+                return *parsed;
+            }
+            // REF, then the first of the comma separated ALTs, which is the
+            // variant Variant::parseVariants puts first.
+            std::string_view fields = skip_spaces(plain->rest);
+            std::string_view ref = first_field(fields);
+            std::string_view alts = skip_spaces(fields.substr(ref.size()));
+            if (ref.empty() || alts.empty()) {
+                return parse_variant_line(line);
+            }
+            std::string_view alt = alts.substr(0, alts.find(','));
+            return {plain->position, std::string(ref), std::string(alt)};
+        }
+    };
+
+    struct ScanTargets {
+        vector<Variant> variants;
+        // Payload rows of the variants, counted from the first line scanned.
+        vector<std::size_t> rows;
+        // Number of payload rows the scanned text spans, i.e. its non-blank lines.
+        std::size_t n_rows = 0;
+    };
+
+    // Scans a chunk of metadata lines for the variants that are requested
+    // explicitly or covered by a scan region.
+    ScanTargets scan_metadata_chunk(std::string_view chunk, const RangeSet& ranges,
+            const unordered_map<Variant, bool>& requested,
+            const std::unordered_set<Position>& requested_positions) {
+        ScanTargets targets;
+        LineReader lines(chunk);
+        while (std::optional<std::string_view> line = lines.next()) {
+            if (line->empty()) {
+                continue;
+            }
+            std::size_t row = targets.n_rows++;
+
+            VariantLine entry(*line);
+            Position position = entry.position();
+            bool in_range = ranges.includes(position);
+            if (!in_range && !requested_positions.contains(position)) {
+                continue;
+            }
+            Variant variant = entry.variant();
+            if (in_range || requested.contains(variant)) {
+                targets.variants.push_back(std::move(variant));
+                targets.rows.push_back(row);
+            }
+        }
+        return targets;
+    }
+
+    // Parallel counterpart of the stream based collect_scan_targets: `text`
+    // holds the variant lines of the mapped metadata, which are cut into chunks
+    // on line boundaries. A chunk cannot know how many rows precede it, so it
+    // numbers its rows from zero and the offsets are added while the chunks are
+    // put together.
+    ScanTargets collect_scan_targets(std::string_view text, const RangeSet& ranges,
+            const unordered_map<Variant, bool>& requested, int threads) {
+        std::unordered_set<Position> requested_positions;
+        for (const Variant& variant: requested | std::views::keys) {
+            requested_positions.insert(variant.position());
+        }
+
+        vector<std::string_view> chunks;
+        while (text.size() > METADATA_CHUNK_BYTES) {
+            std::size_t line_feed = text.find('\n', METADATA_CHUNK_BYTES);
+            if (line_feed == std::string_view::npos) {
+                break;
+            }
+            chunks.push_back(text.substr(0, line_feed + 1));
+            text.remove_prefix(line_feed + 1);
+        }
+        if (!text.empty()) {
+            chunks.push_back(text);
+        }
+
+        auto parts = run_tasks(chunks.size(), threads, [&](std::size_t i) {
+            return scan_metadata_chunk(chunks[i], ranges, requested, requested_positions);
+        });
+
+        std::size_t total = 0;
+        for (const ScanTargets& part: parts) {
+            total += part.rows.size();
+        }
+        ScanTargets targets;
+        targets.variants.reserve(total);
+        targets.rows.reserve(total);
+        for (ScanTargets& part: parts) {
+            std::ranges::move(part.variants, std::back_inserter(targets.variants));
+            for (std::size_t row: part.rows) {
+                targets.rows.push_back(targets.n_rows + row);
+            }
+            targets.n_rows += part.n_rows;
+            part = ScanTargets();
+        }
+        return targets;
+    }
+
+    // Sums the selected clusters of a payload row: the counterpart of
+    // CountsReader for the per-cluster binary. A row holds one
+    // hom-ref/het/hom-alt byte triple per cluster. The payload is mapped once
+    // and read by all threads.
+    class ClusterCountsReader {
+        mio::ummap_source payload;
+        // Where the triple of every selected cluster starts within a row.
+        vector<std::size_t> offsets;
+        std::size_t row_bytes;
+    public:
+        ClusterCountsReader(const std::string& path, const vector<std::size_t>& clusters,
+                std::size_t n_clusters)
+            : payload(map_file<mio::ummap_source>(path, "binary file")),
+              row_bytes(n_clusters * cluster_counts_bytes) {
+            offsets.reserve(clusters.size());
+            for (std::size_t cluster: clusters) {
+                offsets.push_back(cluster * cluster_counts_bytes);
+            }
+        }
+
+        // Whether the file is long enough to hold the given row.
+        bool holds(std::size_t row) const {
+            return (row + 1) * row_bytes <= payload.size();
+        }
+
+        std::tuple<int, int, int> read(std::size_t row) const {
+            std::span<const unsigned char> bytes(payload.data(), payload.size());
+            std::span<const unsigned char> counts = bytes.subspan(row * row_bytes, row_bytes);
+            int hom_ref = 0, het = 0, hom_alt = 0;
+            for (std::size_t offset: offsets) {
+                hom_ref += counts[offset];
+                het += counts[offset + 1];
+                hom_alt += counts[offset + 2];
+            }
+            return {hom_ref, het, hom_alt};
+        }
+    };
+
+    // Reads the requested payload rows. They are ascending, as they were
+    // collected in file order, so every task walks its own stretch of the file
+    // front to back and the last row decides whether the file holds them all.
+    Counts read_cluster_counts(const ClusterCountsReader& reader, const vector<std::size_t>& rows,
+            int threads) {
+        if (!rows.empty() && !reader.holds(rows.back())) {
+            Rcpp::stop("Cluster binary file is truncated or inconsistent with metadata");
+        }
+
+        std::size_t n_tasks = (rows.size() + PAYLOAD_ROWS_PER_TASK - 1) / PAYLOAD_ROWS_PER_TASK;
+        auto parts = run_tasks(n_tasks, threads, [&](std::size_t task) {
+            std::size_t first = task * PAYLOAD_ROWS_PER_TASK;
+            std::size_t count = std::min(PAYLOAD_ROWS_PER_TASK, rows.size() - first);
+            Counts counts;
+            for (std::size_t row: std::span(rows).subspan(first, count)) {
+                auto [hom_ref, het, hom_alt] = reader.read(row);
+                counts.push(hom_ref, het, hom_alt);
+            }
+            return counts;
+        });
+
+        Counts counts;
+        for (const Counts& part: parts) {
+            counts.append(part);
+        }
+        return counts;
+    }
+}
+
 // [[Rcpp::export]]
 List parse_cluster_binary_file(const CharacterVector& variants, const CharacterVector& clusters,
         const CharacterVector& regions, const CharacterVector& binary_file, const CharacterVector& metafile,
         const NumericVector& r_min_maf, const NumericVector& r_max_maf, const NumericVector& r_min_cr,
-        const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons) {
+        const IntegerVector& r_min_mac, const IntegerVector& r_max_mac, const LogicalVector& report_singletons,
+        int threads) {
     try {
         ScanFilters filters = read_filters(r_min_maf, r_max_maf, r_min_cr, r_min_mac, r_max_mac,
                                            report_singletons);
@@ -493,13 +881,10 @@ List parse_cluster_binary_file(const CharacterVector& variants, const CharacterV
         RangeSet rangeSet;
         vector<vcf::Range> ranges = build_ranges(regions, rangeSet);
 
-        std::ifstream meta(metafile[0]);
-        if (!meta) {
-            Rcpp::stop("Cannot open metadata file");
-        }
+        mio::mmap_source meta = map_file<mio::mmap_source>((std::string)metafile[0], "metadata file");
+        LineReader meta_lines{std::string_view(meta.data(), meta.size())};
 
-        std::string labels_line;
-        std::getline(meta, labels_line);
+        std::string labels_line(meta_lines.next().value_or(""));
         std::istringstream labels_iss(labels_line);
         std::unordered_map<std::string, std::size_t> cluster_positions;
         std::size_t n_clusters = 0;
@@ -511,11 +896,11 @@ List parse_cluster_binary_file(const CharacterVector& variants, const CharacterV
             cluster_positions.emplace(label, n_clusters++);
         }
 
-        std::string sizes_line;
-        if (!std::getline(meta, sizes_line)) {
+        std::optional<std::string_view> sizes_line = meta_lines.next();
+        if (!sizes_line) {
             Rcpp::stop("Cluster metadata is missing the cluster sizes line");
         }
-        std::istringstream sizes_iss(sizes_line);
+        std::istringstream sizes_iss{std::string(*sizes_line)};
         std::vector<int> cluster_sizes(n_clusters, 0);
         for (std::size_t c = 0; c < n_clusters; c++) {
             std::string size_token;
@@ -546,36 +931,13 @@ List parse_cluster_binary_file(const CharacterVector& variants, const CharacterV
 
         unordered_map<Variant, bool> requested_variants = build_requested_variants(variants);
 
-        vector<std::size_t> variant_pos;
-        vector<Variant> found_variants;
-        collect_scan_targets(meta, rangeSet, requested_variants, found_variants, variant_pos);
+        ScanTargets targets = collect_scan_targets(meta_lines.remaining(), rangeSet, requested_variants,
+                                                   threads);
 
-        std::ifstream bin(binary_file[0], std::ios::binary);
-        if (!bin) {
-            Rcpp::stop("Cannot open binary file");
-        }
-        const std::streamoff block_bytes = (std::streamoff)(n_clusters * cluster_counts_bytes);
-        std::vector<matching::ClusterCounts> block(n_clusters);
-        Counts counts;
-        for (std::size_t k = 0; k < variant_pos.size(); k++) {
-            if (k % 100 == 0) {
-                Rcpp::checkUserInterrupt();
-            }
-            bin.seekg((std::streamoff)variant_pos[k] * block_bytes, std::ios::beg);
-            bin.read(reinterpret_cast<char*>(block.data()), block_bytes);
-            if (bin.gcount() != block_bytes) {
-                Rcpp::stop("Cluster binary file is truncated or inconsistent with metadata");
-            }
-            int hom = 0, het = 0, alt = 0;
-            for (std::size_t c: selected) {
-                hom += block[c][0];
-                het += block[c][1];
-                alt += block[c][2];
-            }
-            counts.push(hom, het, alt);
-        }
+        ClusterCountsReader reader((std::string)binary_file[0], selected, n_clusters);
+        Counts counts = read_cluster_counts(reader, targets.rows, threads);
 
-        List ret = binaryScanResults(found_variants, requested_variants, ranges, counts, filters, (int)total);
+        List ret = binaryScanResults(targets.variants, requested_variants, ranges, counts, filters, (int)total);
         ret["total"] = (int)total;
         return ret;
     } catch (ParserException& e) {

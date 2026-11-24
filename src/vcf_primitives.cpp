@@ -286,8 +286,14 @@ namespace vcf {
         return {type, allele.DP, allele.GQ};
     }
 
-    bool RangeSet::includes(const Position& pos) {
-        auto& set = rs[pos.chromosome().num()];
+    // Lookup only: a chromosome without ranges must not be inserted on the way,
+    // since the set is queried from several threads at once.
+    bool RangeSet::includes(const Position& pos) const {
+        auto ranges = rs.find(pos.chromosome().num());
+        if (ranges == rs.end()) {
+            return false;
+        }
+        const auto& set = ranges->second;
         // Workaround, c++11
         auto it = set.lower_bound(Range(pos.chromosome(), -1, pos.position()));
         return it != set.end() && it->includes(pos);

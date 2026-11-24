@@ -10,7 +10,7 @@ LINK_DIRECTORIES( /usr/lib64/R/lib )
 LINK_DIRECTORIES(/usr/lib/R/library/RcppEigen/libs)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-long-long -pedantic -pthread")
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(LIBRARIES_TO_LINK profiler "${CMAKE_THREAD_LIBS_INIT}")
 
